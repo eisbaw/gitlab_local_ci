@@ -1,0 +1,64 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_frontend [label="build:frontend"];
+    build_backend [label="build:backend"];
+    build_database [label="build:database"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_frontend_unit [label="test:frontend:unit"];
+    test_frontend_e2e [label="test:frontend:e2e"];
+    test_backend_unit [label="test:backend:unit"];
+    test_backend_api [label="test:backend:api"];
+  }
+
+  subgraph cluster_integration {
+    label="integration";
+    style=filled;
+    fillcolor=lightgrey;
+
+    integration_smoke [label="integration:smoke"];
+    integration_full [label="integration:full"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_staging_frontend [label="deploy:staging:frontend"];
+    deploy_staging_backend [label="deploy:staging:backend"];
+    deploy_production [label="deploy:production"];
+  }
+
+  build_frontend -> test_frontend_unit;
+  build_frontend -> test_frontend_e2e;
+  build_backend -> test_backend_unit;
+  build_backend -> test_backend_api;
+  build_database -> test_backend_api;
+  build_frontend -> integration_smoke;
+  build_backend -> integration_smoke;
+  test_frontend_unit -> integration_full;
+  test_backend_unit -> integration_full;
+  test_backend_api -> integration_full;
+  build_frontend -> deploy_staging_frontend;
+  test_frontend_unit -> deploy_staging_frontend;
+  integration_smoke -> deploy_staging_frontend;
+  build_backend -> deploy_staging_backend;
+  test_backend_api -> deploy_staging_backend;
+  integration_smoke -> deploy_staging_backend;
+  integration_full -> deploy_production;
+  deploy_staging_frontend -> deploy_production;
+  deploy_staging_backend -> deploy_production;
+}

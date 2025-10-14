@@ -1,0 +1,29 @@
+{
+  "valid": true,
+  "stages": [
+    "build",
+    "test",
+    "deploy"
+  ],
+  "jobs": [
+    "build:basic-retry",
+    "build:conditional-retry",
+    "build:selective-retry",
+    "test:with-timeout",
+    "test:short-timeout",
+    "test:interruptible",
+    "test:non-interruptible",
+    "test:complex-retry",
+    "deploy:production",
+    "deploy:staging",
+    "deploy:complex",
+    "test:long-running",
+    "test:precise-timeout"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

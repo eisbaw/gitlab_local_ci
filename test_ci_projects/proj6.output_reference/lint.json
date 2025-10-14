@@ -1,0 +1,27 @@
+{
+  "valid": true,
+  "stages": [
+    "build",
+    "test",
+    "report",
+    "deploy"
+  ],
+  "jobs": [
+    "build:app",
+    "build:assets",
+    "test:unit",
+    "test:coverage",
+    "test:integration",
+    "report:summary",
+    "deploy:staging",
+    "deploy:docs",
+    "test:debug",
+    "build:package"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

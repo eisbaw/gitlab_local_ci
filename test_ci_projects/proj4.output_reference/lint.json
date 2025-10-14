@@ -1,0 +1,29 @@
+{
+  "valid": true,
+  "stages": [
+    "build",
+    "test",
+    "integration",
+    "deploy"
+  ],
+  "jobs": [
+    "build:frontend",
+    "build:backend",
+    "build:database",
+    "test:frontend:unit",
+    "test:frontend:e2e",
+    "test:backend:unit",
+    "test:backend:api",
+    "integration:smoke",
+    "integration:full",
+    "deploy:staging:frontend",
+    "deploy:staging:backend",
+    "deploy:production"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

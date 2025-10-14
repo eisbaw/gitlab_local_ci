@@ -1,0 +1,26 @@
+{
+  "valid": false,
+  "stages": [
+
+  ],
+  "jobs": [
+
+  ],
+  "errors": [
+    "Job 'package:frontend' must have 'script', 'trigger', or 'pages' defined",
+    "Job 'package:backend' must have 'script', 'trigger', or 'pages' defined",
+    "Job 'package:api' must have 'script', 'trigger', or 'pages' defined",
+    "Job 'package:workers' must have 'script', 'trigger', or 'pages' defined"
+  ],
+  "warnings": [
+    "Job '.base_config' is a hidden job template (starts with '.')",
+    "Job '.docker_config' is a hidden job template (starts with '.')",
+    "Job '.node_config' is a hidden job template (starts with '.')",
+    "Job '.ruby_config' is a hidden job template (starts with '.')",
+    "Job '.python_config' is a hidden job template (starts with '.')",
+    "Job '.base_job' is a hidden job template (starts with '.')",
+    "Job '.test_job' is a hidden job template (starts with '.')",
+    "Job '.deploy_job' is a hidden job template (starts with '.')",
+    "Job '.docker_build_job' is a hidden job template (starts with '.')"
+  ]
+}

@@ -1,0 +1,15 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_triggers {
+    label="triggers";
+    style=filled;
+    fillcolor=lightgrey;
+
+    trigger_child1 [label="trigger_child1"];
+    trigger_child2 [label="trigger_child2"];
+    trigger_child_with_rules [label="trigger_child_with_rules"];
+  }
+
+}

@@ -1,0 +1,15 @@
+{
+  "valid": false,
+  "stages": [
+
+  ],
+  "jobs": [
+
+  ],
+  "errors": [
+    "Job 'verify-includes' references undefined stage '.pre'"
+  ],
+  "warnings": [
+
+  ]
+}

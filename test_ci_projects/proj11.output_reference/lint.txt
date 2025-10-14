@@ -1,0 +1,3 @@
+GitLab CI configuration is invalid
+Errors:
+  - Job 'verify-includes' references undefined stage '.pre'

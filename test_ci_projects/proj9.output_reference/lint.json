@@ -1,0 +1,26 @@
+{
+  "valid": true,
+  "stages": [
+    "build",
+    "test",
+    "deploy"
+  ],
+  "jobs": [
+    "build:default-cache",
+    "build:static-cache",
+    "build:dynamic-cache",
+    "test:multi-cache",
+    "test:pull-only",
+    "build:push-only",
+    "deploy:complex-cache-key",
+    "deploy:no-cache",
+    "build:files-cache",
+    "test:combined-cache"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

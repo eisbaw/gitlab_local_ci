@@ -1,0 +1,113 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_prepare {
+    label="prepare";
+    style=filled;
+    fillcolor=lightgrey;
+
+    prepare_environment [label="prepare:environment"];
+    prepare_dependencies [label="prepare:dependencies"];
+  }
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_api_gateway [label="build:api-gateway"];
+    build_auth_service [label="build:auth-service"];
+    build_user_service [label="build:user-service"];
+    build_payment_service [label="build:payment-service"];
+    build_notification_service [label="build:notification-service"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_api_gateway [label="test:api-gateway"];
+    test_auth_service [label="test:auth-service"];
+    test_user_service [label="test:user-service"];
+    test_payment_service [label="test:payment-service"];
+    test_notification_service [label="test:notification-service"];
+  }
+
+  subgraph cluster_integration {
+    label="integration";
+    style=filled;
+    fillcolor=lightgrey;
+
+    integration_auth_flow [label="integration:auth-flow"];
+    integration_payment_flow [label="integration:payment-flow"];
+    integration_notification_flow [label="integration:notification-flow"];
+  }
+
+  subgraph cluster_security {
+    label="security";
+    style=filled;
+    fillcolor=lightgrey;
+
+    security_sast [label="security:sast"];
+    security_dependency_scan [label="security:dependency-scan"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_staging [label="deploy:staging"];
+  }
+
+  subgraph cluster_verify {
+    label="verify";
+    style=filled;
+    fillcolor=lightgrey;
+
+    verify_e2e_tests [label="verify:e2e-tests"];
+    verify_smoke_tests [label="verify:smoke-tests"];
+    verify_performance_tests [label="verify:performance-tests"];
+  }
+
+  prepare_environment -> build_api_gateway;
+  prepare_dependencies -> build_api_gateway;
+  prepare_environment -> build_auth_service;
+  prepare_dependencies -> build_auth_service;
+  prepare_environment -> build_user_service;
+  prepare_dependencies -> build_user_service;
+  prepare_environment -> build_payment_service;
+  prepare_dependencies -> build_payment_service;
+  prepare_environment -> build_notification_service;
+  prepare_dependencies -> build_notification_service;
+  build_api_gateway -> test_api_gateway;
+  build_auth_service -> test_auth_service;
+  build_user_service -> test_user_service;
+  build_payment_service -> test_payment_service;
+  build_notification_service -> test_notification_service;
+  test_api_gateway -> integration_auth_flow;
+  test_auth_service -> integration_auth_flow;
+  test_user_service -> integration_auth_flow;
+  test_api_gateway -> integration_payment_flow;
+  test_payment_service -> integration_payment_flow;
+  test_user_service -> integration_payment_flow;
+  test_notification_service -> integration_notification_flow;
+  test_user_service -> integration_notification_flow;
+  test_payment_service -> integration_notification_flow;
+  build_api_gateway -> security_sast;
+  build_auth_service -> security_sast;
+  build_user_service -> security_sast;
+  build_payment_service -> security_sast;
+  build_notification_service -> security_sast;
+  prepare_dependencies -> security_dependency_scan;
+  integration_auth_flow -> deploy_staging;
+  integration_payment_flow -> deploy_staging;
+  integration_notification_flow -> deploy_staging;
+  security_sast -> deploy_staging;
+  security_dependency_scan -> deploy_staging;
+  deploy_staging -> verify_e2e_tests;
+  deploy_staging -> verify_smoke_tests;
+  deploy_staging -> verify_performance_tests;
+}

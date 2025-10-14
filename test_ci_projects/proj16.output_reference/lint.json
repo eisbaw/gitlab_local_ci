@@ -1,0 +1,17 @@
+{
+  "valid": true,
+  "stages": [
+    "triggers"
+  ],
+  "jobs": [
+    "trigger_child1",
+    "trigger_child2",
+    "trigger_child_with_rules"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

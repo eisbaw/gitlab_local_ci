@@ -1,0 +1,403 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_prebuild {
+    label="prebuild";
+    style=filled;
+    fillcolor=lightgrey;
+
+    validate_yaml [label="validate:yaml"];
+    validate_dependencies [label="validate:dependencies"];
+    lint_frontend [label="lint:frontend"];
+    lint_backend [label="lint:backend"];
+    lint_api [label="lint:api"];
+  }
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_frontend [label="build:frontend"];
+    build_backend [label="build:backend"];
+    build_api [label="build:api"];
+    build_workers [label="build:workers"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    _base_config [label=".base_config"];
+    _docker_config [label=".docker_config"];
+    _node_config [label=".node_config"];
+    _ruby_config [label=".ruby_config"];
+    _python_config [label=".python_config"];
+    _base_job [label=".base_job"];
+    _test_job [label=".test_job"];
+    _deploy_job [label=".deploy_job"];
+    test_frontend_unit [label="test:frontend:unit"];
+    test_frontend_integration [label="test:frontend:integration"];
+    test_backend_unit [label="test:backend:unit"];
+    test_backend_integration [label="test:backend:integration"];
+    test_api_unit [label="test:api:unit"];
+    test_api_integration [label="test:api:integration"];
+    test_workers [label="test:workers"];
+    test_matrix_compatibility [label="test:matrix:compatibility"];
+    package_frontend [label="package:frontend"];
+    package_backend [label="package:backend"];
+    package_api [label="package:api"];
+    package_workers [label="package:workers"];
+  }
+
+  subgraph cluster_security {
+    label="security";
+    style=filled;
+    fillcolor=lightgrey;
+
+    security_sast [label="security:sast"];
+    security_dependency_scanning [label="security:dependency-scanning"];
+    security_secrets [label="security:secrets"];
+  }
+
+  subgraph cluster_quality {
+    label="quality";
+    style=filled;
+    fillcolor=lightgrey;
+
+    quality_codeclimate [label="quality:codeclimate"];
+    quality_metrics [label="quality:metrics"];
+  }
+
+  subgraph cluster_package {
+    label="package";
+    style=filled;
+    fillcolor=lightgrey;
+
+    _docker_build_job [label=".docker_build_job"];
+  }
+
+  subgraph cluster_deploy_dev {
+    label="deploy_dev";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_dev_frontend [label="deploy:dev:frontend"];
+    deploy_dev_backend [label="deploy:dev:backend"];
+    deploy_dev_api [label="deploy:dev:api"];
+    stop_dev_frontend [label="stop:dev:frontend"];
+    stop_dev_backend [label="stop:dev:backend"];
+    stop_dev_api [label="stop:dev:api"];
+  }
+
+  subgraph cluster_integration {
+    label="integration";
+    style=filled;
+    fillcolor=lightgrey;
+
+    integration_e2e [label="integration:e2e"];
+  }
+
+  subgraph cluster_deploy_stage {
+    label="deploy_stage";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_staging_frontend [label="deploy:staging:frontend"];
+    deploy_staging_backend [label="deploy:staging:backend"];
+    deploy_staging_api [label="deploy:staging:api"];
+  }
+
+  subgraph cluster_performance {
+    label="performance";
+    style=filled;
+    fillcolor=lightgrey;
+
+    performance_load_test [label="performance:load-test"];
+    performance_stress_test [label="performance:stress-test"];
+  }
+
+  subgraph cluster_deploy_prod {
+    label="deploy_prod";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_prod_frontend [label="deploy:prod:frontend"];
+    deploy_prod_backend [label="deploy:prod:backend"];
+    deploy_prod_api [label="deploy:prod:api"];
+    trigger_monitoring_setup [label="trigger:monitoring-setup"];
+  }
+
+  subgraph cluster_cleanup {
+    label="cleanup";
+    style=filled;
+    fillcolor=lightgrey;
+
+    cleanup_old_images [label="cleanup:old-images"];
+    cleanup_artifacts [label="cleanup:artifacts"];
+    notify_pipeline_status [label="notify:pipeline-status"];
+  }
+
+  validate_yaml -> _base_config;
+  validate_dependencies -> _base_config;
+  lint_frontend -> _base_config;
+  lint_backend -> _base_config;
+  lint_api -> _base_config;
+  build_frontend -> _base_config;
+  build_backend -> _base_config;
+  build_api -> _base_config;
+  build_workers -> _base_config;
+  validate_yaml -> _docker_config;
+  validate_dependencies -> _docker_config;
+  lint_frontend -> _docker_config;
+  lint_backend -> _docker_config;
+  lint_api -> _docker_config;
+  build_frontend -> _docker_config;
+  build_backend -> _docker_config;
+  build_api -> _docker_config;
+  build_workers -> _docker_config;
+  validate_yaml -> _node_config;
+  validate_dependencies -> _node_config;
+  lint_frontend -> _node_config;
+  lint_backend -> _node_config;
+  lint_api -> _node_config;
+  build_frontend -> _node_config;
+  build_backend -> _node_config;
+  build_api -> _node_config;
+  build_workers -> _node_config;
+  validate_yaml -> _ruby_config;
+  validate_dependencies -> _ruby_config;
+  lint_frontend -> _ruby_config;
+  lint_backend -> _ruby_config;
+  lint_api -> _ruby_config;
+  build_frontend -> _ruby_config;
+  build_backend -> _ruby_config;
+  build_api -> _ruby_config;
+  build_workers -> _ruby_config;
+  validate_yaml -> _python_config;
+  validate_dependencies -> _python_config;
+  lint_frontend -> _python_config;
+  lint_backend -> _python_config;
+  lint_api -> _python_config;
+  build_frontend -> _python_config;
+  build_backend -> _python_config;
+  build_api -> _python_config;
+  build_workers -> _python_config;
+  validate_yaml -> _base_job;
+  validate_dependencies -> _base_job;
+  lint_frontend -> _base_job;
+  lint_backend -> _base_job;
+  lint_api -> _base_job;
+  build_frontend -> _base_job;
+  build_backend -> _base_job;
+  build_api -> _base_job;
+  build_workers -> _base_job;
+  validate_yaml -> _test_job;
+  validate_dependencies -> _test_job;
+  lint_frontend -> _test_job;
+  lint_backend -> _test_job;
+  lint_api -> _test_job;
+  build_frontend -> _test_job;
+  build_backend -> _test_job;
+  build_api -> _test_job;
+  build_workers -> _test_job;
+  validate_yaml -> _deploy_job;
+  validate_dependencies -> _deploy_job;
+  lint_frontend -> _deploy_job;
+  lint_backend -> _deploy_job;
+  lint_api -> _deploy_job;
+  build_frontend -> _deploy_job;
+  build_backend -> _deploy_job;
+  build_api -> _deploy_job;
+  build_workers -> _deploy_job;
+  _base_config -> _docker_build_job;
+  _docker_config -> _docker_build_job;
+  _node_config -> _docker_build_job;
+  _ruby_config -> _docker_build_job;
+  _python_config -> _docker_build_job;
+  _base_job -> _docker_build_job;
+  _test_job -> _docker_build_job;
+  _deploy_job -> _docker_build_job;
+  validate_yaml -> _docker_build_job;
+  validate_dependencies -> _docker_build_job;
+  lint_frontend -> _docker_build_job;
+  lint_backend -> _docker_build_job;
+  lint_api -> _docker_build_job;
+  build_frontend -> _docker_build_job;
+  build_backend -> _docker_build_job;
+  build_api -> _docker_build_job;
+  build_workers -> _docker_build_job;
+  test_frontend_unit -> _docker_build_job;
+  test_frontend_integration -> _docker_build_job;
+  test_backend_unit -> _docker_build_job;
+  test_backend_integration -> _docker_build_job;
+  test_api_unit -> _docker_build_job;
+  test_api_integration -> _docker_build_job;
+  test_workers -> _docker_build_job;
+  test_matrix_compatibility -> _docker_build_job;
+  security_sast -> _docker_build_job;
+  security_dependency_scanning -> _docker_build_job;
+  security_secrets -> _docker_build_job;
+  quality_codeclimate -> _docker_build_job;
+  quality_metrics -> _docker_build_job;
+  package_frontend -> _docker_build_job;
+  package_backend -> _docker_build_job;
+  package_api -> _docker_build_job;
+  package_workers -> _docker_build_job;
+  lint_frontend -> build_frontend;
+  lint_backend -> build_backend;
+  lint_api -> build_api;
+  build_frontend -> test_frontend_unit;
+  build_frontend -> test_frontend_integration;
+  build_backend -> test_backend_unit;
+  build_backend -> test_backend_integration;
+  build_api -> test_api_unit;
+  build_api -> test_api_integration;
+  build_workers -> test_workers;
+  test_frontend_unit -> quality_metrics;
+  test_backend_unit -> quality_metrics;
+  test_api_unit -> quality_metrics;
+  test_workers -> quality_metrics;
+  build_frontend -> package_frontend;
+  test_frontend_unit -> package_frontend;
+  build_backend -> package_backend;
+  test_backend_unit -> package_backend;
+  build_api -> package_api;
+  test_api_unit -> package_api;
+  build_workers -> package_workers;
+  test_workers -> package_workers;
+  package_frontend -> deploy_dev_frontend;
+  package_backend -> deploy_dev_backend;
+  package_api -> deploy_dev_api;
+  _base_config -> stop_dev_frontend;
+  _docker_config -> stop_dev_frontend;
+  _node_config -> stop_dev_frontend;
+  _ruby_config -> stop_dev_frontend;
+  _python_config -> stop_dev_frontend;
+  _base_job -> stop_dev_frontend;
+  _test_job -> stop_dev_frontend;
+  _deploy_job -> stop_dev_frontend;
+  _docker_build_job -> stop_dev_frontend;
+  validate_yaml -> stop_dev_frontend;
+  validate_dependencies -> stop_dev_frontend;
+  lint_frontend -> stop_dev_frontend;
+  lint_backend -> stop_dev_frontend;
+  lint_api -> stop_dev_frontend;
+  build_frontend -> stop_dev_frontend;
+  build_backend -> stop_dev_frontend;
+  build_api -> stop_dev_frontend;
+  build_workers -> stop_dev_frontend;
+  test_frontend_unit -> stop_dev_frontend;
+  test_frontend_integration -> stop_dev_frontend;
+  test_backend_unit -> stop_dev_frontend;
+  test_backend_integration -> stop_dev_frontend;
+  test_api_unit -> stop_dev_frontend;
+  test_api_integration -> stop_dev_frontend;
+  test_workers -> stop_dev_frontend;
+  test_matrix_compatibility -> stop_dev_frontend;
+  security_sast -> stop_dev_frontend;
+  security_dependency_scanning -> stop_dev_frontend;
+  security_secrets -> stop_dev_frontend;
+  quality_codeclimate -> stop_dev_frontend;
+  quality_metrics -> stop_dev_frontend;
+  package_frontend -> stop_dev_frontend;
+  package_backend -> stop_dev_frontend;
+  package_api -> stop_dev_frontend;
+  package_workers -> stop_dev_frontend;
+  _base_config -> stop_dev_backend;
+  _docker_config -> stop_dev_backend;
+  _node_config -> stop_dev_backend;
+  _ruby_config -> stop_dev_backend;
+  _python_config -> stop_dev_backend;
+  _base_job -> stop_dev_backend;
+  _test_job -> stop_dev_backend;
+  _deploy_job -> stop_dev_backend;
+  _docker_build_job -> stop_dev_backend;
+  validate_yaml -> stop_dev_backend;
+  validate_dependencies -> stop_dev_backend;
+  lint_frontend -> stop_dev_backend;
+  lint_backend -> stop_dev_backend;
+  lint_api -> stop_dev_backend;
+  build_frontend -> stop_dev_backend;
+  build_backend -> stop_dev_backend;
+  build_api -> stop_dev_backend;
+  build_workers -> stop_dev_backend;
+  test_frontend_unit -> stop_dev_backend;
+  test_frontend_integration -> stop_dev_backend;
+  test_backend_unit -> stop_dev_backend;
+  test_backend_integration -> stop_dev_backend;
+  test_api_unit -> stop_dev_backend;
+  test_api_integration -> stop_dev_backend;
+  test_workers -> stop_dev_backend;
+  test_matrix_compatibility -> stop_dev_backend;
+  security_sast -> stop_dev_backend;
+  security_dependency_scanning -> stop_dev_backend;
+  security_secrets -> stop_dev_backend;
+  quality_codeclimate -> stop_dev_backend;
+  quality_metrics -> stop_dev_backend;
+  package_frontend -> stop_dev_backend;
+  package_backend -> stop_dev_backend;
+  package_api -> stop_dev_backend;
+  package_workers -> stop_dev_backend;
+  _base_config -> stop_dev_api;
+  _docker_config -> stop_dev_api;
+  _node_config -> stop_dev_api;
+  _ruby_config -> stop_dev_api;
+  _python_config -> stop_dev_api;
+  _base_job -> stop_dev_api;
+  _test_job -> stop_dev_api;
+  _deploy_job -> stop_dev_api;
+  _docker_build_job -> stop_dev_api;
+  validate_yaml -> stop_dev_api;
+  validate_dependencies -> stop_dev_api;
+  lint_frontend -> stop_dev_api;
+  lint_backend -> stop_dev_api;
+  lint_api -> stop_dev_api;
+  build_frontend -> stop_dev_api;
+  build_backend -> stop_dev_api;
+  build_api -> stop_dev_api;
+  build_workers -> stop_dev_api;
+  test_frontend_unit -> stop_dev_api;
+  test_frontend_integration -> stop_dev_api;
+  test_backend_unit -> stop_dev_api;
+  test_backend_integration -> stop_dev_api;
+  test_api_unit -> stop_dev_api;
+  test_api_integration -> stop_dev_api;
+  test_workers -> stop_dev_api;
+  test_matrix_compatibility -> stop_dev_api;
+  security_sast -> stop_dev_api;
+  security_dependency_scanning -> stop_dev_api;
+  security_secrets -> stop_dev_api;
+  quality_codeclimate -> stop_dev_api;
+  quality_metrics -> stop_dev_api;
+  package_frontend -> stop_dev_api;
+  package_backend -> stop_dev_api;
+  package_api -> stop_dev_api;
+  package_workers -> stop_dev_api;
+  deploy_dev_frontend -> integration_e2e;
+  deploy_dev_backend -> integration_e2e;
+  deploy_dev_api -> integration_e2e;
+  package_frontend -> deploy_staging_frontend;
+  integration_e2e -> deploy_staging_frontend;
+  package_backend -> deploy_staging_backend;
+  integration_e2e -> deploy_staging_backend;
+  package_api -> deploy_staging_api;
+  integration_e2e -> deploy_staging_api;
+  deploy_staging_frontend -> performance_load_test;
+  deploy_staging_backend -> performance_load_test;
+  deploy_staging_api -> performance_load_test;
+  deploy_staging_frontend -> performance_stress_test;
+  deploy_staging_backend -> performance_stress_test;
+  deploy_staging_api -> performance_stress_test;
+  deploy_staging_frontend -> deploy_prod_frontend;
+  performance_load_test -> deploy_prod_frontend;
+  deploy_staging_backend -> deploy_prod_backend;
+  performance_load_test -> deploy_prod_backend;
+  deploy_staging_api -> deploy_prod_api;
+  performance_load_test -> deploy_prod_api;
+  deploy_prod_frontend -> trigger_monitoring_setup;
+  deploy_prod_backend -> trigger_monitoring_setup;
+  deploy_prod_api -> trigger_monitoring_setup;
+}

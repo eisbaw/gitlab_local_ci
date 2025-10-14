@@ -1,0 +1,3 @@
+GitLab CI configuration is valid
+Stages: prepare, build, test, integration, security, deploy, verify
+Jobs: 21

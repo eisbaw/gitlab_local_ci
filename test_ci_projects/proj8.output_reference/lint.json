@@ -1,0 +1,35 @@
+{
+  "valid": true,
+  "stages": [
+    "build",
+    "test",
+    "deploy",
+    "cleanup"
+  ],
+  "jobs": [
+    "build_main",
+    "build_feature",
+    "test_mr",
+    "test_comprehensive",
+    "test_backend",
+    "test_frontend",
+    "deploy_staging",
+    "deploy_production",
+    "notify_success",
+    "notify_failure",
+    "cleanup_always",
+    "security_scan",
+    "release",
+    "experimental_test",
+    "nightly_build",
+    "deploy_custom",
+    "integration_test",
+    "skip_on_draft"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

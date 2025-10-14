@@ -1,0 +1,3 @@
+GitLab CI configuration is valid
+Stages: vars_test, build, test, deploy
+Jobs: 8

@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name='GitLab CI Lint' tests='1' failures='0' time='0'>
+    <testcase name='yaml_validation' time='0'/>
+  </testsuite>
+</testsuites>

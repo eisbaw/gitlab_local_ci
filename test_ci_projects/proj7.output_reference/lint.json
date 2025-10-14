@@ -1,0 +1,23 @@
+{
+  "valid": true,
+  "stages": [
+    "test",
+    "integration",
+    "build"
+  ],
+  "jobs": [
+    "test:postgres",
+    "test:redis",
+    "integration:full-stack",
+    "build:docker",
+    "test:mysql",
+    "test:mongodb",
+    "test:custom-service"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

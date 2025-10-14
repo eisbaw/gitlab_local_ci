@@ -1,0 +1,41 @@
+{
+  "valid": true,
+  "stages": [
+    "prepare",
+    "build",
+    "test",
+    "integration",
+    "security",
+    "deploy",
+    "verify"
+  ],
+  "jobs": [
+    "prepare:environment",
+    "prepare:dependencies",
+    "build:api-gateway",
+    "build:auth-service",
+    "build:user-service",
+    "build:payment-service",
+    "build:notification-service",
+    "test:api-gateway",
+    "test:auth-service",
+    "test:user-service",
+    "test:payment-service",
+    "test:notification-service",
+    "integration:auth-flow",
+    "integration:payment-flow",
+    "integration:notification-flow",
+    "security:sast",
+    "security:dependency-scan",
+    "deploy:staging",
+    "verify:e2e-tests",
+    "verify:smoke-tests",
+    "verify:performance-tests"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

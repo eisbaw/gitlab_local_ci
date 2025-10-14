@@ -1,0 +1,3 @@
+GitLab CI configuration is valid
+Stages: build, deploy_staging, deploy_production, cleanup
+Jobs: 9

@@ -1,0 +1,23 @@
+{
+  "valid": true,
+  "stages": [
+    "test",
+    "security",
+    "quality"
+  ],
+  "jobs": [
+    "unit-tests",
+    "integration-tests",
+    "code-quality",
+    "sast",
+    "coverage-formats",
+    "full-test-suite",
+    "go-tests"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

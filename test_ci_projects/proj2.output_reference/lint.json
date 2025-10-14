@@ -1,0 +1,19 @@
+{
+  "valid": true,
+  "stages": [
+    "build",
+    "test",
+    "deploy"
+  ],
+  "jobs": [
+    "build_job",
+    "test_job",
+    "deploy_job"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

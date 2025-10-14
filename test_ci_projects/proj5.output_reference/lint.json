@@ -1,0 +1,25 @@
+{
+  "valid": true,
+  "stages": [
+    "vars_test",
+    "build",
+    "test",
+    "deploy"
+  ],
+  "jobs": [
+    "test_variables",
+    "build_app",
+    "unit_tests",
+    "integration_tests",
+    "deploy_staging",
+    "variable_manipulation",
+    "env_specific_vars",
+    "test_precedence"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

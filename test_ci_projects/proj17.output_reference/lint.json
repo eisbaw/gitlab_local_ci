@@ -1,0 +1,27 @@
+{
+  "valid": true,
+  "stages": [
+    "test",
+    "build",
+    "deploy"
+  ],
+  "jobs": [
+    "test:matrix",
+    "integration:test",
+    "unit:test:parallel",
+    "e2e:test",
+    "build:multiarch",
+    "stress:test",
+    "deploy:cloud",
+    "lint:files",
+    "performance:test",
+    "process:data",
+    "test:microservices"
+  ],
+  "errors": [
+
+  ],
+  "warnings": [
+
+  ]
+}

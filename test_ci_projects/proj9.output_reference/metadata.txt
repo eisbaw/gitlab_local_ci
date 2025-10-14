@@ -1,0 +1,4 @@
+Generated: 2025-10-14T14:24:25+02:00
+Project: proj9
+Config: test_ci_projects/proj9/.gitlab-ci.yml
+Tool Version: gitlab_ci_cli version 0.1.0
