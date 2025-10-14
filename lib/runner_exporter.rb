@@ -75,6 +75,9 @@ class RunnerExporter
 
     puts "Successfully exported #{exported_count} runner(s)"
     exported_count
+  rescue ArgumentError
+    # Re-raise validation errors directly (fail-fast)
+    raise
   rescue Gitlab::Error::Unauthorized => e
     raise AuthenticationError, "Authentication failed: #{e.message}. Check your API token."
   rescue Gitlab::Error::Forbidden => e
