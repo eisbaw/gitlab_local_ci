@@ -378,6 +378,9 @@ Example:
 
 ```ruby
 module Commands
+  # Define a simple result struct for command output
+  Result = Struct.new(:success, :message, :data, keyword_init: true)
+
   class MyCommand
     def self.execute(options)
       # Implementation

@@ -14,3 +14,6 @@ gem 'rexml', '~> 3.2'
 # GitLab API client for interacting with GitLab instance
 # Used for runner export and potential API integrations
 gem 'gitlab', '~> 4.19'
+
+# SimpleCov for code coverage measurement
+gem 'simplecov', '~> 0.22', require: false

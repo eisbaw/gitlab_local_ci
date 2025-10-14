@@ -1,5 +1,19 @@
 # frozen_string_literal: true
 
+
+# Copyright 2025 gitlab_ci_cli
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 require 'spec_helper'
 require 'open3'
 require 'json'
@@ -469,13 +483,16 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
 
     describe 'missing required flags' do
       it 'reports error when --entry is missing' do
-        stdout, stderr, status = Open3.capture3(bin_path, 'dry-run')
+        # Run from a temp directory where .gitlab-ci.yml doesn't exist
+        Dir.mktmpdir do |tmpdir|
+          stdout, stderr, status = Open3.capture3({ 'PWD' => tmpdir }, bin_path, 'dry-run', chdir: tmpdir)
 
-        expect(status).not_to eq(0)
+          expect(status).not_to eq(0)
 
-        combined_output = stdout + stderr
-        # Should report error about missing file or entry
-        expect(combined_output).to match(/entry|file.*required|config.*file.*not.*found|\.gitlab-ci\.yml/i)
+          combined_output = stdout + stderr
+          # Should report error about missing default file
+          expect(combined_output).to match(/file not found|does not exist|\.gitlab-ci\.yml/i)
+        end
       end
     end
   end

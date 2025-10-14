@@ -17,11 +17,11 @@ This document provides guidance for upgrading gitlab_ci_cli and maintaining comp
 
 ### gitlab_ci_cli Versions
 
-Current version: **1.0.0**
+Current version: **0.1.0**
 
 #### Version History
 
-- **1.0.0** (Current) - Initial standalone release
+- **0.1.0** (Current) - Initial standalone release
   - Zero external gem dependencies
   - Pure Ruby + YAML parsing
   - Support for GitLab CI/CD v15.0 - v17.0 syntax
@@ -52,9 +52,9 @@ gitlab_ci_cli is tested against and supports GitLab CI/CD configuration syntax f
 
 ## Upgrading gitlab_ci_cli
 
-### From Development Version to 1.0
+### From Development Version to 0.1.0
 
-If you've been using a development version, upgrade to 1.0:
+If you've been using a development version, upgrade to 0.1.0:
 
 ```bash
 cd gitlab_ci_cli
@@ -157,7 +157,7 @@ After upgrading:
 
 ## Breaking Changes
 
-### Version 1.0 (Current)
+### Version 0.1.0 (Current)
 
 No breaking changes - this is the initial release.
 
