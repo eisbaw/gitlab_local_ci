@@ -33,17 +33,32 @@ class RunnerFleet
     loaded_count = 0
 
     json_files.each do |file_path|
-      # Read and parse JSON file
-      content = File.read(file_path)
-      runner_data = JSON.parse(content)
+      begin
+        # Read and parse JSON file
+        content = File.read(file_path)
+        runner_data = JSON.parse(content)
 
-      # Validate required fields before creating runner
-      validate_runner_data(runner_data, file_path)
+        # Validate required fields before creating runner
+        validate_runner_data(runner_data, file_path)
 
-      # Create MockRunner instance and add to fleet
-      runner = MockRunner.new(runner_data)
-      @runners << runner
-      loaded_count += 1
+        # Create MockRunner instance and add to fleet
+        runner = MockRunner.new(runner_data)
+        @runners << runner
+        loaded_count += 1
+      rescue JSON::ParserError => e
+        raise ArgumentError, "Failed to parse JSON in runner file '#{file_path}': #{e.message}"
+      rescue Errno::ENOENT => e
+        raise ArgumentError, "Failed to read runner file '#{file_path}': #{e.message}"
+      rescue ArgumentError => e
+        # Re-raise ArgumentError with file context if not already included
+        if e.message.include?(file_path)
+          raise
+        else
+          raise ArgumentError, "Error in runner file '#{file_path}': #{e.message}"
+        end
+      rescue StandardError => e
+        raise ArgumentError, "Unexpected error loading runner file '#{file_path}': #{e.message}"
+      end
     end
 
     loaded_count
@@ -82,40 +97,40 @@ class RunnerFleet
   def validate_runner_data(runner_data, file_path)
     # Validate ID field (required)
     unless runner_data.key?('id')
-      raise ArgumentError, "missing required field: id"
+      raise ArgumentError, "Runner file '#{file_path}': missing required field 'id'"
     end
 
     unless runner_data['id'].is_a?(String) || runner_data['id'].is_a?(Integer)
-      raise ArgumentError, "field 'id' must be a string or integer"
+      raise ArgumentError, "Runner file '#{file_path}': field 'id' must be a string or integer, got #{runner_data['id'].class}"
     end
 
     # Validate tags field (required, accept both 'tags' and 'tag_list')
     tags = runner_data['tags'] || runner_data['tag_list']
     unless tags
-      raise ArgumentError, "missing required field: tags (or tag_list)"
+      raise ArgumentError, "Runner file '#{file_path}': missing required field 'tags' (or 'tag_list')"
     end
 
     unless tags.is_a?(Array)
-      raise ArgumentError, "field 'tags' (or 'tag_list') must be an array"
+      raise ArgumentError, "Runner file '#{file_path}': field 'tags' (or 'tag_list') must be an array, got #{tags.class}"
     end
 
     # Validate executor field (required)
     unless runner_data.key?('executor')
-      raise ArgumentError, "missing required field: executor"
+      raise ArgumentError, "Runner file '#{file_path}': missing required field 'executor'"
     end
 
     unless runner_data['executor'].is_a?(String)
-      raise ArgumentError, "field 'executor' must be a string"
+      raise ArgumentError, "Runner file '#{file_path}': field 'executor' must be a string, got #{runner_data['executor'].class}"
     end
 
     # Validate max_jobs field (required, accept both 'max_jobs' and 'concurrent')
     max_jobs = runner_data['max_jobs'] || runner_data['concurrent']
     unless max_jobs
-      raise ArgumentError, "missing required field: max_jobs (or concurrent)"
+      raise ArgumentError, "Runner file '#{file_path}': missing required field 'max_jobs' (or 'concurrent')"
     end
 
     unless max_jobs.is_a?(Integer) && max_jobs >= 1
-      raise ArgumentError, "field 'max_jobs' (or 'concurrent') must be a positive integer"
+      raise ArgumentError, "Runner file '#{file_path}': field 'max_jobs' (or 'concurrent') must be a positive integer, got #{max_jobs.inspect}"
     end
 
     # All validations passed

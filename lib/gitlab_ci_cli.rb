@@ -40,6 +40,9 @@ module GitlabCiCli
       # Parse arguments into options hash and command
       options, command = parse_args(args)
 
+      # Validate arguments based on command requirements (fail-fast)
+      validate_options(options, command)
+
       # Route to command handler
       exit_code = execute_command(command, options)
       exit(exit_code)
@@ -48,7 +51,7 @@ module GitlabCiCli
       exit(EXIT_INVALID_ARGS)
     rescue StandardError => e
       $stderr.puts "Error: #{e.message}"
-      $stderr.puts e.backtrace.join("\n") if options[:verbose]
+      $stderr.puts e.backtrace.join("\n") if options && options[:verbose]
       exit(EXIT_COMMAND_FAILED)
     end
 
@@ -156,6 +159,37 @@ module GitlabCiCli
         raise ArgumentError, "Flag #{flag} requires KEY=VALUE format, got: #{value}"
       end
       parts
+    end
+
+    # Validate options based on command requirements (fail-fast)
+    # Raises: ArgumentError if validation fails
+    def self.validate_options(options, command)
+      # Help command needs no validation
+      return if command == 'help'
+
+      # Commands that need the entry file
+      if %w[lint dag dry-run].include?(command)
+        entry = options[:entry]
+        unless File.exist?(entry)
+          raise ArgumentError, "Entry file not found: #{entry}"
+        end
+      end
+
+      # Commands that need the project directory
+      if %w[dry-run].include?(command)
+        project = options[:project]
+        unless Dir.exist?(project)
+          raise ArgumentError, "Project directory not found: #{project}"
+        end
+      end
+
+      # Commands that need the runners directory
+      if %w[dry-run].include?(command)
+        runners = options[:runners]
+        unless Dir.exist?(runners)
+          raise ArgumentError, "Runners directory not found: #{runners}"
+        end
+      end
     end
 
     # Execute the specified command with options

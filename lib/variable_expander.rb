@@ -94,13 +94,16 @@ class VariableExpander
   # @param variables [Hash] The variables hash
   # @return [String] The expanded value or handled undefined case
   def expand_variable(var_name, original, variables)
-    # Check if variable is defined
-    # Note: We treat nil values as undefined to match GitLab CI behavior
-    if variables.key?(var_name) && !variables[var_name].nil?
-      # Convert value to string to handle non-string values
-      variables[var_name].to_s
-    else
+    # Get value from hash
+    # Note: Missing keys return nil, explicit nil values also count as undefined
+    # This matches GitLab CI behavior: both missing vars and nil vars are undefined
+    value = variables[var_name]
+
+    if value.nil?
       handle_undefined(var_name, original)
+    else
+      # Convert value to string to handle non-string values (integers, booleans, etc.)
+      value.to_s
     end
   end
 
