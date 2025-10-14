@@ -110,7 +110,7 @@ let
     for i in "''${PROJECTS[@]}"; do
       PROJECT="proj$i"
       CONFIG="test_ci_projects/$PROJECT/.gitlab-ci.yml"
-      OUTPUT="dags/dag_$PROJECT.png"
+      OUTPUT="dags/dag_$PROJECT.svg"
 
       if [ ! -f "$CONFIG" ]; then
         echo "⚠️  $PROJECT: Config not found"
@@ -119,7 +119,7 @@ let
 
       echo -n "Generating DAG for $PROJECT... "
 
-      if gitlab_ci_cli dag --entry "$CONFIG" | ${pkgs.graphviz}/bin/dot -Tpng -o "$OUTPUT" 2>/dev/null; then
+      if gitlab_ci_cli dag --entry "$CONFIG" | ${pkgs.graphviz}/bin/dot -Tsvg -o "$OUTPUT" 2>/dev/null; then
         echo "✓ $OUTPUT"
       else
         echo "✗ Failed"
@@ -277,7 +277,7 @@ pkgs.mkShell {
     echo "  run-demo                 - Run interactive demonstration"
     echo "  test-all-projects        - Validate all 20 test projects"
     echo "  show-project-info N      - Show detailed info for project N"
-    echo "  generate-dags            - Generate DAG visualizations (PNG)"
+    echo "  generate-dags            - Generate DAG visualizations (SVG)"
     echo "  regenerate-references    - Regenerate output reference files"
     echo "  compare-references       - Compare current vs reference outputs"
     echo "  gitlab_ci_cli            - Run the CLI tool directly"

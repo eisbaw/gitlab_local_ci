@@ -61,10 +61,10 @@ generate_reference() {
     echo $? > "$output_dir/dag.exit_code"
     set -e
 
-    # PNG visualization (if dot is available and DAG generation succeeded)
+    # SVG visualization (if dot is available and DAG generation succeeded)
     if command -v dot &> /dev/null; then
         if [ -s "$output_dir/dag.dot" ] && [ "$(cat "$output_dir/dag.exit_code")" -eq 0 ]; then
-            dot -Tpng "$output_dir/dag.dot" -o "$output_dir/dag.png" 2>/dev/null || true
+            dot -Tsvg "$output_dir/dag.dot" -o "$output_dir/dag.svg" 2>/dev/null || true
         fi
     fi
 
@@ -99,6 +99,6 @@ echo "  - lint.junit.xml    (JUnit XML format output)"
 echo "  - lint.exit_code    (command exit code)"
 echo "  - dag.dot           (Graphviz DOT format)"
 echo "  - dag.exit_code     (DAG command exit code)"
-echo "  - dag.png           (PNG visualization, if DAG generation succeeded)"
+echo "  - dag.svg           (SVG visualization, if DAG generation succeeded)"
 echo "  - metadata.txt      (generation metadata)"
 echo ""
