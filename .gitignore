@@ -12,6 +12,10 @@ Gemfile.lock
 result
 result-*
 
+# Coverage
+coverage/
+.coverage
+
 # Build artifacts
 *.png
 tmp/
