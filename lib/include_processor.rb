@@ -1,5 +1,19 @@
 # frozen_string_literal: true
 
+# Copyright 2025 gitlab_ci_cli
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 require 'yaml'
 require 'net/http'
 require 'uri'
@@ -136,12 +150,31 @@ class IncludeProcessor
     # Extract file path
     file_path = include_spec.is_a?(String) ? include_spec : include_spec['local']
 
-    # Resolve relative to project path
-    full_path = File.join(@project_path, file_path)
+    # Security: Validate path doesn't contain traversal sequences or absolute paths
+    if file_path.include?('..') || file_path.start_with?('/')
+      raise "Invalid local include path: #{file_path}. Path must be relative and cannot contain '..'"
+    end
+
+    # Resolve to absolute path and validate it's within project
+    full_path = File.expand_path(File.join(@project_path, file_path))
+    project_path_abs = File.expand_path(@project_path)
+
+    # Fail-fast: Ensure path doesn't escape project directory
+    unless full_path.start_with?(project_path_abs + File::SEPARATOR) || full_path == project_path_abs
+      raise "Local include path escapes project directory: #{file_path}"
+    end
+
+    # Security: Check for symlink attacks
+    if File.symlink?(full_path)
+      real_path = File.realpath(full_path)
+      unless real_path.start_with?(project_path_abs + File::SEPARATOR)
+        raise "Local include symlink target escapes project directory: #{file_path}"
+      end
+    end
 
     # Fail-fast: Check if file exists
     unless File.exist?(full_path)
-      raise "Local include file not found: #{file_path} (resolved to: #{full_path})"
+      raise "Local include file not found: #{file_path}"
     end
 
     File.read(full_path)
@@ -271,11 +304,23 @@ class IncludeProcessor
       raise "GitLab templates path not configured. Cannot fetch template: #{template_name}"
     end
 
-    template_path = File.join(@gitlab_templates_path, template_name)
+    # Security: Validate template name doesn't contain traversal sequences
+    if template_name.include?('..') || template_name.start_with?('/')
+      raise "Invalid template name: #{template_name}. Template names cannot contain '..' or start with '/'"
+    end
+
+    # Resolve to absolute path and validate it's within templates directory
+    template_path = File.expand_path(File.join(@gitlab_templates_path, template_name))
+    templates_path_abs = File.expand_path(@gitlab_templates_path)
+
+    # Fail-fast: Ensure path doesn't escape templates directory
+    unless template_path.start_with?(templates_path_abs + File::SEPARATOR) || template_path == templates_path_abs
+      raise "Template path escapes templates directory: #{template_name}"
+    end
 
     # Fail-fast: Check if template exists
     unless File.exist?(template_path)
-      raise "GitLab CI template not found: #{template_name} (checked: #{template_path})"
+      raise "GitLab CI template not found: #{template_name}"
     end
 
     File.read(template_path)
@@ -290,20 +335,41 @@ class IncludeProcessor
     file = include_spec['file'] || '.gitlab-ci.yml'
     ref = include_spec['ref'] # Optional - not implemented for local file system
 
+    # Security: Validate project and file paths don't contain traversal sequences
+    if project.include?('..') || project.start_with?('/')
+      raise "Invalid project path: #{project}. Cannot contain '..' or start with '/'"
+    end
+
+    if file.include?('..') || file.start_with?('/')
+      raise "Invalid file path: #{file}. Cannot contain '..' or start with '/'"
+    end
+
     # For local filesystem simulation, resolve project path
-    # In a real GitLab instance, this would use API calls
-    project_path = File.join(Dir.pwd, '..', project)
+    # Use parent directory of current project as base
+    base_dir = @project_path ? File.dirname(File.expand_path(@project_path)) : File.expand_path('..')
+    project_path = File.expand_path(File.join(base_dir, project))
+    base_dir_abs = File.expand_path(base_dir)
+
+    # Fail-fast: Validate project path is within allowed directory
+    unless project_path.start_with?(base_dir_abs + File::SEPARATOR) || project_path == base_dir_abs
+      raise "Project path escapes allowed directory: #{project}"
+    end
 
     # Fail-fast: Check if project directory exists
     unless Dir.exist?(project_path)
-      raise "Project not found: #{project} (checked: #{project_path})"
+      raise "Project not found: #{project}"
     end
 
-    file_path = File.join(project_path, file)
+    file_path = File.expand_path(File.join(project_path, file))
+
+    # Fail-fast: Validate file path is within project directory
+    unless file_path.start_with?(project_path + File::SEPARATOR) || file_path == project_path
+      raise "File path escapes project directory: #{file}"
+    end
 
     # Fail-fast: Check if file exists
     unless File.exist?(file_path)
-      raise "File not found in project #{project}: #{file} (checked: #{file_path})"
+      raise "File not found in project #{project}: #{file}"
     end
 
     File.read(file_path)
