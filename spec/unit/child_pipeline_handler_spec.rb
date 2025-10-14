@@ -3,6 +3,7 @@
 require 'spec_helper'
 require 'child_pipeline_handler'
 require 'mock_job'
+require 'open3'
 
 RSpec.describe ChildPipelineHandler do
   let(:handler) { described_class.new }
@@ -48,9 +49,9 @@ RSpec.describe ChildPipelineHandler do
       it 'uses default file when not specified' do
         config = { project: '../child-project' }
 
-        # Mock the command execution
-        allow(handler).to receive(:`).and_return('output')
-        allow($?).to receive(:exitstatus).and_return(0)
+        # Mock Open3.capture2e to avoid actual command execution
+        status_double = double('status', exitstatus: 0)
+        allow(Open3).to receive(:capture2e).and_return(['output', status_double])
 
         result = handler.trigger_child(parent_job, config)
 
@@ -87,9 +88,9 @@ RSpec.describe ChildPipelineHandler do
       it 'allows execution within depth limit' do
         config = { project: '../child-project' }
 
-        # Mock the command execution
-        allow(handler).to receive(:`).and_return('output')
-        allow($?).to receive(:exitstatus).and_return(0)
+        # Mock Open3.capture2e to avoid actual command execution
+        status_double = double('status', exitstatus: 0)
+        allow(Open3).to receive(:capture2e).and_return(['output', status_double])
 
         expect {
           handler.trigger_child(parent_job, config, current_depth: handler.max_depth - 1)
@@ -101,9 +102,9 @@ RSpec.describe ChildPipelineHandler do
       it 'returns success when child pipeline succeeds' do
         config = { project: '../child-project' }
 
-        # Mock successful execution
-        allow(handler).to receive(:`).and_return('success output')
-        allow($?).to receive(:exitstatus).and_return(0)
+        # Mock successful execution with Open3.capture2e
+        status_double = double('status', exitstatus: 0)
+        allow(Open3).to receive(:capture2e).and_return(['success output', status_double])
 
         result = handler.trigger_child(parent_job, config)
 
@@ -115,9 +116,9 @@ RSpec.describe ChildPipelineHandler do
       it 'returns failure when child pipeline fails' do
         config = { project: '../child-project' }
 
-        # Mock failed execution
-        allow(handler).to receive(:`).and_return('error output')
-        allow($?).to receive(:exitstatus).and_return(1)
+        # Mock failed execution with Open3.capture2e
+        status_double = double('status', exitstatus: 1)
+        allow(Open3).to receive(:capture2e).and_return(['error output', status_double])
 
         result = handler.trigger_child(parent_job, config)
 

@@ -162,14 +162,22 @@ class IncludeProcessor
   # @return [String] File contents
   def fetch_remote_include(include_spec)
     url_string = include_spec['remote']
-    uri = URI.parse(url_string)
 
-    # Fail-fast: Validate HTTPS (security best practice)
-    unless uri.scheme == 'https'
-      raise "Remote includes must use HTTPS for security: #{url_string}"
+    # Validate and parse URL
+    uri = validate_remote_url(url_string)
+
+    # Fetch with timeouts to prevent resource exhaustion
+    response = Net::HTTP.start(
+      uri.host,
+      uri.port,
+      use_ssl: true,
+      read_timeout: 5,      # 5 second read timeout
+      open_timeout: 3,      # 3 second connection timeout
+      verify_mode: OpenSSL::SSL::VERIFY_PEER  # Verify SSL certificates
+    ) do |http|
+      request = Net::HTTP::Get.new(uri.request_uri)
+      http.request(request)
     end
-
-    response = Net::HTTP.get_response(uri)
 
     # Fail-fast: Check response status
     unless response.is_a?(Net::HTTPSuccess)
@@ -179,6 +187,75 @@ class IncludeProcessor
     response.body
   rescue StandardError => e
     raise "Error fetching remote include #{url_string}: #{e.message}"
+  end
+
+  # Validate a remote URL for security
+  #
+  # @param url_string [String] URL to validate
+  # @return [URI] Parsed and validated URI
+  # @raise [RuntimeError] If URL is invalid or not allowed
+  def validate_remote_url(url_string)
+    uri = URI.parse(url_string)
+
+    # Fail-fast: Validate HTTPS only (security best practice)
+    unless uri.scheme == 'https'
+      raise "Remote includes must use HTTPS for security: #{url_string}"
+    end
+
+    # Fail-fast: Validate host is present
+    unless uri.host
+      raise "Remote URL missing host: #{url_string}"
+    end
+
+    # SSRF Protection: Block requests to private IP ranges
+    # This prevents attacks targeting internal services
+    # Note: DNS rebinding attacks are still possible (hostname could resolve to
+    # private IP after this check). Ruby's Net::HTTP doesn't provide hooks to
+    # validate resolved IPs. This is a known limitation.
+    validate_not_private_ip(uri.host)
+
+    # Optional: Check against allowlist if configured
+    # Set GITLAB_CI_ALLOWED_DOMAINS environment variable to enable
+    allowed_domains = ENV['GITLAB_CI_ALLOWED_DOMAINS']
+    if allowed_domains && !allowed_domains.empty?
+      domains = allowed_domains.split(',').map(&:strip)
+      unless domains.include?(uri.host)
+        raise "Remote host not in allowlist: #{uri.host}. " \
+              "Allowed domains: #{domains.join(', ')}"
+      end
+    end
+
+    uri
+  rescue URI::InvalidURIError => e
+    raise "Invalid remote URL: #{url_string} - #{e.message}"
+  end
+
+  # Validate that a hostname does not resolve to a private IP address
+  # Prevents SSRF attacks targeting internal services
+  #
+  # @param hostname [String] Hostname to validate
+  # @raise [RuntimeError] If hostname resolves to private IP
+  def validate_not_private_ip(hostname)
+    require 'resolv'
+
+    begin
+      # Resolve hostname to IP address
+      ip = Resolv.getaddress(hostname)
+
+      # Check for private IP ranges (SSRF protection)
+      if ip.start_with?('127.') ||              # Loopback (127.0.0.0/8)
+         ip.start_with?('10.') ||               # Private class A (10.0.0.0/8)
+         ip.match?(/^172\.(1[6-9]|2\d|3[01])\./) || # Private class B (172.16.0.0/12)
+         ip.start_with?('192.168.') ||          # Private class C (192.168.0.0/16)
+         ip == '0.0.0.0' ||                     # Unspecified address
+         ip.start_with?('169.254.') ||          # Link-local (169.254.0.0/16)
+         ip.start_with?('224.') ||              # Multicast (224.0.0.0/4)
+         ip == '255.255.255.255'                # Broadcast
+        raise "Remote URL hostname '#{hostname}' resolves to private IP address: #{ip}"
+      end
+    rescue Resolv::ResolvError => e
+      raise "Cannot resolve hostname '#{hostname}': #{e.message}"
+    end
   end
 
   # Fetch a GitLab CI template

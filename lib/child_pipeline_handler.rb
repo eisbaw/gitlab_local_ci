@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'open3'
+
 # Handles triggering of child pipelines from parent jobs
 # Supports recursive pipeline invocation with variable passing
 class ChildPipelineHandler
@@ -53,9 +55,9 @@ class ChildPipelineHandler
     )
 
     # Spawn child process
-    # Note: Using system() for simplicity; could use Process.spawn for more control
-    output = `#{args.join(' ')} 2>&1`
-    exit_code = $?.exitstatus
+    # Use Open3.capture2e to avoid shell injection (passes args directly, no shell)
+    output, status = Open3.capture2e(*args)
+    exit_code = status.exitstatus
     success = exit_code.zero?
 
     # Emit event (if event system is available)
