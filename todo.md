@@ -463,7 +463,7 @@ Add --output-dir flag for runner directory
 Call RunnerExporter.export_from_gitlab
 Add unit tests for RunnerExporter (with mocked API)
 
-## Testing Infrastructure 🚧 IN PROGRESS (tests exist, benchmarks needed)
+## Testing Infrastructure ✅ DONE
 Create spec/spec_helper.rb
 Require rspec
 Configure RSpec
