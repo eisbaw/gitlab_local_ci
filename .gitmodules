@@ -1,3 +1,36 @@
 [submodule "gitlab"]
 	path = gitlab
 	url = https://gitlab.com/gitlab-org/gitlab.git
+[submodule "external_projects/fdroid"]
+	path = external_projects/fdroid
+	url = https://gitlab.com/fdroid/fdroidclient.git
+[submodule "external_projects/gnome-builder"]
+	path = external_projects/gnome-builder
+	url = https://gitlab.gnome.org/GNOME/gnome-builder.git
+[submodule "external_projects/gitlab"]
+	path = external_projects/gitlab
+	url = https://gitlab.com/gitlab-org/gitlab-runner.git
+[submodule "external_projects/inkscape"]
+	path = external_projects/inkscape
+	url = https://gitlab.com/inkscape/inkscape.git
+[submodule "external_projects/kicad"]
+	path = external_projects/kicad
+	url = https://gitlab.com/kicad/code/kicad.git
+[submodule "external_projects/mesa"]
+	path = external_projects/mesa
+	url = https://gitlab.freedesktop.org/mesa/mesa.git
+[submodule "external_projects/gstreamer"]
+	path = external_projects/gstreamer
+	url = https://gitlab.freedesktop.org/gstreamer/gstreamer.git
+[submodule "external_projects/veloren"]
+	path = external_projects/veloren
+	url = https://gitlab.com/veloren/veloren.git
+[submodule "external_projects/openrgb"]
+	path = external_projects/openrgb
+	url = https://gitlab.com/CalcProgrammer1/OpenRGB.git
+[submodule "external_projects/baserow"]
+	path = external_projects/baserow
+	url = https://gitlab.com/baserow/baserow.git
+[submodule "external_projects/graphviz"]
+	path = external_projects/graphviz
+	url = https://gitlab.com/graphviz/graphviz.git

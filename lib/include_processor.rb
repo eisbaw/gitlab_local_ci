@@ -18,6 +18,7 @@ require 'yaml'
 require 'net/http'
 require 'uri'
 require 'set'
+require_relative 'external_resource_cache'
 
 # Custom exception raised when include depth limit is exceeded
 class IncludeDepthExceededError < StandardError
@@ -52,10 +53,12 @@ class IncludeProcessor
   #
   # @param project_path [String] Path to the project root
   # @param gitlab_templates_path [String] Path to GitLab templates directory
-  def initialize(project_path:, gitlab_templates_path: nil)
+  # @param cache_root [String] Root directory for external resource cache
+  def initialize(project_path:, gitlab_templates_path: nil, cache_root: 'ext_tmp')
     @project_path = project_path
     @gitlab_templates_path = gitlab_templates_path
     @processed_includes = Set.new # Track processed includes to detect circular refs
+    @external_cache = ExternalResourceCache.new(cache_root: cache_root)
   end
 
   # Process all includes in a configuration
@@ -73,6 +76,9 @@ class IncludeProcessor
 
     # Normalize to array
     includes = [includes] unless includes.is_a?(Array)
+
+    # Expand project includes with array file specs into multiple includes
+    includes = expand_array_file_includes(includes)
 
     # Start with base config (without include key)
     result = config.dup
@@ -92,38 +98,114 @@ class IncludeProcessor
 
       @processed_includes.add(identifier)
 
-      # Fetch content based on type
-      content = case include_type
-                when :local
-                  fetch_local_include(include_spec)
-                when :remote
-                  fetch_remote_include(include_spec)
-                when :template
-                  fetch_template_include(include_spec)
-                when :project, :file
-                  fetch_project_include(include_spec)
-                when :component
-                  fetch_component_include(include_spec)
-                else
-                  raise "Unknown include type: #{include_type}"
-                end
+      begin
+        # Fetch content based on type
+        content = case include_type
+                  when :local
+                    fetch_local_include(include_spec)
+                  when :remote
+                    fetch_remote_include(include_spec)
+                  when :template
+                    fetch_template_include(include_spec)
+                  when :project, :file
+                    fetch_project_include(include_spec)
+                  when :component
+                    fetch_component_include(include_spec)
+                  else
+                    raise "Unknown include type: #{include_type}"
+                  end
 
-      # Parse YAML content
-      included_config = YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
+        # Parse YAML content
+        included_config = YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
 
-      # Recursively process includes in the included file
-      included_config = process_includes(included_config, depth + 1)
+        # Recursively process includes in the included file
+        included_config = process_includes(included_config, depth + 1)
 
-      # Deep merge into result
-      result = deep_merge(result, included_config)
-
-      @processed_includes.delete(identifier)
+        # Deep merge into result
+        result = deep_merge(result, included_config)
+      ensure
+        # Always cleanup, even if exception occurs
+        @processed_includes.delete(identifier)
+      end
     end
 
     result
   end
 
   private
+
+  # Expand includes with array file specs into multiple individual includes
+  #
+  # @param includes [Array<Hash>] Array of include specifications
+  # @return [Array<Hash>] Expanded array with array files converted to multiple includes
+  def expand_array_file_includes(includes)
+    expanded = []
+
+    includes.each do |include_spec|
+      # Check if this is a project/file include with array file spec
+      if include_spec.is_a?(Hash) &&
+         (include_spec.key?('project') || include_spec.key?('file')) &&
+         include_spec['file'].is_a?(Array)
+
+        # Expand into multiple includes, one per file
+        include_spec['file'].each do |single_file|
+          expanded_spec = include_spec.dup
+          expanded_spec['file'] = single_file
+          expanded << expanded_spec
+        end
+      elsif include_spec.is_a?(Hash) && include_spec.key?('local')
+        # Check if local include has glob pattern
+        local_path = include_spec['local']
+        if local_path.include?('*')
+          # Expand glob pattern
+          expanded_includes = expand_local_glob(local_path)
+          expanded_includes.each do |file_path|
+            expanded_spec = include_spec.dup
+            expanded_spec['local'] = file_path
+            expanded << expanded_spec
+          end
+        else
+          # No glob, keep as-is
+          expanded << include_spec
+        end
+      elsif include_spec.is_a?(String) && include_spec.include?('*')
+        # String local include with glob
+        expanded_includes = expand_local_glob(include_spec)
+        expanded.concat(expanded_includes)
+      else
+        # Not an array file spec or glob, keep as-is
+        expanded << include_spec
+      end
+    end
+
+    expanded
+  end
+
+  # Expand glob pattern in local include path
+  #
+  # @param pattern [String] Glob pattern (may contain * or **)
+  # @return [Array<String>] Array of matched file paths
+  def expand_local_glob(pattern)
+    # Strip leading slash if present (GitLab treats /path as repo-root-relative)
+    normalized_pattern = pattern.start_with?('/') ? pattern[1..-1] : pattern
+
+    # Security: Ensure pattern doesn't escape project directory
+    if normalized_pattern.include?('..')
+      raise "Invalid glob pattern: #{pattern}. Pattern cannot contain '..'"
+    end
+
+    # Build full glob pattern
+    full_pattern = File.join(@project_path, normalized_pattern)
+
+    # Find matching files
+    matches = Dir.glob(full_pattern).select { |path| File.file?(path) }
+
+    # Convert back to project-relative paths
+    project_path_abs = File.expand_path(@project_path)
+    matches.map do |match|
+      File.expand_path(match).sub("#{project_path_abs}/", '')
+    end.sort
+  end
 
   # Determine the type of include from the spec
   #
@@ -150,13 +232,17 @@ class IncludeProcessor
     # Extract file path
     file_path = include_spec.is_a?(String) ? include_spec : include_spec['local']
 
-    # Security: Validate path doesn't contain traversal sequences or absolute paths
-    if file_path.include?('..') || file_path.start_with?('/')
-      raise "Invalid local include path: #{file_path}. Path must be relative and cannot contain '..'"
+    # Security: Validate path doesn't contain traversal sequences
+    if file_path.include?('..')
+      raise "Invalid local include path: #{file_path}. Path cannot contain '..'"
     end
 
+    # GitLab CI treats paths starting with '/' as repository-root-relative,
+    # not absolute filesystem paths. Strip leading slash to normalize.
+    normalized_path = file_path.start_with?('/') ? file_path[1..-1] : file_path
+
     # Resolve to absolute path and validate it's within project
-    full_path = File.expand_path(File.join(@project_path, file_path))
+    full_path = File.expand_path(File.join(@project_path, normalized_path))
     project_path_abs = File.expand_path(@project_path)
 
     # Fail-fast: Ensure path doesn't escape project directory
@@ -298,32 +384,22 @@ class IncludeProcessor
   def fetch_template_include(include_spec)
     template_name = include_spec['template']
 
-    # Templates are stored in the GitLab repository
-    # Path: lib/gitlab/ci/templates/
-    unless @gitlab_templates_path
-      raise "GitLab templates path not configured. Cannot fetch template: #{template_name}"
-    end
-
     # Security: Validate template name doesn't contain traversal sequences
-    if template_name.include?('..') || template_name.start_with?('/')
-      raise "Invalid template name: #{template_name}. Template names cannot contain '..' or start with '/'"
+    if template_name.include?('..')
+      raise "Invalid template name: #{template_name}. Template names cannot contain '..'"
     end
 
-    # Resolve to absolute path and validate it's within templates directory
-    template_path = File.expand_path(File.join(@gitlab_templates_path, template_name))
-    templates_path_abs = File.expand_path(@gitlab_templates_path)
+    # Strip leading slash if present (normalize path)
+    template_name = template_name.sub(%r{^/}, '')
 
-    # Fail-fast: Ensure path doesn't escape templates directory
-    unless template_path.start_with?(templates_path_abs + File::SEPARATOR) || template_path == templates_path_abs
-      raise "Template path escapes templates directory: #{template_name}"
-    end
-
-    # Fail-fast: Check if template exists
-    unless File.exist?(template_path)
-      raise "GitLab CI template not found: #{template_name}"
-    end
-
-    File.read(template_path)
+    # Use external cache to fetch template
+    # This will:
+    # 1. Check local gitlab_templates_path if available
+    # 2. Check cache (ext_tmp/templates/)
+    # 3. Download from gitlab.com if needed
+    @external_cache.fetch_template(template_name, gitlab_templates_path: @gitlab_templates_path)
+  rescue StandardError => e
+    raise "Failed to fetch template '#{template_name}': #{e.message}"
   end
 
   # Fetch a project include
@@ -333,46 +409,65 @@ class IncludeProcessor
   def fetch_project_include(include_spec)
     project = include_spec['project']
     file = include_spec['file'] || '.gitlab-ci.yml'
-    ref = include_spec['ref'] # Optional - not implemented for local file system
+    ref = include_spec['ref'] || 'master'
 
     # Security: Validate project and file paths don't contain traversal sequences
-    if project.include?('..') || project.start_with?('/')
-      raise "Invalid project path: #{project}. Cannot contain '..' or start with '/'"
+    if project.include?('..')
+      raise "Invalid project path: #{project}. Cannot contain '..'"
     end
 
-    if file.include?('..') || file.start_with?('/')
-      raise "Invalid file path: #{file}. Cannot contain '..' or start with '/'"
+    if file.include?('..')
+      raise "Invalid file path: #{file}. Cannot contain '..'"
     end
 
+    # Normalize paths (strip leading slashes)
+    project = project.sub(%r{^/}, '')
+    file = file.sub(%r{^/}, '')
+
+    # Try local filesystem first
+    content = try_fetch_local_project_file(project, file)
+    return content if content
+
+    # If not found locally, download from gitlab.com
+    @external_cache.fetch_project_file(project, file, ref: ref)
+  rescue StandardError => e
+    raise "Failed to fetch file '#{file}' from project '#{project}': #{e.message}"
+  end
+
+  # Try to fetch project file from local filesystem
+  #
+  # @param project [String] Project path
+  # @param file [String] File path
+  # @return [String, nil] File content or nil if not found
+  def try_fetch_local_project_file(project, file)
     # For local filesystem simulation, resolve project path
     # Use parent directory of current project as base
     base_dir = @project_path ? File.dirname(File.expand_path(@project_path)) : File.expand_path('..')
     project_path = File.expand_path(File.join(base_dir, project))
     base_dir_abs = File.expand_path(base_dir)
 
-    # Fail-fast: Validate project path is within allowed directory
+    # Validate project path is within allowed directory
     unless project_path.start_with?(base_dir_abs + File::SEPARATOR) || project_path == base_dir_abs
-      raise "Project path escapes allowed directory: #{project}"
+      return nil # Invalid path, skip local lookup
     end
 
-    # Fail-fast: Check if project directory exists
-    unless Dir.exist?(project_path)
-      raise "Project not found: #{project}"
-    end
+    # Check if project directory exists
+    return nil unless Dir.exist?(project_path)
 
     file_path = File.expand_path(File.join(project_path, file))
 
-    # Fail-fast: Validate file path is within project directory
+    # Validate file path is within project directory
     unless file_path.start_with?(project_path + File::SEPARATOR) || file_path == project_path
-      raise "File path escapes project directory: #{file}"
+      return nil # Invalid path, skip local lookup
     end
 
-    # Fail-fast: Check if file exists
-    unless File.exist?(file_path)
-      raise "File not found in project #{project}: #{file}"
-    end
+    # Check if file exists
+    return nil unless File.exist?(file_path)
 
     File.read(file_path)
+  rescue StandardError
+    # Any error in local lookup, return nil to try remote
+    nil
   end
 
   # Fetch a component include
