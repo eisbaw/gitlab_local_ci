@@ -31,6 +31,7 @@ class MockPipeline
     @stages = stages.freeze
     @ref = ref.freeze
     @variables = variables.dup.freeze
+    @previous_status = nil # Track previous status for change detection
 
     # Convert job hash to MockJob instances
     @jobs = build_mock_jobs(jobs)
@@ -51,6 +52,22 @@ class MockPipeline
 
     # Mixed state: some finished, some not
     STATE_RUNNING
+  end
+
+  # Check if status has changed since last check
+  # Updates internal tracking after checking
+  #
+  # @return [Hash, nil] Hash with :old and :new status if changed, nil otherwise
+  def status_changed?
+    current = status
+    previous = @previous_status || STATE_PENDING
+
+    if current != previous
+      @previous_status = current
+      { old: previous, new: current }
+    else
+      nil
+    end
   end
 
   # Check if pipeline has pending jobs

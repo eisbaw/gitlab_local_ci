@@ -43,7 +43,6 @@ class MockServer
     @event_queue = []
     @pipelines = {}
     @pipeline_counter = 0
-    @pipeline_statuses = {} # Track last known status for each pipeline
   end
 
   # Create a pipeline from a YAML configuration
@@ -266,18 +265,14 @@ class MockServer
   # @param pipeline [MockPipeline] Pipeline to process
   # @return [Boolean] True if state changed since last call
   def process_pipeline(pipeline)
-    # Get last known status (from previous call) or default to pending
-    old_status = @pipeline_statuses[pipeline.id] || MockPipeline::STATE_PENDING
-
-    # Get current status based on job states
+    # Check if status has changed (pipeline tracks its own previous state)
     # Note: Job state transitions are managed externally (e.g., by DryRunCommand)
     # This method only observes state changes and emits events
-    new_status = pipeline.status
+    status_change = pipeline.status_changed?
 
-    # Update tracked status
-    @pipeline_statuses[pipeline.id] = new_status
+    if status_change
+      new_status = status_change[:new]
 
-    if new_status != old_status
       # Emit appropriate event
       event_type = case new_status
                    when MockPipeline::STATE_RUNNING
