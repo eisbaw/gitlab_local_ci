@@ -17,20 +17,29 @@
 <!-- trigger_child1 -->
 <g id="node1" class="node">
 <title>trigger_child1</title>
+<g id="a_node1"><a xlink:title="&#45;&#45;&#45;&#10;stage: triggers&#10;trigger:&#10; &#160;include: &quot;.gitlab/ci/child1.yml&quot;&#10; &#160;strategy: depend&#10;variables:&#10; &#160;CHILD_VAR: for_child1&#10; &#160;ENVIRONMENT: development&#10;">
 <polygon fill="lightblue" stroke="black" points="168.5,-52 52,-52 52,-16 168.5,-16 168.5,-52"/>
 <text text-anchor="middle" x="110.25" y="-29.32" font-family="Times,serif" font-size="14.00">trigger_child1</text>
+</a>
+</g>
 </g>
 <!-- trigger_child2 -->
 <g id="node2" class="node">
 <title>trigger_child2</title>
+<g id="a_node2"><a xlink:title="&#45;&#45;&#45;&#10;stage: triggers&#10;trigger:&#10; &#160;include: &quot;.gitlab/ci/child2.yml&quot;&#10; &#160;strategy: depend&#10;variables:&#10; &#160;CHILD_VAR: for_child2&#10; &#160;ENVIRONMENT: production&#10;">
 <polygon fill="lightblue" stroke="black" points="168.5,-106 52,-106 52,-70 168.5,-70 168.5,-106"/>
 <text text-anchor="middle" x="110.25" y="-83.33" font-family="Times,serif" font-size="14.00">trigger_child2</text>
+</a>
+</g>
 </g>
 <!-- trigger_child_with_rules -->
 <g id="node3" class="node">
 <title>trigger_child_with_rules</title>
+<g id="a_node3"><a xlink:title="&#45;&#45;&#45;&#10;stage: triggers&#10;trigger:&#10; &#160;include: &quot;.gitlab/ci/child1.yml&quot;&#10; &#160;strategy: depend&#10;variables:&#10; &#160;CHILD_VAR: conditional&#10;rules:&#10;&#45; if: $CI_COMMIT_BRANCH == &quot;main&quot;&#10;">
 <polygon fill="lightblue" stroke="black" points="204.5,-160 16,-160 16,-124 204.5,-124 204.5,-160"/>
 <text text-anchor="middle" x="110.25" y="-137.32" font-family="Times,serif" font-size="14.00">trigger_child_with_rules</text>
+</a>
+</g>
 </g>
 </g>
 </svg>

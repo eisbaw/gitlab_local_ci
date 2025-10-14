@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_prebuild {
@@ -7,11 +8,11 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    validate_yaml [label="validate:yaml"];
-    validate_dependencies [label="validate:dependencies"];
-    lint_frontend [label="lint:frontend"];
-    lint_backend [label="lint:backend"];
-    lint_api [label="lint:api"];
+    validate_yaml [label="validate:yaml", tooltip="---\nstage: prebuild\nimage: alpine:latest\nscript:\n- apk add --no-cache yamllint\n- 'yamllint -d \"{extends: relaxed, rules: {line-length: {max: 120}}}\" .gitlab-ci.yml'\n- echo \"YAML validation passed\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    validate_dependencies [label="validate:dependencies", tooltip="---\nstage: prebuild\nimage: alpine:latest\nscript:\n- echo \"Checking dependency files...\"\n- test -f package.json || echo \"Warning: package.json not found\"\n- test -f Gemfile || echo \"Warning: Gemfile not found\"\n- test -f requirements.txt || echo \"Warning: requirements.txt not found\"\n- echo \"Dependency validation complete\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n"];
+    lint_frontend [label="lint:frontend", tooltip="---\nstage: prebuild\nimage: node:20-alpine\ncache:\n  key: node-${CI_COMMIT_REF_SLUG}\n  paths:\n  - node_modules/\n  - \".npm/\"\n  policy: pull-push\nscript:\n- cd services/frontend\n- npm ci\n- npm run lint\n- npm run prettier:check\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/frontend/**/*\n"];
+    lint_backend [label="lint:backend", tooltip="---\nstage: prebuild\nimage: ruby:3.2-alpine\ncache:\n  key: ruby-${CI_COMMIT_REF_SLUG}\n  paths:\n  - vendor/ruby/\n  - \".bundle/\"\n  policy: pull-push\nscript:\n- cd services/backend\n- bundle install --deployment --jobs 4\n- bundle exec rubocop\n- bundle exec reek\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/backend/**/*\n"];
+    lint_api [label="lint:api", tooltip="---\nstage: prebuild\nimage: python:3.11-alpine\ncache:\n  key: python-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \".venv/\"\n  - \".pip-cache/\"\n  policy: pull-push\nscript:\n- cd services/api\n- pip install -q flake8 black mypy\n- flake8 src/\n- black --check src/\n- mypy src/\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/api/**/*\n"];
   }
 
   subgraph cluster_build {
@@ -19,10 +20,10 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_frontend [label="build:frontend"];
-    build_backend [label="build:backend"];
-    build_api [label="build:api"];
-    build_workers [label="build:workers"];
+    build_frontend [label="build:frontend", tooltip="---\nstage: build\nimage: node:20-alpine\ncache:\n  key: node-${CI_COMMIT_REF_SLUG}\n  paths:\n  - node_modules/\n  - \".npm/\"\n  policy: pull-push\nneeds:\n- lint:frontend\nscript:\n- cd services/frontend\n- npm ci\n- npm run build\n- echo \"Frontend build artifacts:\"\n- ls -lah dist/\n- echo \"BUILD_VERSION=${VERSION}\" > ../../build-frontend.env\n- echo \"FRONTEND_BUILD_ID=${CI_JOB_ID}\" >> ../../build-frontend.env\nartifacts:\n  paths:\n  - services/frontend/dist/\n  - services/frontend/package.json\n  - services/frontend/package-lock.json\n  reports:\n    dotenv: build-frontend.env\n  expire_in: 2 hours\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/frontend/**/*\n"];
+    build_backend [label="build:backend", tooltip="---\nstage: build\nimage: ruby:3.2-alpine\ncache:\n  key: ruby-${CI_COMMIT_REF_SLUG}\n  paths:\n  - vendor/ruby/\n  - \".bundle/\"\n  policy: pull-push\nneeds:\n- lint:backend\nscript:\n- cd services/backend\n- bundle install --deployment --jobs 4\n- bundle exec rake assets:precompile\n- echo \"Backend build complete\"\n- echo \"BUILD_VERSION=${VERSION}\" > ../../build-backend.env\n- echo \"BACKEND_BUILD_ID=${CI_JOB_ID}\" >> ../../build-backend.env\nartifacts:\n  paths:\n  - services/backend/public/assets/\n  - services/backend/vendor/bundle/\n  - services/backend/Gemfile.lock\n  reports:\n    dotenv: build-backend.env\n  expire_in: 2 hours\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/backend/**/*\n"];
+    build_api [label="build:api", tooltip="---\nstage: build\nimage: python:3.11-alpine\ncache:\n  key: python-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \".venv/\"\n  - \".pip-cache/\"\n  policy: pull-push\nneeds:\n- lint:api\nscript:\n- cd services/api\n- python -m venv .venv\n- source .venv/bin/activate\n- pip install --upgrade pip setuptools wheel\n- pip install -r requirements.txt\n- python -m compileall src/\n- echo \"API build complete\"\n- echo \"BUILD_VERSION=${VERSION}\" > ../../build-api.env\n- echo \"API_BUILD_ID=${CI_JOB_ID}\" >> ../../build-api.env\nartifacts:\n  paths:\n  - services/api/.venv/\n  - services/api/requirements.txt\n  reports:\n    dotenv: build-api.env\n  expire_in: 2 hours\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/api/**/*\n"];
+    build_workers [label="build:workers", tooltip="---\nstage: build\nimage: golang:1.21-alpine\nneeds: []\ncache:\n  key: go-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \"${GO_CACHE_DIR}\"\nscript:\n- cd services/workers\n- go mod download\n- go build -o worker-binary ./cmd/worker\n- echo \"Worker build complete\"\n- echo \"BUILD_VERSION=${VERSION}\" > ../../build-workers.env\n- echo \"WORKERS_BUILD_ID=${CI_JOB_ID}\" >> ../../build-workers.env\nartifacts:\n  paths:\n  - services/workers/worker-binary\n  reports:\n    dotenv: build-workers.env\n  expire_in: 2 hours\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/workers/**/*\n"];
   }
 
   subgraph cluster_test {
@@ -30,26 +31,26 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    _base_config [label=".base_config"];
-    _docker_config [label=".docker_config"];
-    _node_config [label=".node_config"];
-    _ruby_config [label=".ruby_config"];
-    _python_config [label=".python_config"];
-    _base_job [label=".base_job"];
-    _test_job [label=".test_job"];
-    _deploy_job [label=".deploy_job"];
-    test_frontend_unit [label="test:frontend:unit"];
-    test_frontend_integration [label="test:frontend:integration"];
-    test_backend_unit [label="test:backend:unit"];
-    test_backend_integration [label="test:backend:integration"];
-    test_api_unit [label="test:api:unit"];
-    test_api_integration [label="test:api:integration"];
-    test_workers [label="test:workers"];
-    test_matrix_compatibility [label="test:matrix:compatibility"];
-    package_frontend [label="package:frontend"];
-    package_backend [label="package:backend"];
-    package_api [label="package:api"];
-    package_workers [label="package:workers"];
+    _base_config [label=".base_config", tooltip="---\nretry:\n  max: 2\n  when:\n  - runner_system_failure\n  - stuck_or_timeout_failure\ntimeout: 1h\ninterruptible: true\n"];
+    _docker_config [label=".docker_config", tooltip="---\nimage: docker:24-alpine\nservices:\n- docker:24-dind\nvariables:\n  DOCKER_TLS_CERTDIR: \"/certs\"\ntags:\n- docker\n"];
+    _node_config [label=".node_config", tooltip="---\nimage: node:20-alpine\ncache:\n  key: node-${CI_COMMIT_REF_SLUG}\n  paths:\n  - node_modules/\n  - \".npm/\"\n  policy: pull-push\n"];
+    _ruby_config [label=".ruby_config", tooltip="---\nimage: ruby:3.2-alpine\ncache:\n  key: ruby-${CI_COMMIT_REF_SLUG}\n  paths:\n  - vendor/ruby/\n  - \".bundle/\"\n  policy: pull-push\n"];
+    _python_config [label=".python_config", tooltip="---\nimage: python:3.11-alpine\ncache:\n  key: python-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \".venv/\"\n  - \".pip-cache/\"\n  policy: pull-push\n"];
+    _base_job [label=".base_job", tooltip="---\nretry:\n  max: 2\n  when:\n  - runner_system_failure\n  - stuck_or_timeout_failure\ntimeout: 1h\ninterruptible: true\ntags:\n- docker\nbefore_script:\n- echo \"Base job template initialized\"\n- apk add --no-cache git curl jq\n- - before_script\n"];
+    _test_job [label=".test_job", tooltip="---\nextends: \".base_job\"\nstage: test\ncoverage: \"/COVERAGE:\\\\s+(\\\\d+\\\\.\\\\d+)%/\"\nartifacts:\n  when: always\n  reports:\n    junit: reports/junit.xml\n  paths:\n  - reports/\n  - coverage/\n  expire_in: 1 week\n"];
+    _deploy_job [label=".deploy_job", tooltip="---\nextends: \".base_job\"\nretry:\n  max: 3\n  when:\n  - api_failure\n  - runner_system_failure\ntimeout: 30m\ninterruptible: false\n"];
+    test_frontend_unit [label="test:frontend:unit", tooltip="---\nextends: \".test_job\"\nimage: node:20-alpine\ncache:\n  key: node-${CI_COMMIT_REF_SLUG}\n  paths:\n  - node_modules/\n  - \".npm/\"\n  policy: pull-push\nneeds:\n- build:frontend\nservices:\n- name: redis:7-alpine\n  alias: redis\nvariables:\n  REDIS_HOST: redis\n  NODE_ENV: test\nscript:\n- cd services/frontend\n- npm ci\n- npm run test:unit -- --coverage --reporters=default --reporters=jest-junit\n- echo \"COVERAGE: $(node -pe \"require('./coverage/coverage-summary.json').total.lines.pct\")%\"\nartifacts:\n  when: always\n  reports:\n    junit: services/frontend/junit.xml\n    coverage_report:\n      coverage_format: cobertura\n      path: services/frontend/coverage/cobertura-coverage.xml\n  paths:\n  - services/frontend/coverage/\n  expire_in: 1 week\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/frontend/**/*\n"];
+    test_frontend_integration [label="test:frontend:integration", tooltip="---\nextends: \".test_job\"\nimage: node:20-alpine\ncache:\n  key: node-${CI_COMMIT_REF_SLUG}\n  paths:\n  - node_modules/\n  - \".npm/\"\n  policy: pull-push\nneeds:\n- build:frontend\nservices:\n- name: postgres:15-alpine\n  alias: postgres\n- name: redis:7-alpine\n  alias: redis\nvariables:\n  POSTGRES_DB: test_db\n  POSTGRES_USER: test_user\n  POSTGRES_PASSWORD: test_pass\n  DATABASE_URL: postgresql://test_user:test_pass@postgres:5432/test_db\n  REDIS_URL: redis://redis:6379\n  NODE_ENV: test\nbefore_script:\n- - before_script\n- apk add --no-cache postgresql-client\n- until pg_isready -h postgres -U test_user; do sleep 1; done\n- echo \"Database is ready\"\nscript:\n- cd services/frontend\n- npm ci\n- npm run test:integration\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/frontend/**/*\n"];
+    test_backend_unit [label="test:backend:unit", tooltip="---\nextends: \".test_job\"\nimage: ruby:3.2-alpine\ncache:\n  key: ruby-${CI_COMMIT_REF_SLUG}\n  paths:\n  - vendor/ruby/\n  - \".bundle/\"\n  policy: pull-push\nneeds:\n- build:backend\nscript:\n- cd services/backend\n- bundle install --deployment\n- bundle exec rspec --format progress --format RspecJunitFormatter --out ../../reports/backend-junit.xml\n- echo \"Test coverage: $(bundle exec rake coverage:report)\"\nartifacts:\n  when: always\n  reports:\n    junit: reports/backend-junit.xml\n    coverage_report:\n      coverage_format: cobertura\n      path: services/backend/coverage/cobertura.xml\n  paths:\n  - services/backend/coverage/\n  expire_in: 1 week\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/backend/**/*\n"];
+    test_backend_integration [label="test:backend:integration", tooltip="---\nextends: \".test_job\"\nimage: ruby:3.2-alpine\ncache:\n  key: ruby-${CI_COMMIT_REF_SLUG}\n  paths:\n  - vendor/ruby/\n  - \".bundle/\"\n  policy: pull-push\nneeds:\n- build:backend\nservices:\n- name: postgres:15-alpine\n  alias: postgres\n- name: redis:7-alpine\n  alias: redis\n- name: elasticsearch:8.11.0\n  alias: elasticsearch\n  command:\n  - bin/elasticsearch\n  - \"-Expack.security.enabled=false\"\nvariables:\n  POSTGRES_DB: backend_test\n  POSTGRES_USER: backend_user\n  POSTGRES_PASSWORD: backend_pass\n  DATABASE_URL: postgresql://backend_user:backend_pass@postgres:5432/backend_test\n  REDIS_URL: redis://redis:6379/1\n  ELASTICSEARCH_URL: http://elasticsearch:9200\n  RAILS_ENV: test\nbefore_script:\n- - before_script\n- apk add --no-cache postgresql-client curl\n- until pg_isready -h postgres -U backend_user; do sleep 1; done\n- until curl -f ${ELASTICSEARCH_URL}/_cluster/health; do sleep 1; done\n- echo \"All services are ready\"\nscript:\n- cd services/backend\n- bundle install --deployment\n- bundle exec rake db:create db:schema:load\n- bundle exec rspec spec/integration --format progress\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/backend/**/*\n"];
+    test_api_unit [label="test:api:unit", tooltip="---\nextends: \".test_job\"\nimage: python:3.11-alpine\ncache:\n  key: python-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \".venv/\"\n  - \".pip-cache/\"\n  policy: pull-push\nneeds:\n- build:api\nscript:\n- cd services/api\n- source .venv/bin/activate\n- pytest tests/unit/ -v --junitxml=../../reports/api-junit.xml --cov=src --cov-report=xml\n  --cov-report=term\n- coverage_pct=$(python -c \"import xml.etree.ElementTree as ET; print(ET.parse('coverage.xml').getroot().attrib['line-rate'])\")\n- echo \"COVERAGE: ${coverage_pct}%\"\nartifacts:\n  when: always\n  reports:\n    junit: reports/api-junit.xml\n    coverage_report:\n      coverage_format: cobertura\n      path: services/api/coverage.xml\n  paths:\n  - services/api/htmlcov/\n  expire_in: 1 week\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/api/**/*\n"];
+    test_api_integration [label="test:api:integration", tooltip="---\nextends: \".test_job\"\nimage: python:3.11-alpine\ncache:\n  key: python-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \".venv/\"\n  - \".pip-cache/\"\n  policy: pull-push\nneeds:\n- build:api\nservices:\n- name: postgres:15-alpine\n  alias: postgres\n- name: redis:7-alpine\n  alias: redis\nvariables:\n  POSTGRES_DB: api_test\n  POSTGRES_USER: api_user\n  POSTGRES_PASSWORD: api_pass\n  DATABASE_URL: postgresql://api_user:api_pass@postgres:5432/api_test\n  REDIS_URL: redis://redis:6379/2\nbefore_script:\n- - before_script\n- apk add --no-cache postgresql-client\n- until pg_isready -h postgres -U api_user; do sleep 1; done\nscript:\n- cd services/api\n- source .venv/bin/activate\n- alembic upgrade head\n- pytest tests/integration/ -v --junitxml=../../reports/api-integration-junit.xml\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/api/**/*\n"];
+    test_workers [label="test:workers", tooltip="---\nstage: test\nimage: golang:1.21-alpine\nneeds:\n- build:workers\ncache:\n  key: go-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \"${GO_CACHE_DIR}\"\n  policy: pull\nscript:\n- cd services/workers\n- go test ./... -v -coverprofile=coverage.out -covermode=atomic\n- go tool cover -func=coverage.out | tail -n 1\n- go install github.com/jstemmer/go-junit-report/v2@latest\n- go test ./... -v 2>&1 | go-junit-report > ../../reports/workers-junit.xml\nartifacts:\n  when: always\n  reports:\n    junit: reports/workers-junit.xml\n  paths:\n  - services/workers/coverage.out\n  expire_in: 1 week\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/workers/**/*\n"];
+    test_matrix_compatibility [label="test:matrix:compatibility", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - SERVICE:\n    - frontend\n    - backend\n    - api\n    ENV:\n    - development\n    - staging\n    RUNNER:\n    - linux\n    - alpine\nimage: alpine:latest\nneeds: []\nscript:\n- echo \"Testing ${SERVICE} on ${RUNNER} for ${ENV} environment\"\n- echo \"Service: ${SERVICE}\"\n- echo \"Environment: ${ENV}\"\n- echo \"Runner: ${RUNNER}\"\n- echo \"Compatibility test passed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    package_frontend [label="package:frontend", tooltip="---\nextends: \".docker_build_job\"\nneeds:\n- build:frontend\n- test:frontend:unit\nvariables:\n  IMAGE_NAME: \"${DOCKER_IMAGE_BASE}/frontend\"\n  SERVICE_PATH: services/frontend\nbefore_script:\n- - before_script\n- cd ${SERVICE_PATH}\n- echo \"IMAGE_TAG=${CI_COMMIT_SHA}\" > ../../build.env\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    package_backend [label="package:backend", tooltip="---\nextends: \".docker_build_job\"\nneeds:\n- build:backend\n- test:backend:unit\nvariables:\n  IMAGE_NAME: \"${DOCKER_IMAGE_BASE}/backend\"\n  SERVICE_PATH: services/backend\nbefore_script:\n- - before_script\n- cd ${SERVICE_PATH}\n- echo \"IMAGE_TAG=${CI_COMMIT_SHA}\" > ../../build.env\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    package_api [label="package:api", tooltip="---\nextends: \".docker_build_job\"\nneeds:\n- build:api\n- test:api:unit\nvariables:\n  IMAGE_NAME: \"${DOCKER_IMAGE_BASE}/api\"\n  SERVICE_PATH: services/api\nbefore_script:\n- - before_script\n- cd ${SERVICE_PATH}\n- echo \"IMAGE_TAG=${CI_COMMIT_SHA}\" > ../../build.env\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    package_workers [label="package:workers", tooltip="---\nextends: \".docker_build_job\"\nneeds:\n- build:workers\n- test:workers\nvariables:\n  IMAGE_NAME: \"${DOCKER_IMAGE_BASE}/workers\"\n  SERVICE_PATH: services/workers\nbefore_script:\n- - before_script\n- cd ${SERVICE_PATH}\n- echo \"IMAGE_TAG=${CI_COMMIT_SHA}\" > ../../build.env\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
   }
 
   subgraph cluster_security {
@@ -57,9 +58,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    security_sast [label="security:sast"];
-    security_dependency_scanning [label="security:dependency-scanning"];
-    security_secrets [label="security:secrets"];
+    security_sast [label="security:sast", tooltip="---\nstage: security\nimage: returntocorp/semgrep:latest\nneeds: []\nscript:\n- semgrep --config=auto --json --output=sast-report.json || true\n- echo \"SAST scan completed\"\nartifacts:\n  reports:\n    sast: sast-report.json\n  expire_in: 1 week\nrules:\n- if: $ENABLE_SECURITY_SCANNING == \"true\"\n"];
+    security_dependency_scanning [label="security:dependency-scanning", tooltip="---\nstage: security\nimage: aquasec/trivy:latest\nneeds: []\nscript:\n- trivy fs --format json --output dependency-scan.json --severity HIGH,CRITICAL .\n  || true\n- echo \"Dependency scanning completed\"\nartifacts:\n  reports:\n    dependency_scanning: dependency-scan.json\n  expire_in: 1 week\nrules:\n- if: $ENABLE_SECURITY_SCANNING == \"true\"\n"];
+    security_secrets [label="security:secrets", tooltip="---\nstage: security\nimage: trufflesecurity/trufflehog:latest\nneeds: []\nallow_failure: true\nscript:\n- trufflehog filesystem . --json > secrets-report.json || true\n- echo \"Secret scanning completed\"\nartifacts:\n  paths:\n  - secrets-report.json\n  expire_in: 1 week\nrules:\n- if: $ENABLE_SECURITY_SCANNING == \"true\"\n"];
   }
 
   subgraph cluster_quality {
@@ -67,8 +68,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    quality_codeclimate [label="quality:codeclimate"];
-    quality_metrics [label="quality:metrics"];
+    quality_codeclimate [label="quality:codeclimate", tooltip="---\nstage: quality\nimage: codeclimate/codeclimate:latest\nneeds: []\nscript:\n- codeclimate analyze -f json > codeclimate-report.json || true\n- echo \"Code quality analysis completed\"\nartifacts:\n  reports:\n    codequality: codeclimate-report.json\n  expire_in: 1 week\nrules:\n- if: $ENABLE_CODE_QUALITY == \"true\"\n"];
+    quality_metrics [label="quality:metrics", tooltip="---\nstage: quality\nimage: alpine:latest\nneeds:\n- test:frontend:unit\n- test:backend:unit\n- test:api:unit\n- test:workers\nscript:\n- echo \"Aggregating quality metrics...\"\n- echo \"Test coverage across all services meets minimum threshold\"\n- echo \"Code complexity is within acceptable limits\"\nrules:\n- if: $ENABLE_CODE_QUALITY == \"true\"\n"];
   }
 
   subgraph cluster_package {
@@ -76,7 +77,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    _docker_build_job [label=".docker_build_job"];
+    _docker_build_job [label=".docker_build_job", tooltip="---\nextends: \".base_job\"\nimage: docker:24-alpine\nservices:\n- docker:24-dind\nvariables:\n  DOCKER_TLS_CERTDIR: \"/certs\"\ntags:\n- docker\nstage: package\nscript:\n- docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $DOCKER_REGISTRY\n- docker build --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${CI_COMMIT_SHA} -t\n  ${IMAGE_NAME}:latest .\n- docker push ${IMAGE_NAME}:${CI_COMMIT_SHA}\n- docker push ${IMAGE_NAME}:latest\nartifacts:\n  reports:\n    dotenv: build.env\n  expire_in: 1 day\n"];
   }
 
   subgraph cluster_deploy_dev {
@@ -84,12 +85,12 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_dev_frontend [label="deploy:dev:frontend"];
-    deploy_dev_backend [label="deploy:dev:backend"];
-    deploy_dev_api [label="deploy:dev:api"];
-    stop_dev_frontend [label="stop:dev:frontend"];
-    stop_dev_backend [label="stop:dev:backend"];
-    stop_dev_api [label="stop:dev:api"];
+    deploy_dev_frontend [label="deploy:dev:frontend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_dev\nneeds:\n- package:frontend\nenvironment:\n  name: development/frontend\n  url: https://frontend-dev.example.com\n  on_stop: stop:dev:frontend\nscript:\n- echo \"Deploying frontend to development environment\"\n- kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA}\n  -n dev\n- kubectl rollout status deployment/frontend -n dev --timeout=5m\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    deploy_dev_backend [label="deploy:dev:backend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_dev\nneeds:\n- package:backend\nenvironment:\n  name: development/backend\n  url: https://backend-dev.example.com\n  on_stop: stop:dev:backend\nscript:\n- echo \"Deploying backend to development environment\"\n- kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA}\n  -n dev\n- kubectl rollout status deployment/backend -n dev --timeout=5m\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    deploy_dev_api [label="deploy:dev:api", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_dev\nneeds:\n- package:api\nenvironment:\n  name: development/api\n  url: https://api-dev.example.com\n  on_stop: stop:dev:api\nscript:\n- echo \"Deploying API to development environment\"\n- kubectl set image deployment/api api=${DOCKER_IMAGE_BASE}/api:${CI_COMMIT_SHA} -n\n  dev\n- kubectl rollout status deployment/api -n dev --timeout=5m\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    stop_dev_frontend [label="stop:dev:frontend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_dev\nenvironment:\n  name: development/frontend\n  action: stop\nscript:\n- echo \"Stopping development frontend environment\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n  when: manual\n"];
+    stop_dev_backend [label="stop:dev:backend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_dev\nenvironment:\n  name: development/backend\n  action: stop\nscript:\n- echo \"Stopping development backend environment\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n  when: manual\n"];
+    stop_dev_api [label="stop:dev:api", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_dev\nenvironment:\n  name: development/api\n  action: stop\nscript:\n- echo \"Stopping development API environment\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n  when: manual\n"];
   }
 
   subgraph cluster_integration {
@@ -97,7 +98,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    integration_e2e [label="integration:e2e"];
+    integration_e2e [label="integration:e2e", tooltip="---\nstage: integration\nimage: cypress/included:13.6.0\nneeds:\n- deploy:dev:frontend\n- deploy:dev:backend\n- deploy:dev:api\nvariables:\n  CYPRESS_BASE_URL: https://frontend-dev.example.com\n  CYPRESS_API_URL: https://api-dev.example.com\nscript:\n- cypress run --spec \"cypress/e2e/**/*\" --reporter junit --reporter-options \"mochaFile=reports/e2e-junit.xml\"\nartifacts:\n  when: always\n  reports:\n    junit: reports/e2e-junit.xml\n  paths:\n  - cypress/videos/\n  - cypress/screenshots/\n  expire_in: 1 week\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
   }
 
   subgraph cluster_deploy_stage {
@@ -105,9 +106,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_staging_frontend [label="deploy:staging:frontend"];
-    deploy_staging_backend [label="deploy:staging:backend"];
-    deploy_staging_api [label="deploy:staging:api"];
+    deploy_staging_frontend [label="deploy:staging:frontend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_stage\nneeds:\n- package:frontend\n- integration:e2e\nresource_group: staging-frontend\nenvironment:\n  name: staging/frontend\n  url: https://frontend-staging.example.com\nscript:\n- echo \"Deploying frontend to staging environment\"\n- kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA}\n  -n staging\n- kubectl rollout status deployment/frontend -n staging --timeout=10m\n- echo \"Running smoke tests...\"\n- curl -f https://frontend-staging.example.com/health || exit 1\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
+    deploy_staging_backend [label="deploy:staging:backend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_stage\nneeds:\n- package:backend\n- integration:e2e\nresource_group: staging-backend\nenvironment:\n  name: staging/backend\n  url: https://backend-staging.example.com\nscript:\n- echo \"Deploying backend to staging environment\"\n- kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA}\n  -n staging\n- kubectl rollout status deployment/backend -n staging --timeout=10m\n- echo \"Running database migrations...\"\n- kubectl exec -n staging deployment/backend -- bundle exec rake db:migrate\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
+    deploy_staging_api [label="deploy:staging:api", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_stage\nneeds:\n- package:api\n- integration:e2e\nresource_group: staging-api\nenvironment:\n  name: staging/api\n  url: https://api-staging.example.com\nscript:\n- echo \"Deploying API to staging environment\"\n- kubectl set image deployment/api api=${DOCKER_IMAGE_BASE}/api:${CI_COMMIT_SHA} -n\n  staging\n- kubectl rollout status deployment/api -n staging --timeout=10m\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
   }
 
   subgraph cluster_performance {
@@ -115,8 +116,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    performance_load_test [label="performance:load-test"];
-    performance_stress_test [label="performance:stress-test"];
+    performance_load_test [label="performance:load-test", tooltip="---\nstage: performance\nimage: grafana/k6:latest\nneeds:\n- deploy:staging:frontend\n- deploy:staging:backend\n- deploy:staging:api\nscript:\n- k6 run --out json=performance-report.json tests/performance/load-test.js\n- echo \"Load test completed\"\nartifacts:\n  reports:\n    performance: performance-report.json\n  expire_in: 1 week\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\" && $ENABLE_PERFORMANCE_TESTS == \"true\"\n"];
+    performance_stress_test [label="performance:stress-test", tooltip="---\nstage: performance\nimage: grafana/k6:latest\nneeds:\n- deploy:staging:frontend\n- deploy:staging:backend\n- deploy:staging:api\nscript:\n- k6 run --vus 100 --duration 5m tests/performance/stress-test.js\n- echo \"Stress test completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\" && $ENABLE_PERFORMANCE_TESTS == \"true\"\n  when: manual\n"];
   }
 
   subgraph cluster_deploy_prod {
@@ -124,10 +125,10 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_prod_frontend [label="deploy:prod:frontend"];
-    deploy_prod_backend [label="deploy:prod:backend"];
-    deploy_prod_api [label="deploy:prod:api"];
-    trigger_monitoring_setup [label="trigger:monitoring-setup"];
+    deploy_prod_frontend [label="deploy:prod:frontend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_prod\nneeds:\n- deploy:staging:frontend\n- performance:load-test\nresource_group: production-frontend\nenvironment:\n  name: production/frontend\n  url: https://frontend.example.com\nscript:\n- echo \"Deploying frontend to production environment\"\n- kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA}\n  -n production\n- kubectl rollout status deployment/frontend -n production --timeout=15m\n- echo \"Production deployment completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\nretry:\n  max: 1\n  when:\n  - api_failure\n"];
+    deploy_prod_backend [label="deploy:prod:backend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_prod\nneeds:\n- deploy:staging:backend\n- performance:load-test\nresource_group: production-backend\nenvironment:\n  name: production/backend\n  url: https://backend.example.com\nbefore_script:\n- - before_script\n- echo \"Creating database backup before deployment...\"\nscript:\n- echo \"Deploying backend to production environment\"\n- kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA}\n  -n production\n- kubectl rollout status deployment/backend -n production --timeout=15m\n- echo \"Running production database migrations...\"\n- kubectl exec -n production deployment/backend -- bundle exec rake db:migrate\nafter_script:\n- - after_script\n- echo \"Deployment metrics recorded\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n"];
+    deploy_prod_api [label="deploy:prod:api", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_prod\nneeds:\n- deploy:staging:api\n- performance:load-test\nresource_group: production-api\nenvironment:\n  name: production/api\n  url: https://api.example.com\nscript:\n- echo \"Deploying API to production environment\"\n- kubectl set image deployment/api api=${DOCKER_IMAGE_BASE}/api:${CI_COMMIT_SHA} -n\n  production\n- kubectl rollout status deployment/api -n production --timeout=15m\n- echo \"Warming up API cache...\"\n- curl -f https://api.example.com/health || exit 1\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n"];
+    trigger_monitoring_setup [label="trigger:monitoring-setup", tooltip="---\nstage: deploy_prod\nneeds:\n- deploy:prod:frontend\n- deploy:prod:backend\n- deploy:prod:api\ntrigger:\n  include: \".gitlab/ci/monitoring.yml\"\n  strategy: depend\nvariables:\n  DEPLOYMENT_ID: \"${CI_PIPELINE_ID}\"\n  ENVIRONMENT: production\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
   }
 
   subgraph cluster_cleanup {
@@ -135,9 +136,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    cleanup_old_images [label="cleanup:old-images"];
-    cleanup_artifacts [label="cleanup:artifacts"];
-    notify_pipeline_status [label="notify:pipeline-status"];
+    cleanup_old_images [label="cleanup:old-images", tooltip="---\nstage: cleanup\nimage: alpine:latest\nneeds: []\nscript:\n- echo \"Cleaning up old Docker images...\"\n- echo \"Removing images older than 30 days\"\n- echo \"Cleanup completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n"];
+    cleanup_artifacts [label="cleanup:artifacts", tooltip="---\nstage: cleanup\nimage: alpine:latest\nneeds: []\nscript:\n- echo \"Cleaning up old artifacts...\"\n- echo \"Removing artifacts older than 7 days\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"schedule\"\n"];
+    notify_pipeline_status [label="notify:pipeline-status", tooltip="---\nstage: cleanup\nimage: alpine:latest\nneeds: []\nscript:\n- echo \"================================================\"\n- echo \"Pipeline Summary\"\n- echo \"================================================\"\n- echo \"Pipeline ID: ${CI_PIPELINE_ID}\"\n- echo \"Pipeline URL: ${CI_PIPELINE_URL}\"\n- echo \"Commit: ${CI_COMMIT_SHA}\"\n- echo \"Branch: ${CI_COMMIT_REF_NAME}\"\n- echo \"Status: ${CI_JOB_STATUS}\"\n- echo \"================================================\"\n- |\n  if [ \"${CI_JOB_STATUS}\" = \"success\" ]; then\n    echo \"All pipeline jobs completed successfully!\"\n  else\n    echo \"Some pipeline jobs failed. Please review.\"\n  fi\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: always\n"];
   }
 
   validate_yaml -> _base_config;

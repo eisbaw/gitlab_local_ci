@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
@@ -7,10 +8,10 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_app [label="build-app"];
-    integration_tests [label="integration-tests"];
-    code_quality [label="code-quality"];
-    deploy_production [label="deploy-production"];
+    build_app [label="build-app", tooltip="---\nvariables:\n  BUILD_TYPE: optimized\nscript:\n- echo \"Building application with overrides...\"\n- echo \"Build type: ${BUILD_TYPE}\"\n- mkdir -p build\n- echo \"app-v${VERSION}-optimized\" > build/app.txt\n- echo \"Build completed with custom configuration\"\nafter_script:\n- echo \"Custom post-build step\"\n- ls -la build/\n"];
+    integration_tests [label="integration-tests", tooltip="---\nallow_failure: true\nscript:\n- echo \"Running integration tests (with override)...\"\n- echo \"Test suite: Integration Tests (Extended)\"\n- echo \"Running additional smoke tests...\"\n- echo \"Tests passed: 50/50\"\n- echo \"All integration tests passed\"\n"];
+    code_quality [label="code-quality", tooltip="---\nstage: test\nscript:\n- echo \"Running code quality checks...\"\n- echo \"Analyzing code style...\"\n- echo \"Checking for code smells...\"\n- echo \"Quality score: A+\"\ndependencies:\n- build-app\nallow_failure: true\n"];
+    deploy_production [label="deploy-production", tooltip="---\nbefore_script:\n- echo \"Preparing production deployment with extra checks...\"\n- echo \"Verifying all tests passed...\"\n- echo \"Checking deployment prerequisites...\"\nscript:\n- echo \"Deploying to production environment (verified)...\"\n- echo \"Target: www.example.com\"\n- echo \"Running pre-deployment health checks...\"\n- echo \"Production deployment completed successfully\"\nafter_script:\n- echo \"Running post-deployment verification...\"\n- echo \"Sending deployment notification...\"\n"];
   }
 
 }

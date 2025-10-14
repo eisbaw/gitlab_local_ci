@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
@@ -7,7 +8,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    _build_template [label=".build_template"];
+    _build_template [label=".build_template", tooltip="---\nextends: \".base\"\nstage: build\ntags:\n- docker\n- build\nbefore_script:\n- echo \"Build template before_script\"\n- apk add --no-cache build-base git\nscript:\n- echo \"Default build script\"\nartifacts:\n  paths:\n  - build/\n  expire_in: 1 hour\n"];
   }
 
   subgraph cluster_test {
@@ -15,20 +16,20 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    _base [label=".base"];
-    _test_template [label=".test_template"];
-    _advanced_build [label=".advanced_build"];
-    build_simple [label="build_simple"];
-    build_complex [label="build_complex"];
-    build_advanced [label="build_advanced"];
-    test_unit [label="test_unit"];
-    test_integration [label="test_integration"];
-    test_e2e [label="test_e2e"];
-    deploy_staging [label="deploy_staging"];
-    deploy_production [label="deploy_production"];
-    deploy_canary [label="deploy_canary"];
-    build_no_retry [label="build_no_retry"];
-    test_security [label="test_security"];
+    _base [label=".base", tooltip="---\nimage: alpine:latest\ntags:\n- docker\nretry:\n  max: 2\n  when:\n  - runner_system_failure\nbefore_script:\n- echo \"Base before_script\"\n- apk add --no-cache curl\n"];
+    _test_template [label=".test_template", tooltip="---\nextends: \".base\"\nstage: test\ntags:\n- docker\n- test\nbefore_script:\n- echo \"Test template before_script\"\n- apk add --no-cache python3 py3-pip\nscript:\n- echo \"Default test script\"\ncoverage: \"/TOTAL.*\\\\s+(\\\\d+%)$/\"\n"];
+    _advanced_build [label=".advanced_build", tooltip="---\nextends: \".build_template\"\nvariables:\n  BUILD_TYPE: advanced\n  OPTIMIZATION: enabled\nafter_script:\n- echo \"Advanced build cleanup\"\n- rm -rf /tmp/*\n"];
+    build_simple [label="build_simple", tooltip="---\nextends: \".build_template\"\nscript:\n- echo \"Building simple application\"\n- mkdir -p build\n- echo \"binary\" > build/app\n"];
+    build_complex [label="build_complex", tooltip="---\nextends: \".build_template\"\nvariables:\n  BUILD_ENV: production\n  OPTIMIZATION_LEVEL: '3'\nscript:\n- echo \"Building complex application with optimizations\"\n- echo \"BUILD_ENV=$BUILD_ENV\"\n- mkdir -p build\n- echo \"optimized_binary\" > build/app_optimized\nartifacts:\n  paths:\n  - build/\n  expire_in: 2 hours\n"];
+    build_advanced [label="build_advanced", tooltip="---\nextends: \".advanced_build\"\nvariables:\n  BUILD_TYPE: super_advanced\n  EXTRA_FLAGS: \"--strict\"\nscript:\n- echo \"Building with advanced template\"\n- echo \"BUILD_TYPE=$BUILD_TYPE\"\n- echo \"OPTIMIZATION=$OPTIMIZATION\"\n- mkdir -p build\n- echo \"advanced_binary\" > build/app_advanced\n"];
+    test_unit [label="test_unit", tooltip="---\nextends: \".test_template\"\nscript:\n- echo \"Running unit tests\"\n- python3 -c \"print('All unit tests passed')\"\ndependencies:\n- build_simple\n"];
+    test_integration [label="test_integration", tooltip="---\nextends: \".test_template\"\nscript:\n- echo \"Running integration tests\"\n- echo \"Coverage: 85.5%\"\ncoverage: \"/Coverage:\\\\s+(\\\\d+\\\\.\\\\d+%)/\"\ndependencies:\n- build_complex\n"];
+    test_e2e [label="test_e2e", tooltip="---\nextends: \".test_template\"\nbefore_script:\n- echo \"E2E specific setup - replaces template before_script\"\n- apk add --no-cache chromium chromium-chromedriver\nscript:\n- echo \"Running end-to-end tests\"\n- echo \"Browser tests completed\"\ndependencies:\n- build_advanced\n"];
+    deploy_staging [label="deploy_staging", tooltip="---\nextends: \".deploy_template\"\nenvironment:\n  name: staging\n  url: https://staging.example.com\nonly:\n- develop\n- \"/^feature\\\\/.*$/\"\nscript:\n- echo \"Deploying to staging environment\"\n- echo \"Deployment successful\"\n"];
+    deploy_production [label="deploy_production", tooltip="---\nextends: \".deploy_template\"\nvariables:\n  DEPLOY_STRATEGY: blue-green\n  HEALTH_CHECK_TIMEOUT: '300'\nbefore_script:\n- echo \"Production deploy setup\"\n- apk add --no-cache openssh-client aws-cli\nscript:\n- echo \"Deploying to production with $DEPLOY_STRATEGY strategy\"\n- echo \"Running health checks\"\n- echo \"Production deployment successful\"\nonly:\n- master\nwhen: manual\n"];
+    deploy_canary [label="deploy_canary", tooltip="---\nextends: \".deploy_template\"\nvariables:\n  DEPLOY_STRATEGY: canary\n  CANARY_PERCENTAGE: '10'\nenvironment:\n  name: production-canary\n  url: https://canary.example.com\nscript:\n- echo \"Deploying canary release\"\n- echo \"Canary percentage: $CANARY_PERCENTAGE%\"\nwhen: manual\nallow_failure: true\n"];
+    build_no_retry [label="build_no_retry", tooltip="---\nextends: \".build_template\"\nretry: 0\nscript:\n- echo \"Building without retry capability\"\n- mkdir -p build\n- echo \"no_retry_binary\" > build/app_no_retry\n"];
+    test_security [label="test_security", tooltip="---\nextends: \".test_template\"\nscript:\n- echo \"Running security scans\"\n- echo \"Vulnerability check passed\"\nallow_failure: true\ntimeout: 30m\nrules:\n- if: $CI_COMMIT_BRANCH == \"master\"\n  when: always\n- when: manual\n"];
   }
 
   subgraph cluster_deploy {
@@ -36,7 +37,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    _deploy_template [label=".deploy_template"];
+    _deploy_template [label=".deploy_template", tooltip="---\nextends: \".base\"\nstage: deploy\ntags:\n- docker\n- deploy\nbefore_script:\n- echo \"Deploy template before_script\"\n- apk add --no-cache openssh-client\nonly:\n- main\n- master\nenvironment:\n  name: production\n  url: https://example.com\n"];
   }
 
   _build_template -> _base;

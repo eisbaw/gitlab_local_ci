@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
@@ -7,11 +8,11 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    unit_tests [label="unit-tests"];
-    integration_tests [label="integration-tests"];
-    coverage_formats [label="coverage-formats"];
-    full_test_suite [label="full-test-suite"];
-    go_tests [label="go-tests"];
+    unit_tests [label="unit-tests", tooltip="---\nstage: test\nimage: ruby:3.0\nscript:\n- echo \"Running unit tests with coverage...\"\n- bundle install\n- bundle exec rspec --format RspecJunitFormatter --out rspec.xml\n- echo \"Coverage: 85.5%\"\ncoverage: \"/Coverage: \\\\d+\\\\.\\\\d+%/\"\nartifacts:\n  reports:\n    junit: rspec.xml\n    coverage_report:\n      coverage_format: cobertura\n      path: coverage/coverage.xml\n  paths:\n  - coverage/\n  expire_in: 30 days\n"];
+    integration_tests [label="integration-tests", tooltip="---\nstage: test\nimage: python:3.9\nscript:\n- echo \"Running integration tests...\"\n- pip install pytest pytest-cov\n- pytest --cov=src --cov-report=xml:coverage.xml --cov-report=term\n- echo \"Total coverage: 92.3 percent\"\ncoverage: \"/Total coverage: (\\\\d+\\\\.\\\\d+)/\"\nartifacts:\n  reports:\n    junit: test-results.xml\n    cobertura: coverage.xml\n  expire_in: 1 week\n"];
+    coverage_formats [label="coverage-formats", tooltip="---\nstage: test\nimage: alpine:latest\nscript:\n- echo \"Testing various coverage formats...\"\n- echo \"Line coverage: 78.9%\"\n- echo \"Branch coverage: 65.4%\"\n- echo \"Function coverage: 91.2%\"\ncoverage: \"/Line coverage: (\\\\d+\\\\.\\\\d+)%/\"\n"];
+    full_test_suite [label="full-test-suite", tooltip="---\nstage: test\nimage: node:16\nscript:\n- echo \"Running comprehensive test suite...\"\n- npm install\n- npm run test:coverage\n- echo \"Code coverage is 88.7%\"\ncoverage: \"/Code coverage is (\\\\d+\\\\.\\\\d+)%/\"\nartifacts:\n  reports:\n    junit:\n    - test-results/unit.xml\n    - test-results/integration.xml\n    cobertura: coverage/cobertura-coverage.xml\n    codequality: code-quality-report.json\n  paths:\n  - coverage/\n  - test-results/\n  when: always\n  expire_in: 2 weeks\n"];
+    go_tests [label="go-tests", tooltip="---\nstage: test\nimage: golang:1.19\nscript:\n- echo \"Running Go tests with coverage...\"\n- go test -v -coverprofile=coverage.out ./...\n- go tool cover -func=coverage.out\n- echo \"total: (statements) 94.5%\"\ncoverage: \"/total:.*\\\\(statements\\\\)\\\\s+(\\\\d+\\\\.\\\\d+)%/\"\nartifacts:\n  reports:\n    junit: report.xml\n    cobertura: coverage.xml\n"];
   }
 
   subgraph cluster_security {
@@ -19,7 +20,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    sast [label="sast"];
+    sast [label="sast", tooltip="---\nstage: security\nimage: returntocorp/semgrep\nscript:\n- echo \"Running SAST analysis...\"\n- semgrep --config=auto --gitlab-sast --output gl-sast-report.json src/ || true\nartifacts:\n  reports:\n    sast: gl-sast-report.json\n"];
   }
 
   subgraph cluster_quality {
@@ -27,7 +28,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    code_quality [label="code-quality"];
+    code_quality [label="code-quality", tooltip="---\nstage: quality\nimage: node:16\nscript:\n- echo \"Running code quality checks...\"\n- npm install -g eslint\n- eslint src/ --format json --output-file gl-code-quality-report.json || true\nartifacts:\n  reports:\n    codequality: gl-code-quality-report.json\n  paths:\n  - gl-code-quality-report.json\n"];
   }
 
   unit_tests -> code_quality;

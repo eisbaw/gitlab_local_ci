@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
@@ -7,9 +8,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    unit_tests [label="unit_tests"];
-    integration_tests [label="integration_tests"];
-    lint [label="lint"];
+    unit_tests [label="unit_tests", tooltip="---\nstage: test\nscript:\n- echo \"Running unit tests...\"\n- sleep 2\n- echo \"Unit tests passed\"\n"];
+    integration_tests [label="integration_tests", tooltip="---\nstage: test\nscript:\n- echo \"Running integration tests...\"\n- sleep 3\n- echo \"Integration tests passed\"\n"];
+    lint [label="lint", tooltip="---\nstage: test\nscript:\n- echo \"Running linter...\"\n- sleep 1\n- echo \"Linting passed\"\n"];
   }
 
   subgraph cluster_deploy {
@@ -17,7 +18,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy [label="deploy"];
+    deploy [label="deploy", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying application...\"\n- sleep 2\n- echo \"Deployment complete\"\n"];
   }
 
   unit_tests -> deploy;

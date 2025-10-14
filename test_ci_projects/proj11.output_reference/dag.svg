@@ -17,26 +17,38 @@
 <!-- build_app -->
 <g id="node1" class="node">
 <title>build_app</title>
+<g id="a_node1"><a xlink:title="&#45;&#45;&#45;&#10;variables:&#10; &#160;BUILD_TYPE: optimized&#10;script:&#10;&#45; echo &quot;Building application with overrides...&quot;&#10;&#45; echo &quot;Build type: ${BUILD_TYPE}&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;app&#45;v${VERSION}&#45;optimized&quot; &gt; build/app.txt&#10;&#45; echo &quot;Build completed with custom configuration&quot;&#10;after_script:&#10;&#45; echo &quot;Custom post&#45;build step&quot;&#10;&#45; ls &#45;la build/&#10;">
 <polygon fill="lightblue" stroke="black" points="129.88,-52 47.12,-52 47.12,-16 129.88,-16 129.88,-52"/>
 <text text-anchor="middle" x="88.5" y="-29.32" font-family="Times,serif" font-size="14.00">build&#45;app</text>
+</a>
+</g>
 </g>
 <!-- integration_tests -->
 <g id="node2" class="node">
 <title>integration_tests</title>
+<g id="a_node2"><a xlink:title="&#45;&#45;&#45;&#10;allow_failure: true&#10;script:&#10;&#45; echo &quot;Running integration tests (with override)...&quot;&#10;&#45; echo &quot;Test suite: Integration Tests (Extended)&quot;&#10;&#45; echo &quot;Running additional smoke tests...&quot;&#10;&#45; echo &quot;Tests passed: 50/50&quot;&#10;&#45; echo &quot;All integration tests passed&quot;&#10;">
 <polygon fill="lightblue" stroke="black" points="156.12,-106 20.88,-106 20.88,-70 156.12,-70 156.12,-106"/>
 <text text-anchor="middle" x="88.5" y="-83.33" font-family="Times,serif" font-size="14.00">integration&#45;tests</text>
+</a>
+</g>
 </g>
 <!-- code_quality -->
 <g id="node3" class="node">
 <title>code_quality</title>
+<g id="a_node3"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running code quality checks...&quot;&#10;&#45; echo &quot;Analyzing code style...&quot;&#10;&#45; echo &quot;Checking for code smells...&quot;&#10;&#45; echo &quot;Quality score: A+&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;allow_failure: true&#10;">
 <polygon fill="lightblue" stroke="black" points="140,-160 37,-160 37,-124 140,-124 140,-160"/>
 <text text-anchor="middle" x="88.5" y="-137.32" font-family="Times,serif" font-size="14.00">code&#45;quality</text>
+</a>
+</g>
 </g>
 <!-- deploy_production -->
 <g id="node4" class="node">
 <title>deploy_production</title>
+<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;before_script:&#10;&#45; echo &quot;Preparing production deployment with extra checks...&quot;&#10;&#45; echo &quot;Verifying all tests passed...&quot;&#10;&#45; echo &quot;Checking deployment prerequisites...&quot;&#10;script:&#10;&#45; echo &quot;Deploying to production environment (verified)...&quot;&#10;&#45; echo &quot;Target: www.example.com&quot;&#10;&#45; echo &quot;Running pre&#45;deployment health checks...&quot;&#10;&#45; echo &quot;Production deployment completed successfully&quot;&#10;after_script:&#10;&#45; echo &quot;Running post&#45;deployment verification...&quot;&#10;&#45; echo &quot;Sending deployment notification...&quot;&#10;">
 <polygon fill="lightblue" stroke="black" points="161,-214 16,-214 16,-178 161,-178 161,-214"/>
 <text text-anchor="middle" x="88.5" y="-191.32" font-family="Times,serif" font-size="14.00">deploy&#45;production</text>
+</a>
+</g>
 </g>
 </g>
 </svg>

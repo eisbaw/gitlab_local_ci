@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
@@ -7,7 +8,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build [label="build"];
+    build [label="build", tooltip="---\nstage: build\nscript:\n- echo \"Building application version ${DEPLOY_VERSION}\"\n- echo \"Build artifacts created\"\n- mkdir -p dist\n- echo \"app-${DEPLOY_VERSION}\" > dist/app.tar.gz\nartifacts:\n  paths:\n  - dist/\n  expire_in: 1 hour\n"];
   }
 
   subgraph cluster_deploy_staging {
@@ -15,8 +16,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_staging_app [label="deploy_staging_app"];
-    deploy_staging_database [label="deploy_staging_database"];
+    deploy_staging_app [label="deploy_staging_app", tooltip="---\nstage: deploy_staging\nresource_group: staging/deployment\nenvironment:\n  name: staging\n  url: https://staging.example.com\n  auto_stop_in: 1 day\n  on_stop: stop_staging\nscript:\n- echo \"Deploying to staging environment\"\n- echo \"Resource group 'staging/deployment' ensures only one staging deploy at a time\"\n- sleep 2\n- echo \"Application deployed to staging\"\n- echo \"Environment URL: https://staging.example.com\"\nneeds:\n- build\n"];
+    deploy_staging_database [label="deploy_staging_database", tooltip="---\nstage: deploy_staging\nresource_group: staging/deployment\nenvironment:\n  name: staging\n  url: https://staging.example.com\n  auto_stop_in: 1 day\nscript:\n- echo \"Deploying database migrations to staging\"\n- echo \"Waiting for staging/deployment resource group lock\"\n- sleep 2\n- echo \"Database migrations applied to staging\"\nneeds:\n- build\nwhen: manual\n"];
   }
 
   subgraph cluster_deploy_production {
@@ -24,10 +25,10 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_production_app [label="deploy_production_app"];
-    deploy_production_database [label="deploy_production_database"];
-    deploy_production_hotfix [label="deploy_production_hotfix"];
-    deploy_monitoring [label="deploy_monitoring"];
+    deploy_production_app [label="deploy_production_app", tooltip="---\nstage: deploy_production\nresource_group: production/deployment\nenvironment:\n  name: production\n  url: https://production.example.com\n  auto_stop_in: 30 days\n  on_stop: stop_production\nscript:\n- echo \"Deploying to production environment\"\n- echo \"Resource group 'production/deployment' ensures safe production deploys\"\n- sleep 3\n- echo \"Application deployed to production\"\n- echo \"Environment URL: https://production.example.com\"\nneeds:\n- deploy_staging_app\nwhen: manual\nonly:\n- master\n- main\n"];
+    deploy_production_database [label="deploy_production_database", tooltip="---\nstage: deploy_production\nresource_group: production/deployment\nenvironment:\n  name: production\n  url: https://production.example.com\n  auto_stop_in: 30 days\nscript:\n- echo \"Deploying database migrations to production\"\n- echo \"Waiting for production/deployment resource group lock\"\n- sleep 3\n- echo \"Database migrations applied to production\"\nneeds:\n- deploy_staging_database\n- deploy_production_app\nwhen: manual\nonly:\n- master\n- main\n"];
+    deploy_production_hotfix [label="deploy_production_hotfix", tooltip="---\nstage: deploy_production\nresource_group: production/deployment\nenvironment:\n  name: production\n  url: https://production.example.com\nscript:\n- echo \"Deploying emergency hotfix to production\"\n- echo \"Must wait for production/deployment resource group\"\n- sleep 2\n- echo \"Hotfix deployed successfully\"\nwhen: manual\nonly:\n- hotfix/*\n"];
+    deploy_monitoring [label="deploy_monitoring", tooltip="---\nstage: deploy_production\nresource_group: monitoring/deployment\nenvironment:\n  name: monitoring\n  url: https://monitoring.example.com\n  auto_stop_in: 7 days\nscript:\n- echo \"Deploying monitoring stack\"\n- echo \"Resource group 'monitoring/deployment' separate from app deployments\"\n- sleep 1\n- echo \"Monitoring deployed\"\nneeds:\n- deploy_production_app\nwhen: manual\n"];
   }
 
   subgraph cluster_cleanup {
@@ -35,8 +36,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    stop_staging [label="stop_staging"];
-    stop_production [label="stop_production"];
+    stop_staging [label="stop_staging", tooltip="---\nstage: cleanup\nresource_group: staging/deployment\nenvironment:\n  name: staging\n  action: stop\nscript:\n- echo \"Stopping staging environment\"\n- echo \"Cleaning up staging resources\"\n- sleep 1\n- echo \"Staging environment stopped\"\nwhen: manual\n"];
+    stop_production [label="stop_production", tooltip="---\nstage: cleanup\nresource_group: production/deployment\nenvironment:\n  name: production\n  action: stop\nscript:\n- echo \"Stopping production environment\"\n- echo \"Cleaning up production resources\"\n- sleep 2\n- echo \"Production environment stopped\"\nwhen: manual\nonly:\n- master\n- main\n"];
   }
 
   build -> deploy_staging_app;

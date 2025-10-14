@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_prepare {
@@ -7,8 +8,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    prepare_environment [label="prepare:environment"];
-    prepare_dependencies [label="prepare:dependencies"];
+    prepare_environment [label="prepare:environment", tooltip="---\nstage: prepare\nscript:\n- echo \"Setting up build environment\"\n- echo \"Loading configuration from vault\"\n- sleep 1\n"];
+    prepare_dependencies [label="prepare:dependencies", tooltip="---\nstage: prepare\nscript:\n- echo \"Downloading and caching dependencies\"\n- echo \"npm install, pip install, etc.\"\n- sleep 1\n"];
   }
 
   subgraph cluster_build {
@@ -16,11 +17,11 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_api_gateway [label="build:api-gateway"];
-    build_auth_service [label="build:auth-service"];
-    build_user_service [label="build:user-service"];
-    build_payment_service [label="build:payment-service"];
-    build_notification_service [label="build:notification-service"];
+    build_api_gateway [label="build:api-gateway", tooltip="---\nstage: build\nneeds:\n- prepare:environment\n- prepare:dependencies\nscript:\n- echo \"Building API Gateway service\"\n- echo \"Compiling TypeScript, running webpack\"\n- sleep 2\n"];
+    build_auth_service [label="build:auth-service", tooltip="---\nstage: build\nneeds:\n- prepare:environment\n- prepare:dependencies\nscript:\n- echo \"Building Authentication Service\"\n- echo \"Compiling Go binaries\"\n- sleep 2\n"];
+    build_user_service [label="build:user-service", tooltip="---\nstage: build\nneeds:\n- prepare:environment\n- prepare:dependencies\nscript:\n- echo \"Building User Service\"\n- echo \"Building Java Spring Boot application\"\n- sleep 2\n"];
+    build_payment_service [label="build:payment-service", tooltip="---\nstage: build\nneeds:\n- prepare:environment\n- prepare:dependencies\nscript:\n- echo \"Building Payment Service\"\n- echo \"Compiling Python FastAPI service\"\n- sleep 2\n"];
+    build_notification_service [label="build:notification-service", tooltip="---\nstage: build\nneeds:\n- prepare:environment\n- prepare:dependencies\nscript:\n- echo \"Building Notification Service\"\n- echo \"Building Node.js microservice\"\n- sleep 2\n"];
   }
 
   subgraph cluster_test {
@@ -28,11 +29,11 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    test_api_gateway [label="test:api-gateway"];
-    test_auth_service [label="test:auth-service"];
-    test_user_service [label="test:user-service"];
-    test_payment_service [label="test:payment-service"];
-    test_notification_service [label="test:notification-service"];
+    test_api_gateway [label="test:api-gateway", tooltip="---\nstage: test\nneeds:\n- build:api-gateway\nscript:\n- echo \"Running API Gateway unit tests\"\n- echo \"Jest test suite\"\n- sleep 2\n"];
+    test_auth_service [label="test:auth-service", tooltip="---\nstage: test\nneeds:\n- build:auth-service\nscript:\n- echo \"Running Auth Service unit tests\"\n- echo \"Go test coverage\"\n- sleep 2\n"];
+    test_user_service [label="test:user-service", tooltip="---\nstage: test\nneeds:\n- build:user-service\nscript:\n- echo \"Running User Service unit tests\"\n- echo \"JUnit test suite\"\n- sleep 2\n"];
+    test_payment_service [label="test:payment-service", tooltip="---\nstage: test\nneeds:\n- build:payment-service\nscript:\n- echo \"Running Payment Service unit tests\"\n- echo \"pytest with coverage\"\n- sleep 2\n"];
+    test_notification_service [label="test:notification-service", tooltip="---\nstage: test\nneeds:\n- build:notification-service\nscript:\n- echo \"Running Notification Service unit tests\"\n- echo \"Mocha test suite\"\n- sleep 2\n"];
   }
 
   subgraph cluster_integration {
@@ -40,9 +41,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    integration_auth_flow [label="integration:auth-flow"];
-    integration_payment_flow [label="integration:payment-flow"];
-    integration_notification_flow [label="integration:notification-flow"];
+    integration_auth_flow [label="integration:auth-flow", tooltip="---\nstage: integration\nneeds:\n- test:api-gateway\n- test:auth-service\n- test:user-service\nscript:\n- echo \"Testing authentication flow integration\"\n- echo \"API Gateway -> Auth Service -> User Service\"\n- sleep 3\n"];
+    integration_payment_flow [label="integration:payment-flow", tooltip="---\nstage: integration\nneeds:\n- test:api-gateway\n- test:payment-service\n- test:user-service\nscript:\n- echo \"Testing payment flow integration\"\n- echo \"API Gateway -> Payment Service -> User Service\"\n- sleep 3\n"];
+    integration_notification_flow [label="integration:notification-flow", tooltip="---\nstage: integration\nneeds:\n- test:notification-service\n- test:user-service\n- test:payment-service\nscript:\n- echo \"Testing notification flow integration\"\n- echo \"Payment Service triggers -> Notification Service\"\n- sleep 3\n"];
   }
 
   subgraph cluster_security {
@@ -50,8 +51,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    security_sast [label="security:sast"];
-    security_dependency_scan [label="security:dependency-scan"];
+    security_sast [label="security:sast", tooltip="---\nstage: security\nneeds:\n- build:api-gateway\n- build:auth-service\n- build:user-service\n- build:payment-service\n- build:notification-service\nscript:\n- echo \"Running SAST security analysis\"\n- echo \"Scanning all service codebases for vulnerabilities\"\n- sleep 2\n"];
+    security_dependency_scan [label="security:dependency-scan", tooltip="---\nstage: security\nneeds:\n- prepare:dependencies\nscript:\n- echo \"Scanning dependencies for known vulnerabilities\"\n- echo \"Checking npm audit, safety, etc.\"\n- sleep 2\n"];
   }
 
   subgraph cluster_deploy {
@@ -59,7 +60,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_staging [label="deploy:staging"];
+    deploy_staging [label="deploy:staging", tooltip="---\nstage: deploy\nneeds:\n- integration:auth-flow\n- integration:payment-flow\n- integration:notification-flow\n- security:sast\n- security:dependency-scan\nscript:\n- echo \"Deploying all services to staging environment\"\n- echo \"Updating Kubernetes manifests\"\n- echo \"Rolling out with zero downtime\"\n- sleep 3\n"];
   }
 
   subgraph cluster_verify {
@@ -67,9 +68,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    verify_e2e_tests [label="verify:e2e-tests"];
-    verify_smoke_tests [label="verify:smoke-tests"];
-    verify_performance_tests [label="verify:performance-tests"];
+    verify_e2e_tests [label="verify:e2e-tests", tooltip="---\nstage: verify\nneeds:\n- deploy:staging\nscript:\n- echo \"Running end-to-end tests on staging\"\n- echo \"Simulating real user workflows\"\n- echo \"Testing complete microservices ecosystem\"\n- sleep 3\n"];
+    verify_smoke_tests [label="verify:smoke-tests", tooltip="---\nstage: verify\nneeds:\n- deploy:staging\nscript:\n- echo \"Running smoke tests\"\n- echo \"Verifying critical paths are functional\"\n- sleep 2\n"];
+    verify_performance_tests [label="verify:performance-tests", tooltip="---\nstage: verify\nneeds:\n- deploy:staging\nscript:\n- echo \"Running performance tests\"\n- echo \"Load testing with k6\"\n- echo \"Measuring response times and throughput\"\n- sleep 3\n"];
   }
 
   prepare_environment -> build_api_gateway;

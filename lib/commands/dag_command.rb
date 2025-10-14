@@ -162,12 +162,17 @@ class DagCommand
     # Extract script (required for actual jobs, but we're just visualizing)
     script = job_config['script'] || []
 
+    # Store full job config for tooltip generation
+    # This is the concatenated/resolved YAML after anchors and extends
+    full_config = job_config.dup
+
     {
       name: name,
       stage: stage,
       needs: needs,
       has_explicit_needs: has_explicit_needs,
-      script: script
+      script: script,
+      config: full_config
     }
   end
 
@@ -274,6 +279,7 @@ class DagCommand
     lines = []
     lines << 'digraph pipeline {'
     lines << '  rankdir="LR";'
+    lines << '  ranksep=2;'
     lines << '  node [shape=box, style=filled, fillcolor=lightblue];'
     lines << ''
 
@@ -293,7 +299,8 @@ class DagCommand
 
       # Add nodes for jobs in this stage
       stage_jobs.each do |job|
-        lines << "    #{sanitize_id(job[:name])} [label=\"#{escape_label(job[:name])}\"];"
+        tooltip = generate_job_tooltip(job)
+        lines << "    #{sanitize_id(job[:name])} [label=\"#{escape_label(job[:name])}\", tooltip=#{tooltip}];"
       end
 
       lines << '  }'
@@ -383,5 +390,30 @@ class DagCommand
   # @return [String] Escaped label
   def escape_label(str)
     str.gsub('\\', '\\\\').gsub('"', '\\"')
+  end
+
+  # Generate tooltip for a job showing the resolved YAML configuration
+  #
+  # This shows the "concatenated" YAML - the full job configuration after
+  # anchors and extends have been resolved by YAML parser
+  #
+  # @param job [Hash] Job structure with :config key
+  # @return [String] Quoted and escaped tooltip string for DOT format
+  def generate_job_tooltip(job)
+    return '""' unless job[:config]
+
+    # Convert config hash to YAML, pretty-printed
+    yaml_str = YAML.dump(job[:config])
+
+    # Escape for DOT tooltip attribute
+    # - Replace backslashes with double backslashes
+    # - Replace quotes with escaped quotes
+    # - Replace newlines with \n literal
+    escaped = yaml_str.gsub('\\', '\\\\\\\\')
+                      .gsub('"', '\\"')
+                      .gsub("\n", '\\n')
+
+    # Return as quoted string
+    "\"#{escaped}\""
   end
 end

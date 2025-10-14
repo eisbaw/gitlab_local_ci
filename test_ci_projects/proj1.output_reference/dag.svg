@@ -17,8 +17,11 @@
 <!-- test -->
 <g id="node1" class="node">
 <title>test</title>
+<g id="a_node1"><a xlink:title="&#45;&#45;&#45;&#10;script:&#10;&#45; echo &quot;Hello World&quot;&#10;">
 <polygon fill="lightblue" stroke="black" points="70,-52 16,-52 16,-16 70,-16 70,-52"/>
 <text text-anchor="middle" x="43" y="-29.32" font-family="Times,serif" font-size="14.00">test</text>
+</a>
+</g>
 </g>
 </g>
 </svg>

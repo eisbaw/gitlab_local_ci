@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
@@ -7,11 +8,11 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_default_cache [label="build:default-cache"];
-    build_static_cache [label="build:static-cache"];
-    build_dynamic_cache [label="build:dynamic-cache"];
-    build_push_only [label="build:push-only"];
-    build_files_cache [label="build:files-cache"];
+    build_default_cache [label="build:default-cache", tooltip="---\nstage: build\nscript:\n- echo \"Using global cache configuration\"\n- mkdir -p .cache vendor\n- echo \"build artifacts\" > .cache/build.txt\n- echo \"vendor libs\" > vendor/libs.txt\n"];
+    build_static_cache [label="build:static-cache", tooltip="---\nstage: build\ncache:\n  key: static-build-cache\n  paths:\n  - build/\n  - \".npm/\"\n  policy: push\nscript:\n- echo \"Using static cache key\"\n- mkdir -p build .npm\n- echo \"build output\" > build/app.js\n- echo \"npm cache\" > .npm/cache.txt\n"];
+    build_dynamic_cache [label="build:dynamic-cache", tooltip="---\nstage: build\ncache:\n  key: \"${CI_COMMIT_REF_SLUG}-build\"\n  paths:\n  - dist/\n  - node_modules/\n  policy: push\nscript:\n- echo \"Using dynamic cache key with branch name\"\n- echo \"Branch: $CI_COMMIT_REF_SLUG\"\n- mkdir -p dist node_modules\n- echo \"distribution\" > dist/bundle.js\n- echo \"dependencies\" > node_modules/.cache\n"];
+    build_push_only [label="build:push-only", tooltip="---\nstage: build\ncache:\n  key: dependencies-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \".bundler/\"\n  - \".yarn/\"\n  policy: push\nscript:\n- echo \"Using push-only cache policy\"\n- mkdir -p .bundler .yarn\n- echo \"bundler cache\" > .bundler/config\n- echo \"yarn cache\" > .yarn/cache.txt\n- echo \"Only writing to cache, not reading\"\n"];
+    build_files_cache [label="build:files-cache", tooltip="---\nstage: build\ncache:\n  key:\n    files:\n    - Gemfile.lock\n    - package-lock.json\n    prefix: \"${CI_COMMIT_REF_SLUG}\"\n  paths:\n  - vendor/bundle\n  - node_modules/\n  policy: pull-push\nscript:\n- echo \"Cache key based on lockfile checksums\"\n- echo \"Key changes when dependencies change\"\n- mkdir -p vendor/bundle node_modules\n- echo \"gems\" > vendor/bundle/cache.txt\n- echo \"npm packages\" > node_modules/.package-lock.json\n"];
   }
 
   subgraph cluster_test {
@@ -19,9 +20,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    test_multi_cache [label="test:multi-cache"];
-    test_pull_only [label="test:pull-only"];
-    test_combined_cache [label="test:combined-cache"];
+    test_multi_cache [label="test:multi-cache", tooltip="---\nstage: test\ncache:\n- key: \"${CI_COMMIT_REF_SLUG}-gems\"\n  paths:\n  - vendor/ruby\n  policy: pull\n- key: \"${CI_COMMIT_REF_SLUG}-pip\"\n  paths:\n  - \".pip-cache\"\n  policy: pull\n- key: static-test-data\n  paths:\n  - test/fixtures\n  policy: pull\nscript:\n- echo \"Using multiple cache entries\"\n- echo \"Testing with cached dependencies\"\n- ls -la vendor/ruby || echo \"Ruby cache not found\"\n- ls -la .pip-cache || echo \"Pip cache not found\"\n- ls -la test/fixtures || echo \"Test fixtures not found\"\n"];
+    test_pull_only [label="test:pull-only", tooltip="---\nstage: test\ncache:\n  key: \"${CI_COMMIT_REF_SLUG}-build\"\n  paths:\n  - dist/\n  policy: pull\nscript:\n- echo \"Using pull-only cache policy\"\n- ls -la dist/ || echo \"No cached dist found\"\n- echo \"Running tests with cached build artifacts\"\n"];
+    test_combined_cache [label="test:combined-cache", tooltip="---\nstage: test\ncache:\n- key: global-cache-key\n  paths:\n  - \".cache/\"\n  policy: pull\n- key: \"${CI_COMMIT_REF_SLUG}-test\"\n  paths:\n  - coverage/\n  policy: push\nscript:\n- echo \"Using both global and job-specific cache\"\n- mkdir -p coverage\n- echo \"test coverage\" > coverage/index.html\n"];
   }
 
   subgraph cluster_deploy {
@@ -29,8 +30,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_complex_cache_key [label="deploy:complex-cache-key"];
-    deploy_no_cache [label="deploy:no-cache"];
+    deploy_complex_cache_key [label="deploy:complex-cache-key", tooltip="---\nstage: deploy\ncache:\n  key: \"${CI_COMMIT_REF_SLUG}-${CI_JOB_NAME}-v1\"\n  paths:\n  - \".deploy-cache/\"\n  policy: pull-push\nscript:\n- echo \"Using complex cache key with job name and version\"\n- mkdir -p .deploy-cache\n- echo \"deployment state\" > .deploy-cache/state.txt\n"];
+    deploy_no_cache [label="deploy:no-cache", tooltip="---\nstage: deploy\ncache: {}\nscript:\n- echo \"This job has cache disabled\"\n- echo \"No cache will be used or saved\"\n"];
   }
 
   build_default_cache -> test_multi_cache;

@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
@@ -7,11 +8,11 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    test_postgres [label="test:postgres"];
-    test_redis [label="test:redis"];
-    test_mysql [label="test:mysql"];
-    test_mongodb [label="test:mongodb"];
-    test_custom_service [label="test:custom-service"];
+    test_postgres [label="test:postgres", tooltip="---\nstage: test\nimage: ruby:3.2\nservices:\n- name: postgres:15\n  alias: db\nvariables:\n  POSTGRES_DB: test_database\n  POSTGRES_USER: test_user\n  POSTGRES_PASSWORD: test_password\n  DATABASE_URL: postgresql://test_user:test_password@db:5432/test_database\nscript:\n- apt-get update -qq && apt-get install -y postgresql-client\n- echo \"Testing PostgreSQL connection...\"\n- PGPASSWORD=$POSTGRES_PASSWORD psql -h db -U test_user -d test_database -c \"SELECT\n  version();\"\n- echo \"Running database migrations...\"\n- echo \"Running tests against database...\"\n"];
+    test_redis [label="test:redis", tooltip="---\nstage: test\nimage: node:18\nservices:\n- name: redis:7-alpine\n  alias: cache\nvariables:\n  REDIS_URL: redis://cache:6379\nscript:\n- apt-get update -qq && apt-get install -y redis-tools\n- echo \"Testing Redis connection...\"\n- redis-cli -h cache ping\n- redis-cli -h cache SET test_key \"test_value\"\n- redis-cli -h cache GET test_key\n- echo \"Running cache integration tests...\"\n"];
+    test_mysql [label="test:mysql", tooltip="---\nstage: test\nimage: ruby:3.2\nservices:\n- name: mysql:8.0\n  alias: mysql\nvariables:\n  MYSQL_ROOT_PASSWORD: root_password\n  MYSQL_DATABASE: test_db\n  MYSQL_USER: test_user\n  MYSQL_PASSWORD: test_pass\n  DATABASE_URL: mysql2://test_user:test_pass@mysql:3306/test_db\nscript:\n- apt-get update -qq && apt-get install -y default-mysql-client\n- echo \"Waiting for MySQL to be ready...\"\n- sleep 10\n- mysql -h mysql -u test_user -ptest_pass test_db -e \"SELECT 'MySQL connection successful';\"\n- echo \"Running MySQL tests...\"\n"];
+    test_mongodb [label="test:mongodb", tooltip="---\nstage: test\nimage: node:18\nservices:\n- name: mongo:7\n  alias: mongodb\nvariables:\n  MONGODB_URL: mongodb://mongodb:27017/test_db\nscript:\n- apt-get update -qq && apt-get install -y curl gnupg\n- curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o\n  /usr/share/keyrings/mongodb-archive-keyring.gpg\n- echo \"deb [signed-by=/usr/share/keyrings/mongodb-archive-keyring.gpg] http://repo.mongodb.org/apt/debian\n  bullseye/mongodb-org/7.0 main\" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list\n- apt-get update -qq && apt-get install -y mongodb-mongosh\n- echo \"Testing MongoDB connection...\"\n- mongosh $MONGODB_URL --eval \"db.version()\"\n- echo \"Running MongoDB tests...\"\n"];
+    test_custom_service [label="test:custom-service", tooltip="---\nstage: test\nimage: alpine:3.19\nservices:\n- name: nginx:alpine\n  alias: webserver\n  entrypoint:\n  - nginx\n  - \"-g\"\n  - daemon off;\nscript:\n- apk add --no-cache curl\n- sleep 5\n- echo \"Testing custom service with entrypoint...\"\n- curl -f http://webserver:80 || echo \"Service is running\"\n"];
   }
 
   subgraph cluster_integration {
@@ -19,7 +20,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    integration_full_stack [label="integration:full-stack"];
+    integration_full_stack [label="integration:full-stack", tooltip="---\nstage: integration\nimage: python:3.11\nservices:\n- name: postgres:15\n  alias: database\n- name: redis:7-alpine\n  alias: redis\n- name: elasticsearch:8.11.0\n  alias: search\n  command:\n  - bin/elasticsearch\n  - \"-Expack.security.enabled=false\"\nvariables:\n  POSTGRES_DB: app_db\n  POSTGRES_USER: app_user\n  POSTGRES_PASSWORD: app_pass\n  DATABASE_URL: postgresql://app_user:app_pass@database:5432/app_db\n  REDIS_URL: redis://redis:6379\n  ELASTICSEARCH_URL: http://search:9200\nscript:\n- pip install psycopg2-binary redis elasticsearch\n- echo \"Testing all service connections...\"\n- python -c \"import psycopg2; conn = psycopg2.connect('$DATABASE_URL'); print('PostgreSQL\n  OK')\"\n- python -c \"import redis; r = redis.from_url('$REDIS_URL'); r.ping(); print('Redis\n  OK')\"\n- sleep 10\n- python -c \"from elasticsearch import Elasticsearch; es = Elasticsearch(['$ELASTICSEARCH_URL']);\n  print('Elasticsearch OK')\"\n- echo \"Running full integration tests...\"\n"];
   }
 
   subgraph cluster_build {
@@ -27,7 +28,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_docker [label="build:docker"];
+    build_docker [label="build:docker", tooltip="---\nstage: build\nimage: docker:24-cli\nservices:\n- name: docker:24-dind\n  alias: docker\nvariables:\n  DOCKER_HOST: tcp://docker:2376\n  DOCKER_TLS_CERTDIR: \"/certs\"\n  DOCKER_TLS_VERIFY: 1\n  DOCKER_CERT_PATH: \"$DOCKER_TLS_CERTDIR/client\"\n  IMAGE_TAG: \"$CI_COMMIT_SHORT_SHA\"\nscript:\n- echo \"Building Docker image...\"\n- docker info\n- |\n  cat > Dockerfile <<EOF\n  FROM alpine:3.19\n  RUN apk add --no-cache curl\n  CMD [\"echo\", \"Hello from Docker\"]\n  EOF\n- docker build -t test-app:$IMAGE_TAG .\n- docker images\n- docker run --rm test-app:$IMAGE_TAG\n- echo \"Docker build completed successfully\"\n"];
   }
 
   test_postgres -> integration_full_stack;

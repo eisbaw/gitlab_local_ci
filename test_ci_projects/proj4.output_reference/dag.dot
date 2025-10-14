@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
@@ -7,9 +8,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_frontend [label="build:frontend"];
-    build_backend [label="build:backend"];
-    build_database [label="build:database"];
+    build_frontend [label="build:frontend", tooltip="---\nstage: build\nscript:\n- echo \"Building frontend...\"\n- sleep 2\n- echo \"Frontend build complete\"\nartifacts:\n  paths:\n  - dist/frontend/\n  expire_in: 1 hour\n"];
+    build_backend [label="build:backend", tooltip="---\nstage: build\nscript:\n- echo \"Building backend...\"\n- sleep 2\n- echo \"Backend build complete\"\nartifacts:\n  paths:\n  - dist/backend/\n  expire_in: 1 hour\n"];
+    build_database [label="build:database", tooltip="---\nstage: build\nscript:\n- echo \"Building database migrations...\"\n- sleep 1\n- echo \"Database migrations ready\"\nartifacts:\n  paths:\n  - dist/migrations/\n  expire_in: 1 hour\n"];
   }
 
   subgraph cluster_test {
@@ -17,10 +18,10 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    test_frontend_unit [label="test:frontend:unit"];
-    test_frontend_e2e [label="test:frontend:e2e"];
-    test_backend_unit [label="test:backend:unit"];
-    test_backend_api [label="test:backend:api"];
+    test_frontend_unit [label="test:frontend:unit", tooltip="---\nstage: test\nneeds:\n- build:frontend\nscript:\n- echo \"Running frontend unit tests...\"\n- sleep 2\n- echo \"Frontend tests passed\"\n"];
+    test_frontend_e2e [label="test:frontend:e2e", tooltip="---\nstage: test\nneeds:\n- build:frontend\nscript:\n- echo \"Running frontend E2E tests...\"\n- sleep 3\n- echo \"Frontend E2E tests passed\"\n"];
+    test_backend_unit [label="test:backend:unit", tooltip="---\nstage: test\nneeds:\n- build:backend\nscript:\n- echo \"Running backend unit tests...\"\n- sleep 2\n- echo \"Backend tests passed\"\n"];
+    test_backend_api [label="test:backend:api", tooltip="---\nstage: test\nneeds:\n- build:backend\n- build:database\nscript:\n- echo \"Running backend API tests with database...\"\n- sleep 3\n- echo \"API tests passed\"\n"];
   }
 
   subgraph cluster_integration {
@@ -28,8 +29,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    integration_smoke [label="integration:smoke"];
-    integration_full [label="integration:full"];
+    integration_smoke [label="integration:smoke", tooltip="---\nstage: integration\nneeds:\n- build:frontend\n- build:backend\nscript:\n- echo \"Running smoke tests...\"\n- sleep 2\n- echo \"Smoke tests passed\"\n"];
+    integration_full [label="integration:full", tooltip="---\nstage: integration\nneeds:\n- test:frontend:unit\n- test:backend:unit\n- test:backend:api\nscript:\n- echo \"Running full integration tests...\"\n- sleep 4\n- echo \"Integration tests passed\"\n"];
   }
 
   subgraph cluster_deploy {
@@ -37,9 +38,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_staging_frontend [label="deploy:staging:frontend"];
-    deploy_staging_backend [label="deploy:staging:backend"];
-    deploy_production [label="deploy:production"];
+    deploy_staging_frontend [label="deploy:staging:frontend", tooltip="---\nstage: deploy\nneeds:\n- build:frontend\n- test:frontend:unit\n- integration:smoke\nscript:\n- echo \"Deploying frontend to staging...\"\n- sleep 2\n- echo \"Frontend deployed to staging\"\nenvironment:\n  name: staging/frontend\n"];
+    deploy_staging_backend [label="deploy:staging:backend", tooltip="---\nstage: deploy\nneeds:\n- build:backend\n- test:backend:api\n- integration:smoke\nscript:\n- echo \"Deploying backend to staging...\"\n- sleep 2\n- echo \"Backend deployed to staging\"\nenvironment:\n  name: staging/backend\n"];
+    deploy_production [label="deploy:production", tooltip="---\nstage: deploy\nneeds:\n- integration:full\n- deploy:staging:frontend\n- deploy:staging:backend\nscript:\n- echo \"Deploying to production...\"\n- sleep 3\n- echo \"Deployed to production\"\nenvironment:\n  name: production\nwhen: manual\n"];
   }
 
   build_frontend -> test_frontend_unit;

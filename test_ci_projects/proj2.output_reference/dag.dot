@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
@@ -7,7 +8,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_job [label="build_job"];
+    build_job [label="build_job", tooltip="---\nstage: build\nscript:\n- echo \"Building the project...\"\n- echo \"Compiling source files\"\n- echo \"Build complete\"\n"];
   }
 
   subgraph cluster_test {
@@ -15,7 +16,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    test_job [label="test_job"];
+    test_job [label="test_job", tooltip="---\nstage: test\nscript:\n- echo \"Running tests...\"\n- echo \"Executing unit tests\"\n- echo \"All tests passed\"\n"];
   }
 
   subgraph cluster_deploy {
@@ -23,7 +24,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_job [label="deploy_job"];
+    deploy_job [label="deploy_job", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying application...\"\n- echo \"Uploading artifacts\"\n- echo \"Deployment successful\"\n"];
   }
 
   build_job -> test_job;

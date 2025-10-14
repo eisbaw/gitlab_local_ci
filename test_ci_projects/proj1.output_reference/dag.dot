@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
@@ -7,7 +8,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    test [label="test"];
+    test [label="test", tooltip="---\nscript:\n- echo \"Hello World\"\n"];
   }
 
 }

@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
@@ -7,9 +8,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_basic_retry [label="build:basic-retry"];
-    build_conditional_retry [label="build:conditional-retry"];
-    build_selective_retry [label="build:selective-retry"];
+    build_basic_retry [label="build:basic-retry", tooltip="---\nstage: build\nscript:\n- echo \"Building with basic retry configuration\"\n- echo \"This job will retry up to 2 times on any failure\"\nretry: 2\n"];
+    build_conditional_retry [label="build:conditional-retry", tooltip="---\nstage: build\nscript:\n- echo \"Building with conditional retry\"\n- echo \"Will retry only on specific failure types\"\nretry:\n  max: 3\n  when:\n  - runner_system_failure\n  - stuck_or_timeout_failure\n  - script_failure\n"];
+    build_selective_retry [label="build:selective-retry", tooltip="---\nstage: build\nscript:\n- echo \"Building with selective retry\"\n- echo \"Only retries on infrastructure failures\"\nretry:\n  max: 2\n  when:\n  - runner_system_failure\n  - api_failure\n"];
   }
 
   subgraph cluster_test {
@@ -17,13 +18,13 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    test_with_timeout [label="test:with-timeout"];
-    test_short_timeout [label="test:short-timeout"];
-    test_interruptible [label="test:interruptible"];
-    test_non_interruptible [label="test:non-interruptible"];
-    test_complex_retry [label="test:complex-retry"];
-    test_long_running [label="test:long-running"];
-    test_precise_timeout [label="test:precise-timeout"];
+    test_with_timeout [label="test:with-timeout", tooltip="---\nstage: test\nscript:\n- echo \"Running tests with timeout\"\n- echo \"This job has a 30 minute timeout\"\n- sleep 5\ntimeout: 30m\nretry: 1\n"];
+    test_short_timeout [label="test:short-timeout", tooltip="---\nstage: test\nscript:\n- echo \"Running quick tests\"\n- echo \"This job has a 5 minute timeout\"\ntimeout: 5 minutes\n"];
+    test_interruptible [label="test:interruptible", tooltip="---\nstage: test\nscript:\n- echo \"Running interruptible tests\"\n- echo \"This job can be cancelled if a newer pipeline starts\"\n- sleep 10\ninterruptible: true\ntimeout: 1h\n"];
+    test_non_interruptible [label="test:non-interruptible", tooltip="---\nstage: test\nscript:\n- echo \"Running critical tests\"\n- echo \"This job cannot be interrupted\"\ninterruptible: false\ntimeout: 45m\n"];
+    test_complex_retry [label="test:complex-retry", tooltip="---\nstage: test\nscript:\n- echo \"Running tests with complex retry logic\"\n- echo \"Different retry strategies for different failures\"\nretry:\n  max: 5\n  when:\n  - unknown_failure\n  - script_failure\n  - api_failure\n  - stuck_or_timeout_failure\n  - runner_system_failure\n  - job_execution_timeout\n  - archived_failure\n  - unmet_prerequisites\n  - scheduler_failure\n  - data_integrity_failure\ntimeout: 20m\ninterruptible: true\n"];
+    test_long_running [label="test:long-running", tooltip="---\nstage: test\nscript:\n- echo \"Starting long-running test suite\"\n- echo \"This job has a 3 hour timeout\"\ntimeout: 3h\nretry: 1\ninterruptible: true\n"];
+    test_precise_timeout [label="test:precise-timeout", tooltip="---\nstage: test\nscript:\n- echo \"Running tests with precise timeout\"\n- echo \"Timeout specified in seconds\"\ntimeout: 300s\nretry: 2\n"];
   }
 
   subgraph cluster_deploy {
@@ -31,9 +32,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_production [label="deploy:production"];
-    deploy_staging [label="deploy:staging"];
-    deploy_complex [label="deploy:complex"];
+    deploy_production [label="deploy:production", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to production\"\n- echo \"No retries - deployment failures require manual intervention\"\nretry: 0\ntimeout: 15m\ninterruptible: false\n"];
+    deploy_staging [label="deploy:staging", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to staging\"\n- echo \"Only retry on infrastructure issues\"\nretry:\n  max: 2\n  when:\n  - runner_system_failure\n  - stuck_or_timeout_failure\ntimeout: 10m\ninterruptible: true\n"];
+    deploy_complex [label="deploy:complex", tooltip="---\nstage: deploy\nscript:\n- echo \"Complex deployment job\"\n- echo \"Has timeout, retry, and interruptible settings\"\n- sleep 3\nretry:\n  max: 3\n  when:\n  - runner_system_failure\n  - api_failure\ntimeout: 2h\ninterruptible: false\n"];
   }
 
   build_basic_retry -> test_with_timeout;

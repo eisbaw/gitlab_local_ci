@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
@@ -7,14 +8,14 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    test_matrix [label="test:matrix"];
-    integration_test [label="integration:test"];
-    unit_test_parallel [label="unit:test:parallel"];
-    e2e_test [label="e2e:test"];
-    stress_test [label="stress:test"];
-    lint_files [label="lint:files"];
-    performance_test [label="performance:test"];
-    test_microservices [label="test:microservices"];
+    test_matrix [label="test:matrix", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - RUBY_VERSION:\n    - '2.7'\n    - '3.0'\n    - '3.1'\n    - '3.2'\n    OS:\n    - ubuntu\n    - alpine\nscript:\n- echo \"Testing on Ruby ${RUBY_VERSION} with ${OS}\"\n- ruby --version\n- bundle install\n- bundle exec rspec\n"];
+    integration_test [label="integration:test", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - RUBY_VERSION:\n    - '3.0'\n    - '3.1'\n    - '3.2'\n    DATABASE:\n    - postgresql\n    - mysql\n  - RUBY_VERSION: '2.7'\n    DATABASE: sqlite\nscript:\n- echo \"Integration tests with Ruby ${RUBY_VERSION} and ${DATABASE}\"\n- bundle exec rake db:test:prepare\n- bundle exec rspec spec/integration\n"];
+    unit_test_parallel [label="unit:test:parallel", tooltip="---\nstage: test\nparallel: 5\nscript:\n- echo \"Running unit tests in parallel job ${CI_NODE_INDEX}/${CI_NODE_TOTAL}\"\n- bundle exec rspec --tag ~integration --only-failures\n"];
+    e2e_test [label="e2e:test", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - BROWSER:\n    - chrome\n    - firefox\n    - safari\n    BROWSER_VERSION:\n    - latest\n    - previous\nscript:\n- echo \"E2E tests on ${BROWSER} ${BROWSER_VERSION}\"\n- npm install\n- npm run test:e2e -- --browser=${BROWSER} --version=${BROWSER_VERSION}\n"];
+    stress_test [label="stress:test", tooltip="---\nstage: test\nparallel: 10\nscript:\n- echo \"Stress test instance ${CI_NODE_INDEX} of ${CI_NODE_TOTAL}\"\n- \"./scripts/stress_test.sh --instance=${CI_NODE_INDEX}\"\n"];
+    lint_files [label="lint:files", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - LINTER:\n    - rubocop\n    - reek\n    - brakeman\n    TARGET:\n    - app/\n    - lib/\n    - spec/\nscript:\n- echo \"Running ${LINTER} on ${TARGET}\"\n- bundle exec ${LINTER} ${TARGET}\n"];
+    performance_test [label="performance:test", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - RUBY_VERSION:\n    - '3.0'\n    - '3.1'\n    - '3.2'\n    CONCURRENCY:\n    - 1\n    - 10\n    - 100\n    PAYLOAD_SIZE:\n    - small\n    - medium\n    - large\nscript:\n- echo \"Performance test: Ruby ${RUBY_VERSION}, Concurrency ${CONCURRENCY}, Payload\n    ${PAYLOAD_SIZE}\"\n- bundle exec ruby scripts/performance_test.rb --concurrency=${CONCURRENCY} --payload=${PAYLOAD_SIZE}\n"];
+    test_microservices [label="test:microservices", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - SERVICE:\n    - api\n    - auth\n    - notifications\n    - billing\n    TEST_SUITE:\n    - unit\n    - integration\n    - contract\nscript:\n- echo \"Testing ${SERVICE} service: ${TEST_SUITE} tests\"\n- cd services/${SERVICE}\n- bundle exec rspec spec/${TEST_SUITE}\n"];
   }
 
   subgraph cluster_build {
@@ -22,8 +23,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    build_multiarch [label="build:multiarch"];
-    process_data [label="process:data"];
+    build_multiarch [label="build:multiarch", tooltip="---\nstage: build\nparallel:\n  matrix:\n  - PLATFORM:\n    - linux/amd64\n    - linux/arm64\n    - linux/arm/v7\n    BUILD_TYPE:\n    - release\n    - debug\nscript:\n- echo \"Building for ${PLATFORM} (${BUILD_TYPE})\"\n- docker buildx build --platform=${PLATFORM} --build-arg BUILD_TYPE=${BUILD_TYPE}\n  -t myapp:${CI_COMMIT_SHA}-${PLATFORM//\\//-}-${BUILD_TYPE} .\n"];
+    process_data [label="process:data", tooltip="---\nstage: build\nparallel: 8\nscript:\n- echo \"Processing data shard ${CI_NODE_INDEX}/${CI_NODE_TOTAL}\"\n- \"./scripts/process_shard.sh ${CI_NODE_INDEX} ${CI_NODE_TOTAL}\"\n"];
   }
 
   subgraph cluster_deploy {
@@ -31,7 +32,7 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    deploy_cloud [label="deploy:cloud"];
+    deploy_cloud [label="deploy:cloud", tooltip="---\nstage: deploy\nparallel:\n  matrix:\n  - PROVIDER:\n    - aws\n    - gcp\n    - azure\n    REGION:\n    - us-east-1\n    - us-west-2\n    - eu-central-1\n    ENVIRONMENT:\n    - staging\n    - production\nscript:\n- echo \"Deploying to ${PROVIDER} ${REGION} (${ENVIRONMENT})\"\n- \"./scripts/deploy.sh --provider=${PROVIDER} --region=${REGION} --env=${ENVIRONMENT}\"\nwhen: manual\nonly:\n- main\n"];
   }
 
   test_matrix -> build_multiarch;

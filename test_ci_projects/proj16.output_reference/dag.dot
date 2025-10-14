@@ -1,5 +1,6 @@
 digraph pipeline {
   rankdir="LR";
+  ranksep=2;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_triggers {
@@ -7,9 +8,9 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
-    trigger_child1 [label="trigger_child1"];
-    trigger_child2 [label="trigger_child2"];
-    trigger_child_with_rules [label="trigger_child_with_rules"];
+    trigger_child1 [label="trigger_child1", tooltip="---\nstage: triggers\ntrigger:\n  include: \".gitlab/ci/child1.yml\"\n  strategy: depend\nvariables:\n  CHILD_VAR: for_child1\n  ENVIRONMENT: development\n"];
+    trigger_child2 [label="trigger_child2", tooltip="---\nstage: triggers\ntrigger:\n  include: \".gitlab/ci/child2.yml\"\n  strategy: depend\nvariables:\n  CHILD_VAR: for_child2\n  ENVIRONMENT: production\n"];
+    trigger_child_with_rules [label="trigger_child_with_rules", tooltip="---\nstage: triggers\ntrigger:\n  include: \".gitlab/ci/child1.yml\"\n  strategy: depend\nvariables:\n  CHILD_VAR: conditional\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
   }
 
 }
