@@ -1,0 +1,206 @@
+stages:
+  - build
+  - test
+  - report
+  - deploy
+
+variables:
+  BUILD_VERSION: "1.0.0"
+
+# Job that produces basic artifacts
+build:app:
+  stage: build
+  script:
+    - echo "Building application version $BUILD_VERSION"
+    - mkdir -p build/bin
+    - echo "app-binary-content" > build/bin/app
+    - echo "Version $BUILD_VERSION built at $(date)" > build/version.txt
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 week
+    name: "app-build-$CI_COMMIT_REF_SLUG"
+
+# Job that produces artifacts with custom name and expiration
+build:assets:
+  stage: build
+  script:
+    - echo "Compiling assets"
+    - mkdir -p dist/css dist/js
+    - echo "body { color: blue; }" > dist/css/style.css
+    - echo "console.log('hello');" > dist/js/app.js
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 2 days
+    name: "assets-$CI_JOB_NAME-$CI_COMMIT_SHORT_SHA"
+
+# Job that produces reports (test results)
+test:unit:
+  stage: test
+  dependencies:
+    - build:app
+  script:
+    - echo "Running unit tests with $(cat build/version.txt)"
+    - mkdir -p test-results
+    - |
+      cat > test-results/junit.xml << EOF
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuites>
+        <testsuite name="UnitTests" tests="5" failures="0" errors="0">
+          <testcase name="test_login" time="0.5"/>
+          <testcase name="test_logout" time="0.3"/>
+          <testcase name="test_validation" time="0.7"/>
+          <testcase name="test_api" time="1.2"/>
+          <testcase name="test_database" time="0.8"/>
+        </testsuite>
+      </testsuites>
+      EOF
+  artifacts:
+    reports:
+      junit: test-results/junit.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+
+# Job that produces code coverage reports
+test:coverage:
+  stage: test
+  dependencies:
+    - build:app
+  script:
+    - echo "Generating coverage report"
+    - mkdir -p coverage
+    - |
+      cat > coverage/cobertura.xml << EOF
+      <?xml version="1.0"?>
+      <coverage line-rate="0.85" branch-rate="0.80" version="1.0">
+        <packages>
+          <package name="main" line-rate="0.85" branch-rate="0.80">
+            <classes>
+              <class name="App" line-rate="0.90" branch-rate="0.85"/>
+            </classes>
+          </package>
+        </packages>
+      </coverage>
+      EOF
+    - echo "Total coverage: 85%" > coverage/summary.txt
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura.xml
+    paths:
+      - coverage/
+    expire_in: 1 month
+
+# Job that produces multiple artifact types
+test:integration:
+  stage: test
+  dependencies:
+    - build:app
+    - build:assets
+  script:
+    - echo "Running integration tests"
+    - ls -la build/ dist/
+    - mkdir -p integration-logs
+    - echo "Integration test log - $(date)" > integration-logs/test.log
+    - echo "All integration tests passed" > integration-logs/status.txt
+  artifacts:
+    paths:
+      - integration-logs/
+    expire_in: 1 week
+    when: always
+
+# Job that consumes artifacts but produces none
+report:summary:
+  stage: report
+  dependencies:
+    - test:unit
+    - test:coverage
+    - test:integration
+  script:
+    - echo "Generating test summary report"
+    - echo "=== Test Summary ===" > summary.txt
+    - echo "Unit Tests:" >> summary.txt
+    - cat test-results/junit.xml | grep 'testsuite' >> summary.txt || true
+    - echo "" >> summary.txt
+    - echo "Coverage:" >> summary.txt
+    - cat coverage/summary.txt >> summary.txt
+    - echo "" >> summary.txt
+    - echo "Integration:" >> summary.txt
+    - cat integration-logs/status.txt >> summary.txt
+    - cat summary.txt
+  artifacts:
+    paths:
+      - summary.txt
+    expire_in: 90 days
+    name: "test-summary-$CI_PIPELINE_ID"
+
+# Job that only needs specific artifacts
+deploy:staging:
+  stage: deploy
+  dependencies:
+    - build:app
+    - build:assets
+  script:
+    - echo "Deploying to staging"
+    - echo "Application binary: $(cat build/bin/app)"
+    - echo "CSS files: $(ls dist/css/)"
+    - echo "JS files: $(ls dist/js/)"
+    - echo "Deployed version: $(cat build/version.txt)"
+  environment:
+    name: staging
+  artifacts:
+    paths:
+      - build/version.txt
+    expire_in: 6 months
+    name: "deployment-info"
+
+# Job that doesn't depend on any artifacts
+deploy:docs:
+  stage: deploy
+  dependencies: []
+  script:
+    - echo "Deploying documentation"
+    - mkdir -p docs
+    - echo "# API Documentation" > docs/README.md
+    - echo "Version: $BUILD_VERSION" >> docs/README.md
+  artifacts:
+    paths:
+      - docs/
+    expire_in: never
+
+# Job with conditional artifacts (only on failure)
+test:debug:
+  stage: test
+  dependencies:
+    - build:app
+  script:
+    - echo "Running debug tests"
+    - mkdir -p debug-logs
+    - echo "Debug output: $(date)" > debug-logs/debug.log
+    - echo "Memory usage: 128MB" > debug-logs/memory.log
+  artifacts:
+    paths:
+      - debug-logs/
+    expire_in: 3 days
+    when: on_failure
+    name: "debug-logs-$CI_JOB_ID"
+
+# Job with artifacts that exclude certain files
+build:package:
+  stage: build
+  script:
+    - echo "Creating package"
+    - mkdir -p package/src package/test
+    - echo "source code" > package/src/main.rb
+    - echo "test code" > package/test/main_test.rb
+    - echo "secret" > package/secret.key
+  artifacts:
+    paths:
+      - package/
+    exclude:
+      - package/**/*.key
+    expire_in: 2 weeks
+    name: "package-$CI_COMMIT_TAG"

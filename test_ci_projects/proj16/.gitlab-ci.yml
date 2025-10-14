@@ -1,0 +1,33 @@
+stages:
+  - triggers
+
+variables:
+  PARENT_VAR: "from_parent"
+
+trigger_child1:
+  stage: triggers
+  trigger:
+    include: .gitlab/ci/child1.yml
+    strategy: depend
+  variables:
+    CHILD_VAR: "for_child1"
+    ENVIRONMENT: "development"
+
+trigger_child2:
+  stage: triggers
+  trigger:
+    include: .gitlab/ci/child2.yml
+    strategy: depend
+  variables:
+    CHILD_VAR: "for_child2"
+    ENVIRONMENT: "production"
+
+trigger_child_with_rules:
+  stage: triggers
+  trigger:
+    include: .gitlab/ci/child1.yml
+    strategy: depend
+  variables:
+    CHILD_VAR: "conditional"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

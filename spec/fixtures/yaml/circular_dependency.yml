@@ -1,0 +1,33 @@
+# Pipeline with circular dependencies for error detection
+stages:
+  - build
+  - test
+
+variables:
+  PROJECT_NAME: "circular-test"
+
+# Circular dependency: job-a needs job-b, job-b needs job-a
+job-a:
+  stage: build
+  needs:
+    - job-b
+  script:
+    - echo "Job A depends on Job B"
+    - echo "This creates a circular dependency"
+
+job-b:
+  stage: test
+  needs:
+    - job-a
+  script:
+    - echo "Job B depends on Job A"
+    - echo "This completes the circular dependency"
+
+# Additional job to make the pipeline more realistic
+job-c:
+  stage: test
+  needs:
+    - job-a
+  script:
+    - echo "Job C also depends on Job A"
+    - echo "This will fail due to circular dependency in job-a and job-b"

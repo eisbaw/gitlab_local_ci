@@ -1,0 +1,30 @@
+{
+  "id": 1,
+  "description": "Docker Runner for CI/CD",
+  "active": true,
+  "is_shared": false,
+  "ip_address": "127.0.0.1",
+  "name": "docker-runner-1",
+  "online": true,
+  "status": "online",
+  "token": "mock-runner-token-1",
+  "tag_list": [
+    "docker",
+    "linux",
+    "x86_64"
+  ],
+  "run_untagged": true,
+  "locked": false,
+  "access_level": "not_protected",
+  "maximum_timeout": 3600,
+  "executor": "docker",
+  "executor_config": {
+    "image": "ruby:3.0",
+    "privileged": false,
+    "volumes": [
+      "/cache"
+    ]
+  },
+  "max_jobs": 1,
+  "job_count": 0
+}

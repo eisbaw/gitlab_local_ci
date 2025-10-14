@@ -1,0 +1,158 @@
+---
+# Test project for retry and timeout configuration
+# Tests retry logic, timeout handling, and interruptible jobs
+
+stages:
+  - build
+  - test
+  - deploy
+
+# Simple retry with count only
+build:basic-retry:
+  stage: build
+  script:
+    - echo "Building with basic retry configuration"
+    - echo "This job will retry up to 2 times on any failure"
+  retry: 2
+
+# Retry with when conditions
+build:conditional-retry:
+  stage: build
+  script:
+    - echo "Building with conditional retry"
+    - echo "Will retry only on specific failure types"
+  retry:
+    max: 3
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - script_failure
+
+# Retry on specific conditions only
+build:selective-retry:
+  stage: build
+  script:
+    - echo "Building with selective retry"
+    - echo "Only retries on infrastructure failures"
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - api_failure
+
+# Job with timeout
+test:with-timeout:
+  stage: test
+  script:
+    - echo "Running tests with timeout"
+    - echo "This job has a 30 minute timeout"
+    - sleep 5
+  timeout: 30m
+  retry: 1
+
+# Job with short timeout
+test:short-timeout:
+  stage: test
+  script:
+    - echo "Running quick tests"
+    - echo "This job has a 5 minute timeout"
+  timeout: 5 minutes
+
+# Interruptible job
+test:interruptible:
+  stage: test
+  script:
+    - echo "Running interruptible tests"
+    - echo "This job can be cancelled if a newer pipeline starts"
+    - sleep 10
+  interruptible: true
+  timeout: 1h
+
+# Non-interruptible job
+test:non-interruptible:
+  stage: test
+  script:
+    - echo "Running critical tests"
+    - echo "This job cannot be interrupted"
+  interruptible: false
+  timeout: 45m
+
+# Complex retry configuration
+test:complex-retry:
+  stage: test
+  script:
+    - echo "Running tests with complex retry logic"
+    - echo "Different retry strategies for different failures"
+  retry:
+    max: 5
+    when:
+      - unknown_failure
+      - script_failure
+      - api_failure
+      - stuck_or_timeout_failure
+      - runner_system_failure
+      - job_execution_timeout
+      - archived_failure
+      - unmet_prerequisites
+      - scheduler_failure
+      - data_integrity_failure
+  timeout: 20m
+  interruptible: true
+
+# Deploy job with no retry
+deploy:production:
+  stage: deploy
+  script:
+    - echo "Deploying to production"
+    - echo "No retries - deployment failures require manual intervention"
+  retry: 0
+  timeout: 15m
+  interruptible: false
+
+# Deploy with retry on system failures only
+deploy:staging:
+  stage: deploy
+  script:
+    - echo "Deploying to staging"
+    - echo "Only retry on infrastructure issues"
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  timeout: 10m
+  interruptible: true
+
+# Job combining all features
+deploy:complex:
+  stage: deploy
+  script:
+    - echo "Complex deployment job"
+    - echo "Has timeout, retry, and interruptible settings"
+    - sleep 3
+  retry:
+    max: 3
+    when:
+      - runner_system_failure
+      - api_failure
+  timeout: 2h
+  interruptible: false
+
+# Job with very long timeout
+test:long-running:
+  stage: test
+  script:
+    - echo "Starting long-running test suite"
+    - echo "This job has a 3 hour timeout"
+  timeout: 3h
+  retry: 1
+  interruptible: true
+
+# Job with timeout in seconds
+test:precise-timeout:
+  stage: test
+  script:
+    - echo "Running tests with precise timeout"
+    - echo "Timeout specified in seconds"
+  timeout: 300s
+  retry: 2

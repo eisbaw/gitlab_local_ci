@@ -1,0 +1,298 @@
+# Complex realistic GitLab CI pipeline for comprehensive testing
+stages:
+  - prepare
+  - build
+  - test
+  - security
+  - deploy
+  - cleanup
+
+variables:
+  DOCKER_REGISTRY: "registry.example.com"
+  APP_NAME: "complex-app"
+  BUILD_VERSION: "1.0.${CI_PIPELINE_IID}"
+  POSTGRES_VERSION: "14"
+
+# Prepare stage
+cache_dependencies:
+  stage: prepare
+  tags:
+    - docker
+    - linux
+  script:
+    - echo "Caching dependencies"
+    - npm ci --cache .npm --prefer-offline
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .npm/
+      - node_modules/
+  artifacts:
+    paths:
+      - node_modules/
+    expire_in: 1 hour
+
+lint_code:
+  stage: prepare
+  tags:
+    - docker
+  needs:
+    - cache_dependencies
+  script:
+    - echo "Running linters"
+    - npm run lint
+    - npm run prettier:check
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# Build stage - parallel builds
+build_backend:
+  stage: build
+  tags:
+    - docker
+    - build
+  needs:
+    - cache_dependencies
+  services:
+    - postgres:${POSTGRES_VERSION}
+  variables:
+    POSTGRES_DB: test_db
+    POSTGRES_USER: test_user
+    POSTGRES_PASSWORD: test_password
+  script:
+    - echo "Building backend application"
+    - npm run build:backend
+    - docker build -t ${DOCKER_REGISTRY}/${APP_NAME}-backend:${BUILD_VERSION} ./backend
+  artifacts:
+    paths:
+      - backend/dist/
+      - backend/Dockerfile
+    expire_in: 2 hours
+
+build_frontend:
+  stage: build
+  tags:
+    - docker
+    - build
+  needs:
+    - cache_dependencies
+  script:
+    - echo "Building frontend application"
+    - npm run build:frontend
+    - docker build -t ${DOCKER_REGISTRY}/${APP_NAME}-frontend:${BUILD_VERSION} ./frontend
+  artifacts:
+    paths:
+      - frontend/dist/
+      - frontend/Dockerfile
+    expire_in: 2 hours
+
+build_docs:
+  stage: build
+  tags:
+    - docker
+  needs: []
+  script:
+    - echo "Building documentation"
+    - npm run docs:build
+  artifacts:
+    paths:
+      - docs/public/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+
+# Test stage - parallel tests with specific needs
+test_backend_unit:
+  stage: test
+  tags:
+    - docker
+  needs:
+    - build_backend
+  services:
+    - postgres:${POSTGRES_VERSION}
+    - redis:alpine
+  variables:
+    DATABASE_URL: "postgres://test_user:test_password@postgres:5432/test_db"
+    REDIS_URL: "redis://redis:6379"
+  script:
+    - echo "Running backend unit tests"
+    - npm run test:backend:unit
+  coverage: '/Coverage: \d+\.\d+%/'
+  artifacts:
+    reports:
+      junit: backend/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: backend/coverage/cobertura-coverage.xml
+
+test_backend_integration:
+  stage: test
+  tags:
+    - docker
+  needs:
+    - build_backend
+  services:
+    - postgres:${POSTGRES_VERSION}
+    - redis:alpine
+  variables:
+    DATABASE_URL: "postgres://test_user:test_password@postgres:5432/test_db"
+    REDIS_URL: "redis://redis:6379"
+  script:
+    - echo "Running backend integration tests"
+    - npm run test:backend:integration
+  artifacts:
+    reports:
+      junit: backend/integration-junit.xml
+
+test_frontend_unit:
+  stage: test
+  tags:
+    - docker
+  needs:
+    - build_frontend
+  script:
+    - echo "Running frontend unit tests"
+    - npm run test:frontend:unit
+  artifacts:
+    reports:
+      junit: frontend/junit.xml
+
+test_frontend_e2e:
+  stage: test
+  tags:
+    - docker
+  needs:
+    - build_frontend
+    - build_backend
+  services:
+    - postgres:${POSTGRES_VERSION}
+  script:
+    - echo "Running E2E tests"
+    - npm run test:e2e
+  artifacts:
+    when: on_failure
+    paths:
+      - tests/e2e/screenshots/
+      - tests/e2e/videos/
+    expire_in: 1 week
+
+# Security stage
+security_scan:
+  stage: security
+  tags:
+    - docker
+    - security
+  needs:
+    - build_backend
+    - build_frontend
+  script:
+    - echo "Running security scans"
+    - npm audit --audit-level=high
+    - docker scan ${DOCKER_REGISTRY}/${APP_NAME}-backend:${BUILD_VERSION}
+    - docker scan ${DOCKER_REGISTRY}/${APP_NAME}-frontend:${BUILD_VERSION}
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+sast_analysis:
+  stage: security
+  tags:
+    - docker
+  needs: []
+  script:
+    - echo "Running SAST analysis"
+    - npm run security:sast
+  artifacts:
+    reports:
+      sast: sast-report.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+# Deploy stage
+deploy_staging:
+  stage: deploy
+  tags:
+    - deploy
+    - staging
+  needs:
+    - test_backend_unit
+    - test_backend_integration
+    - test_frontend_unit
+    - test_frontend_e2e
+  environment:
+    name: staging
+    url: https://staging.example.com
+  script:
+    - echo "Deploying to staging environment"
+    - docker push ${DOCKER_REGISTRY}/${APP_NAME}-backend:${BUILD_VERSION}
+    - docker push ${DOCKER_REGISTRY}/${APP_NAME}-frontend:${BUILD_VERSION}
+    - kubectl apply -f k8s/staging/
+    - kubectl set image deployment/backend backend=${DOCKER_REGISTRY}/${APP_NAME}-backend:${BUILD_VERSION}
+    - kubectl set image deployment/frontend frontend=${DOCKER_REGISTRY}/${APP_NAME}-frontend:${BUILD_VERSION}
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+
+deploy_production:
+  stage: deploy
+  tags:
+    - deploy
+    - production
+  needs:
+    - test_backend_unit
+    - test_backend_integration
+    - test_frontend_unit
+    - test_frontend_e2e
+    - security_scan
+  environment:
+    name: production
+    url: https://example.com
+  script:
+    - echo "Deploying to production environment"
+    - docker push ${DOCKER_REGISTRY}/${APP_NAME}-backend:${BUILD_VERSION}
+    - docker push ${DOCKER_REGISTRY}/${APP_NAME}-frontend:${BUILD_VERSION}
+    - kubectl apply -f k8s/production/
+    - kubectl set image deployment/backend backend=${DOCKER_REGISTRY}/${APP_NAME}-backend:${BUILD_VERSION}
+    - kubectl set image deployment/frontend frontend=${DOCKER_REGISTRY}/${APP_NAME}-frontend:${BUILD_VERSION}
+  when: manual
+  only:
+    - main
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+
+# Cleanup stage
+cleanup_staging:
+  stage: cleanup
+  tags:
+    - docker
+  needs:
+    - deploy_staging
+  script:
+    - echo "Cleaning up old staging deployments"
+    - docker image prune -f --filter "until=72h"
+    - kubectl delete pods --field-selector status.phase=Failed -n staging
+  when: on_success
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+cleanup_artifacts:
+  stage: cleanup
+  tags:
+    - docker
+  needs: []
+  script:
+    - echo "Cleaning up temporary artifacts"
+    - rm -rf .npm/
+    - docker system prune -f
+  when: always
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'

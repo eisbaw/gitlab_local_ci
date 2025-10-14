@@ -32,7 +32,8 @@
 - Dynamic runner registration or auto-scaling
 
 ### 1.5 Assumptions
-- Users have Ruby 3.0+ installed (matching GitLab's requirements)
+- Users have Nix installed for reproducible dependency management
+- All dependencies (Ruby 3.0+, Git, Bundler, Graphviz) are managed via shell.nix
 - The ~100MB GitLab submodule size is acceptable
 - Runners are represented by static JSON files
 - Ruby implementation enables direct reuse of upstream modules like `Gitlab::Ci::YamlProcessor`
@@ -87,6 +88,7 @@
 ```
 gitlab_ci_cli/
 ├── .gitmodules              # Points to gitlab.com/gitlab-org/gitlab
+├── shell.nix                # Nix environment with all dependencies
 ├── gitlab/                  # Unmodified GitLab CE submodule
 │   ├── lib/gitlab/ci/      # Reused without modification
 │   ├── app/services/ci/    # Reused without modification
@@ -99,7 +101,8 @@ gitlab_ci_cli/
 ├── spec/                    # Test suite
 ├── bin/
 │   └── gitlab_ci_cli        # Executable
-└── Gemfile
+├── Gemfile                  # Ruby dependencies
+└── justfile                 # Common development commands
 ```
 
 ### 2.3 Architecture Trade-offs
@@ -121,6 +124,7 @@ gitlab_ci_cli/
 ```
 gitlab_ci_cli/
 ├── .gitmodules              # Points to gitlab.com/gitlab-org/gitlab
+├── shell.nix                # Nix environment with all dependencies
 ├── gitlab/                  # Unmodified GitLab CE submodule
 │   ├── lib/gitlab/ci/      # Reused without modification
 │   ├── app/services/ci/    # Reused without modification
@@ -133,7 +137,8 @@ gitlab_ci_cli/
 ├── spec/                    # Test suite
 ├── bin/
 │   └── gitlab_ci_cli        # Executable
-└── Gemfile
+├── Gemfile                  # Ruby dependencies
+└── justfile                 # Common development commands
 ```
 
 ---
@@ -374,21 +379,21 @@ end
 def dry_run_command(options)
   server = MockServer.new(gitlab_path: options[:gitlab_dir])
   fleet = RunnerFleet.load(options[:runners])
-  
+
   pipeline = server.create_pipeline(
     config: File.read(options[:entry]),
     ref: options[:ref],
     variables: parse_variables(options[:variables])
   )
-  
+
   puts "Pipeline ##{pipeline.id} created with #{pipeline.jobs.count} jobs"
   puts ""
-  
+
   # Simulate job scheduling
   time = 0
   while pipeline.has_pending_jobs?
     server.process_pipeline(pipeline)
-    
+
     pipeline.pending_jobs.each do |job|
       runner = fleet.find_available_runner(job)
       if runner
@@ -399,13 +404,70 @@ def dry_run_command(options)
         puts "[T+#{time}s] Job '#{job.name}' waiting (no eligible runner)"
       end
     end
-    
+
     time += 1
   end
-  
+
   puts ""
   puts "Pipeline completed: #{pipeline.status}"
 end
+```
+
+#### 3.4.3 Justfile Workflow Commands
+
+The justfile provides convenient aliases for common development tasks:
+
+```makefile
+# justfile - Common development workflows
+
+# Show all available commands
+help:
+    @just --list
+
+# Enter nix-shell
+shell:
+    nix-shell
+
+# Initialize GitLab submodule and install dependencies
+setup:
+    git submodule update --init
+    bundle install
+
+# Run tests
+test:
+    bundle exec rspec
+
+# Run specific test file
+test-file FILE:
+    bundle exec rspec {{FILE}}
+
+# Lint YAML file
+lint FILE=".gitlab-ci.yml":
+    ./bin/gitlab_ci_cli lint --entry {{FILE}}
+
+# Generate DAG visualization
+dag FILE=".gitlab-ci.yml" OUTPUT="pipeline.png":
+    ./bin/gitlab_ci_cli dag --entry {{FILE}} | dot -Tpng -o {{OUTPUT}}
+    @echo "Generated {{OUTPUT}}"
+
+# Dry run simulation
+dry-run FILE=".gitlab-ci.yml":
+    ./bin/gitlab_ci_cli dry-run --entry {{FILE}}
+
+# Update GitLab submodule to latest version
+update-gitlab:
+    cd gitlab && git fetch && git checkout $(git describe --tags --abbrev=0)
+    git add gitlab
+    @echo "GitLab submodule updated. Review changes before committing."
+
+# Clean temporary files
+clean:
+    rm -f *.png
+    rm -rf tmp/
+
+# Run integration tests
+test-integration:
+    bundle exec rspec spec/integration/
 ```
 
 ### 3.5 Advanced Features
@@ -649,11 +711,13 @@ end
 ## 7. Dependencies and Risks
 
 ### 7.1 Technical Dependencies
+- **Nix** - Primary dependency manager (shell.nix provides reproducible environment)
 - GitLab CE source code (Apache 2.0 license compatible)
-- Ruby 3.0+ runtime
-- Bundler for dependency management
-- Git for submodule operations
-- Graphviz (optional, for DAG visualization)
+- Ruby 3.0+ runtime (via Nix)
+- Bundler for Ruby gem management (via Nix)
+- Git 2.25+ for submodule operations (via Nix)
+- Graphviz (optional, for DAG visualization, via Nix)
+- Just command runner (optional, for workflow automation, via Nix)
 
 ### 7.2 Risks and Mitigations
 
@@ -685,18 +749,29 @@ end
 ## 9. User Experience
 
 ### 9.1 Installation and Setup
-1. Clone the repository and initialize the GitLab submodule:
+1. Clone the repository and enter Nix shell:
    ```bash
    git clone <repository>
    cd gitlab_ci_cli
+   nix-shell  # Loads all dependencies from shell.nix
+   ```
+
+2. Initialize the GitLab submodule:
+   ```bash
    git submodule update --init
    bundle install
    ```
 
-2. Set up runner fleet (optional):
+3. Set up runner fleet (optional):
    ```bash
    mkdir runners/
    # Create runner JSON files or export from production
+   ```
+
+4. Verify installation:
+   ```bash
+   just help  # Show available commands
+   gitlab_ci_cli --help
    ```
 
 ### 9.2 Basic Workflow

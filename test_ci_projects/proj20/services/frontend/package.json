@@ -1,0 +1,28 @@
+{
+  "name": "monorepo-frontend",
+  "version": "2.0.0",
+  "description": "Frontend service for monorepo platform",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "webpack --mode production",
+    "start": "webpack serve --mode development",
+    "test": "jest",
+    "test:unit": "jest --coverage --testMatch='**/*.test.js'",
+    "test:integration": "jest --testMatch='**/*.integration.test.js'",
+    "lint": "eslint src/",
+    "prettier:check": "prettier --check 'src/**/*.{js,jsx,json,css}'"
+  },
+  "devDependencies": {
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1",
+    "jest": "^29.7.0",
+    "jest-junit": "^16.0.0",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.1"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

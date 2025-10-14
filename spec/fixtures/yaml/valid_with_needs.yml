@@ -1,0 +1,85 @@
+# Pipeline with needs dependencies for DAG testing
+stages:
+  - prepare
+  - build
+  - test
+  - deploy
+
+variables:
+  BUILD_ENV: "production"
+
+# Prepare stage - no dependencies
+setup_env:
+  stage: prepare
+  script:
+    - echo "Setting up environment"
+    - mkdir -p build/
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 hour
+
+# Build stage - depends on prepare
+build_backend:
+  stage: build
+  needs:
+    - setup_env
+  script:
+    - echo "Building backend"
+    - cd build && touch backend.jar
+  artifacts:
+    paths:
+      - build/backend.jar
+
+build_frontend:
+  stage: build
+  needs:
+    - setup_env
+  script:
+    - echo "Building frontend"
+    - cd build && touch frontend.js
+  artifacts:
+    paths:
+      - build/frontend.js
+
+# Test stage - parallel tests with specific needs
+test_backend:
+  stage: test
+  needs:
+    - build_backend
+  script:
+    - echo "Testing backend"
+    - test -f build/backend.jar
+
+test_frontend:
+  stage: test
+  needs:
+    - build_frontend
+  script:
+    - echo "Testing frontend"
+    - test -f build/frontend.js
+
+# Integration test needs both builds
+test_integration:
+  stage: test
+  needs:
+    - build_backend
+    - build_frontend
+  script:
+    - echo "Running integration tests"
+    - test -f build/backend.jar
+    - test -f build/frontend.js
+
+# Deploy needs all tests to pass
+deploy_production:
+  stage: deploy
+  needs:
+    - test_backend
+    - test_frontend
+    - test_integration
+  script:
+    - echo "Deploying to production"
+    - ls -la build/
+  only:
+    - main
+  when: manual

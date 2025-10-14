@@ -1,0 +1,37 @@
+# Basic GitLab CI YAML configuration for testing
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  DOCKER_IMAGE: "ruby:3.0"
+  APP_NAME: "sample-app"
+
+build_job:
+  stage: build
+  script:
+    - echo "Building the application"
+    - bundle install
+    - bundle exec rake assets:precompile
+  artifacts:
+    paths:
+      - public/
+    expire_in: 1 hour
+
+test_job:
+  stage: test
+  script:
+    - echo "Running tests"
+    - bundle exec rspec
+  dependencies:
+    - build_job
+
+deploy_job:
+  stage: deploy
+  script:
+    - echo "Deploying to production"
+    - ./deploy.sh
+  only:
+    - main
+  when: manual

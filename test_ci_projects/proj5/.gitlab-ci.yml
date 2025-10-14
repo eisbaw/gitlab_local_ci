@@ -1,0 +1,246 @@
+---
+# Test Project 5: Extensive Variable Usage
+# Purpose: Test variable handling, expansion, and predefined GitLab CI variables
+
+# Global variables defined at top level
+variables:
+  GLOBAL_VAR: "global_value"
+  BUILD_VERSION: "1.0.0"
+  DOCKER_REGISTRY: "registry.example.com"
+  DOCKER_IMAGE: "${DOCKER_REGISTRY}/${CI_PROJECT_NAME}"
+  DEPLOYMENT_ENV: "staging"
+  APP_NAME: "myapp"
+  CONFIG_PATH: "/etc/${APP_NAME}"
+  LOG_LEVEL: "info"
+  MAX_RETRIES: "3"
+  TIMEOUT_SECONDS: "300"
+
+stages:
+  - vars_test
+  - build
+  - test
+  - deploy
+
+# Test basic variable usage and expansion
+test_variables:
+  stage: vars_test
+  variables:
+    JOB_VAR: "job_specific_value"
+    COMBINED_VAR: "${GLOBAL_VAR}_${JOB_VAR}"
+  script:
+    - echo "=== Testing Variable Expansion ==="
+    - echo "Global variable GLOBAL_VAR = ${GLOBAL_VAR}"
+    - echo "Job-specific variable JOB_VAR = ${JOB_VAR}"
+    - echo "Combined variable COMBINED_VAR = ${COMBINED_VAR}"
+    - echo ""
+    - echo "=== Testing Predefined GitLab CI Variables ==="
+    - echo "CI_COMMIT_SHA = ${CI_COMMIT_SHA}"
+    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
+    - echo "CI_COMMIT_REF_NAME = ${CI_COMMIT_REF_NAME}"
+    - echo "CI_COMMIT_BRANCH = ${CI_COMMIT_BRANCH}"
+    - echo "CI_PROJECT_NAME = ${CI_PROJECT_NAME}"
+    - echo "CI_PROJECT_PATH = ${CI_PROJECT_PATH}"
+    - echo "CI_PROJECT_DIR = ${CI_PROJECT_DIR}"
+    - echo "CI_PIPELINE_ID = ${CI_PIPELINE_ID}"
+    - echo "CI_JOB_ID = ${CI_JOB_ID}"
+    - echo "CI_JOB_NAME = ${CI_JOB_NAME}"
+    - echo "CI_JOB_STAGE = ${CI_JOB_STAGE}"
+    - echo "CI_RUNNER_ID = ${CI_RUNNER_ID}"
+    - echo "CI_SERVER_HOST = ${CI_SERVER_HOST}"
+    - echo "CI_SERVER_VERSION = ${CI_SERVER_VERSION}"
+    - echo "GITLAB_USER_LOGIN = ${GITLAB_USER_LOGIN}"
+    - echo "GITLAB_USER_EMAIL = ${GITLAB_USER_EMAIL}"
+
+# Test variable usage in build context
+build_app:
+  stage: build
+  variables:
+    BUILD_TARGET: "production"
+    BUILD_FLAGS: "-O2 -Wall"
+    OUTPUT_DIR: "build/${BUILD_VERSION}"
+    ARTIFACT_NAME: "${CI_PROJECT_NAME}-${BUILD_VERSION}-${CI_COMMIT_SHORT_SHA}"
+  script:
+    - echo "=== Building Application ==="
+    - echo "Build version ${BUILD_VERSION}"
+    - echo "Build target ${BUILD_TARGET}"
+    - echo "Build flags ${BUILD_FLAGS}"
+    - echo "Output directory ${OUTPUT_DIR}"
+    - echo "Artifact name ${ARTIFACT_NAME}"
+    - echo "Docker image will be ${DOCKER_IMAGE}:${BUILD_VERSION}"
+    - echo ""
+    - echo "Creating build directory..."
+    - mkdir -p "${OUTPUT_DIR}"
+    - echo "Build completed at $(date)" > "${OUTPUT_DIR}/build-info.txt"
+    - echo "Commit ${CI_COMMIT_SHA}" >> "${OUTPUT_DIR}/build-info.txt"
+    - echo "Branch ${CI_COMMIT_REF_NAME}" >> "${OUTPUT_DIR}/build-info.txt"
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 hour
+
+# Test variable expansion in test environment
+unit_tests:
+  stage: test
+  variables:
+    TEST_ENV: "unit"
+    TEST_TIMEOUT: "${TIMEOUT_SECONDS}"
+    TEST_LOG_LEVEL: "debug"
+    TEST_RESULTS_DIR: "test-results/${CI_JOB_NAME}"
+    COVERAGE_TARGET: "80"
+  script:
+    - echo "=== Running Unit Tests ==="
+    - echo "Test environment ${TEST_ENV}"
+    - echo "Test timeout ${TEST_TIMEOUT} seconds"
+    - echo "Log level ${TEST_LOG_LEVEL}"
+    - echo "Results directory ${TEST_RESULTS_DIR}"
+    - echo "Coverage target ${COVERAGE_TARGET}%"
+    - echo ""
+    - echo "Running tests for commit ${CI_COMMIT_SHORT_SHA}"
+    - echo "Pipeline ID ${CI_PIPELINE_ID}"
+    - echo "Job ID ${CI_JOB_ID}"
+    - mkdir -p "${TEST_RESULTS_DIR}"
+    - echo "Test passed" > "${TEST_RESULTS_DIR}/results.txt"
+  artifacts:
+    paths:
+      - test-results/
+    expire_in: 1 day
+  needs:
+    - build_app
+
+integration_tests:
+  stage: test
+  variables:
+    TEST_ENV: "integration"
+    TEST_DATABASE_URL: "postgres://localhost/${CI_PROJECT_NAME}_test"
+    TEST_REDIS_URL: "redis://localhost:6379/1"
+    API_BASE_URL: "http://localhost:3000/api"
+    RETRY_COUNT: "${MAX_RETRIES}"
+  script:
+    - echo "=== Running Integration Tests ==="
+    - echo "Test environment ${TEST_ENV}"
+    - echo "Database URL ${TEST_DATABASE_URL}"
+    - echo "Redis URL ${TEST_REDIS_URL}"
+    - echo "API base URL ${API_BASE_URL}"
+    - echo "Max retries ${RETRY_COUNT}"
+    - echo ""
+    - echo "Testing integration for ${CI_PROJECT_NAME}"
+    - echo "Branch ${CI_COMMIT_BRANCH}"
+    - echo "Commit ${CI_COMMIT_SHA}"
+  needs:
+    - build_app
+
+# Test variable usage in deployment
+deploy_staging:
+  stage: deploy
+  variables:
+    DEPLOY_ENV: "${DEPLOYMENT_ENV}"
+    DEPLOY_HOST: "staging.example.com"
+    DEPLOY_USER: "deployer"
+    DEPLOY_PATH: "/var/www/${APP_NAME}"
+    DOCKER_TAG: "${BUILD_VERSION}-${CI_COMMIT_SHORT_SHA}"
+    DEPLOY_IMAGE: "${DOCKER_IMAGE}:${DOCKER_TAG}"
+    CONFIG_FILE: "${CONFIG_PATH}/config.yml"
+  script:
+    - echo "=== Deploying to Staging ==="
+    - echo "Environment ${DEPLOY_ENV}"
+    - echo "Host ${DEPLOY_HOST}"
+    - echo "User ${DEPLOY_USER}"
+    - echo "Deploy path ${DEPLOY_PATH}"
+    - echo "Docker image ${DEPLOY_IMAGE}"
+    - echo "Config file ${CONFIG_FILE}"
+    - echo ""
+    - echo "Deploying ${CI_PROJECT_NAME} version ${BUILD_VERSION}"
+    - echo "From commit ${CI_COMMIT_SHA}"
+    - echo "On branch ${CI_COMMIT_REF_NAME}"
+    - echo "Pipeline ${CI_PIPELINE_ID}"
+    - echo "Triggered by ${GITLAB_USER_LOGIN}"
+    - echo ""
+    - echo "Deployment steps:"
+    - echo "1. Pull image ${DEPLOY_IMAGE}"
+    - echo "2. Stop current containers"
+    - echo "3. Start new containers"
+    - echo "4. Run health checks"
+    - echo ""
+    - echo "Deployment completed successfully"
+  environment:
+    name: staging
+    url: https://staging.example.com
+  needs:
+    - build_app
+    - unit_tests
+    - integration_tests
+  only:
+    - main
+    - master
+
+# Test complex variable expansion
+variable_manipulation:
+  stage: vars_test
+  variables:
+    ORIGINAL_VAR: "hello_world"
+    UPPERCASE_TEST: "UPPERCASE"
+    LOWERCASE_TEST: "lowercase"
+    PATH_VAR: "/home/user/project"
+    URL_VAR: "https://example.com/path"
+    NESTED_VAR_1: "${GLOBAL_VAR}"
+    NESTED_VAR_2: "${NESTED_VAR_1}_nested"
+    COMPLEX_VAR: "${CI_PROJECT_NAME}-${BUILD_VERSION}-${CI_COMMIT_SHORT_SHA}-${NESTED_VAR_2}"
+  script:
+    - echo "=== Testing Complex Variable Expansion ==="
+    - echo "Original variable ORIGINAL_VAR = ${ORIGINAL_VAR}"
+    - echo "Uppercase test UPPERCASE_TEST = ${UPPERCASE_TEST}"
+    - echo "Lowercase test LOWERCASE_TEST = ${LOWERCASE_TEST}"
+    - echo "Path variable PATH_VAR = ${PATH_VAR}"
+    - echo "URL variable URL_VAR = ${URL_VAR}"
+    - echo ""
+    - echo "=== Testing Nested Variable Expansion ==="
+    - echo "NESTED_VAR_1 = ${NESTED_VAR_1}"
+    - echo "NESTED_VAR_2 = ${NESTED_VAR_2}"
+    - echo "COMPLEX_VAR = ${COMPLEX_VAR}"
+    - echo ""
+    - echo "=== Testing Variables in Commands ==="
+    - export COMPUTED_VAR="${CI_PROJECT_NAME}_${CI_COMMIT_SHORT_SHA}"
+    - echo "Computed variable COMPUTED_VAR = ${COMPUTED_VAR}"
+    - echo "${COMPUTED_VAR}" > /tmp/computed_var.txt
+    - cat /tmp/computed_var.txt
+    - rm /tmp/computed_var.txt
+
+# Test environment-specific variables
+env_specific_vars:
+  stage: vars_test
+  variables:
+    ENV_TYPE: "production"
+    DEBUG_MODE: "false"
+    CACHE_ENABLED: "true"
+    MONITORING_ENABLED: "true"
+    METRICS_PORT: "9090"
+    HEALTH_CHECK_PATH: "/health"
+    READY_CHECK_PATH: "/ready"
+  script:
+    - echo "=== Environment-Specific Configuration ==="
+    - echo "Environment type ${ENV_TYPE}"
+    - echo "Debug mode ${DEBUG_MODE}"
+    - echo "Cache enabled ${CACHE_ENABLED}"
+    - echo "Monitoring enabled ${MONITORING_ENABLED}"
+    - echo "Metrics port ${METRICS_PORT}"
+    - echo "Health check ${HEALTH_CHECK_PATH}"
+    - echo "Ready check ${READY_CHECK_PATH}"
+    - echo ""
+    - echo "Full service URL http://${DEPLOY_HOST:-localhost}:${METRICS_PORT}${HEALTH_CHECK_PATH}"
+
+# Test variable precedence
+test_precedence:
+  stage: vars_test
+  variables:
+    GLOBAL_VAR: "overridden_at_job_level"
+    PRECEDENCE_TEST: "job_level_value"
+  script:
+    - echo "=== Testing Variable Precedence ==="
+    - echo "GLOBAL_VAR (should be overridden) = ${GLOBAL_VAR}"
+    - echo "PRECEDENCE_TEST (job-level) = ${PRECEDENCE_TEST}"
+    - echo ""
+    - echo "=== Setting Runtime Variables ==="
+    - export RUNTIME_VAR="runtime_value"
+    - echo "RUNTIME_VAR = ${RUNTIME_VAR}"
+    - export GLOBAL_VAR="runtime_override"
+    - echo "GLOBAL_VAR (runtime override) = ${GLOBAL_VAR}"

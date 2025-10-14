@@ -1,0 +1,128 @@
+stages:
+  - test
+  - build
+  - deploy
+
+# Job with parallel:matrix for multiple Ruby versions and OS combinations
+test:matrix:
+  stage: test
+  parallel:
+    matrix:
+      - RUBY_VERSION: ['2.7', '3.0', '3.1', '3.2']
+        OS: ['ubuntu', 'alpine']
+  script:
+    - echo "Testing on Ruby ${RUBY_VERSION} with ${OS}"
+    - ruby --version
+    - bundle install
+    - bundle exec rspec
+
+# Job with parallel:matrix for database and Ruby combinations
+integration:test:
+  stage: test
+  parallel:
+    matrix:
+      - RUBY_VERSION: ['3.0', '3.1', '3.2']
+        DATABASE: ['postgresql', 'mysql']
+      - RUBY_VERSION: '2.7'
+        DATABASE: 'sqlite'
+  script:
+    - echo "Integration tests with Ruby ${RUBY_VERSION} and ${DATABASE}"
+    - bundle exec rake db:test:prepare
+    - bundle exec rspec spec/integration
+
+# Job with simple parallel: N for splitting tests
+unit:test:parallel:
+  stage: test
+  parallel: 5
+  script:
+    - echo "Running unit tests in parallel job ${CI_NODE_INDEX}/${CI_NODE_TOTAL}"
+    - bundle exec rspec --tag ~integration --only-failures
+
+# Job with parallel:matrix for browser testing
+e2e:test:
+  stage: test
+  parallel:
+    matrix:
+      - BROWSER: ['chrome', 'firefox', 'safari']
+        BROWSER_VERSION: ['latest', 'previous']
+  script:
+    - echo "E2E tests on ${BROWSER} ${BROWSER_VERSION}"
+    - npm install
+    - npm run test:e2e -- --browser=${BROWSER} --version=${BROWSER_VERSION}
+
+# Job with parallel:matrix for multiple architecture builds
+build:multiarch:
+  stage: build
+  parallel:
+    matrix:
+      - PLATFORM: ['linux/amd64', 'linux/arm64', 'linux/arm/v7']
+        BUILD_TYPE: ['release', 'debug']
+  script:
+    - echo "Building for ${PLATFORM} (${BUILD_TYPE})"
+    - docker buildx build --platform=${PLATFORM} --build-arg BUILD_TYPE=${BUILD_TYPE} -t myapp:${CI_COMMIT_SHA}-${PLATFORM//\//-}-${BUILD_TYPE} .
+
+# Job with parallel: N for stress testing
+stress:test:
+  stage: test
+  parallel: 10
+  script:
+    - echo "Stress test instance ${CI_NODE_INDEX} of ${CI_NODE_TOTAL}"
+    - ./scripts/stress_test.sh --instance=${CI_NODE_INDEX}
+
+# Job with parallel:matrix for cloud provider deployments
+deploy:cloud:
+  stage: deploy
+  parallel:
+    matrix:
+      - PROVIDER: ['aws', 'gcp', 'azure']
+        REGION: ['us-east-1', 'us-west-2', 'eu-central-1']
+        ENVIRONMENT: ['staging', 'production']
+  script:
+    - echo "Deploying to ${PROVIDER} ${REGION} (${ENVIRONMENT})"
+    - ./scripts/deploy.sh --provider=${PROVIDER} --region=${REGION} --env=${ENVIRONMENT}
+  when: manual
+  only:
+    - main
+
+# Job with parallel:matrix for linting different file types
+lint:files:
+  stage: test
+  parallel:
+    matrix:
+      - LINTER: ['rubocop', 'reek', 'brakeman']
+        TARGET: ['app/', 'lib/', 'spec/']
+  script:
+    - echo "Running ${LINTER} on ${TARGET}"
+    - bundle exec ${LINTER} ${TARGET}
+
+# Job with parallel:matrix combining multiple dimensions
+performance:test:
+  stage: test
+  parallel:
+    matrix:
+      - RUBY_VERSION: ['3.0', '3.1', '3.2']
+        CONCURRENCY: [1, 10, 100]
+        PAYLOAD_SIZE: ['small', 'medium', 'large']
+  script:
+    - echo "Performance test: Ruby ${RUBY_VERSION}, Concurrency ${CONCURRENCY}, Payload ${PAYLOAD_SIZE}"
+    - bundle exec ruby scripts/performance_test.rb --concurrency=${CONCURRENCY} --payload=${PAYLOAD_SIZE}
+
+# Job with parallel: N for data processing
+process:data:
+  stage: build
+  parallel: 8
+  script:
+    - echo "Processing data shard ${CI_NODE_INDEX}/${CI_NODE_TOTAL}"
+    - ./scripts/process_shard.sh ${CI_NODE_INDEX} ${CI_NODE_TOTAL}
+
+# Job with parallel:matrix for microservices testing
+test:microservices:
+  stage: test
+  parallel:
+    matrix:
+      - SERVICE: ['api', 'auth', 'notifications', 'billing']
+        TEST_SUITE: ['unit', 'integration', 'contract']
+  script:
+    - echo "Testing ${SERVICE} service: ${TEST_SUITE} tests"
+    - cd services/${SERVICE}
+    - bundle exec rspec spec/${TEST_SUITE}

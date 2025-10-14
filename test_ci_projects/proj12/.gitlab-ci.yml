@@ -1,0 +1,186 @@
+# Test project for YAML anchors and references
+# This configuration demonstrates:
+# - Basic anchors and aliases
+# - Merge keys for extending configurations
+# - Multiple levels of anchor composition
+# - Complex nested structures
+
+# Base anchor definitions
+.base_config: &base_config
+  retry: 2
+  timeout: 30m
+  interruptible: true
+
+.docker_config: &docker_config
+  image: alpine:latest
+  tags:
+    - docker
+
+.cache_config: &cache_config
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .cache/
+      - vendor/
+
+.artifacts_config: &artifacts_config
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - build/
+      - dist/
+
+# Script anchors
+.install_dependencies: &install_dependencies
+  - apk add --no-cache git curl bash
+  - echo "Dependencies installed"
+
+.setup_environment: &setup_environment
+  - export PATH="$PATH:/usr/local/bin"
+  - echo "Environment configured"
+
+# Composite anchors that merge multiple anchors
+.base_job: &base_job
+  <<: *base_config
+  <<: *docker_config
+  before_script:
+    - *install_dependencies
+    - *setup_environment
+
+.test_job_base: &test_job_base
+  <<: *base_job
+  <<: *cache_config
+  stage: test
+  variables:
+    TEST_ENV: "true"
+
+.build_job_base: &build_job_base
+  <<: *base_job
+  <<: *artifacts_config
+  stage: build
+  variables:
+    BUILD_ENV: "true"
+
+# Rule anchors
+.on_merge_request: &on_merge_request
+  if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+.on_main_branch: &on_main_branch
+  if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+
+.rule_set_standard: &rule_set_standard
+  rules:
+    - *on_merge_request
+    - *on_main_branch
+    - if: '$CI_COMMIT_TAG'
+
+# Pipeline stages
+stages:
+  - build
+  - test
+  - integration
+  - deploy
+
+# Jobs using simple anchors
+build:app:
+  <<: *build_job_base
+  script:
+    - echo "Building application..."
+    - mkdir -p build
+    - echo "app build" > build/app.txt
+  <<: *rule_set_standard
+
+build:library:
+  <<: *build_job_base
+  script:
+    - echo "Building library..."
+    - mkdir -p build
+    - echo "lib build" > build/lib.txt
+  variables:
+    BUILD_TYPE: "library"
+  <<: *rule_set_standard
+
+# Jobs with multiple anchor composition levels
+test:unit:
+  <<: *test_job_base
+  script:
+    - echo "Running unit tests..."
+    - echo "All unit tests passed"
+  coverage: '/Coverage: \d+\.\d+%/'
+
+test:integration:
+  <<: *test_job_base
+  stage: integration
+  script:
+    - echo "Running integration tests..."
+    - echo "Integration tests completed"
+  dependencies:
+    - build:app
+
+# Advanced anchor usage with overrides
+test:e2e:
+  <<: *test_job_base
+  stage: integration
+  image: cypress/base:latest  # Override from base_job
+  retry: 3  # Override from base_config
+  script:
+    - echo "Running E2E tests..."
+    - echo "E2E tests completed"
+  dependencies:
+    - build:app
+    - build:library
+
+# Deploy job with complex composition
+deploy:staging:
+  <<: *base_job
+  stage: deploy
+  script:
+    - echo "Deploying to staging..."
+    - echo "Staging deployment complete"
+  environment:
+    name: staging
+    url: https://staging.example.com
+  only:
+    - main
+  dependencies:
+    - build:app
+
+deploy:production:
+  <<: *base_job
+  stage: deploy
+  script:
+    - echo "Deploying to production..."
+    - echo "Production deployment complete"
+  environment:
+    name: production
+    url: https://production.example.com
+  when: manual
+  only:
+    - tags
+  dependencies:
+    - build:app
+    - build:library
+
+# Job using inline anchor reference
+security:scan:
+  <<: *base_config
+  image: aquasec/trivy:latest
+  stage: test
+  script:
+    - echo "Running security scan..."
+    - echo "Security scan completed"
+  allow_failure: true
+
+# Demonstrate complex nested anchor structures
+.complex_matrix: &complex_matrix
+  parallel:
+    matrix:
+      - PLATFORM: [linux, macos, windows]
+        VERSION: ["3.9", "3.10", "3.11"]
+
+test:matrix:
+  <<: *test_job_base
+  <<: *complex_matrix
+  script:
+    - echo "Testing on ${PLATFORM} with version ${VERSION}"
+    - echo "Matrix test completed"

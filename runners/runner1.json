@@ -1,0 +1,6 @@
+{
+  "id": "runner-1",
+  "tags": ["docker", "linux"],
+  "executor": "shell",
+  "max_jobs": 2
+}

@@ -1,0 +1,47 @@
+# Deploy stage jobs
+.deploy-template:
+  stage: deploy
+  before_script:
+    - echo "Preparing deployment..."
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-staging:
+  extends: .deploy-template
+  script:
+    - echo "Deploying to staging environment..."
+    - echo "Target: staging.example.com"
+    - echo "Deployment completed"
+  environment:
+    name: staging
+    url: https://staging.example.com
+  only:
+    - develop
+
+deploy-production:
+  extends: .deploy-template
+  script:
+    - echo "Deploying to production environment..."
+    - echo "Target: www.example.com"
+    - echo "Production deployment completed"
+  environment:
+    name: production
+    url: https://www.example.com
+  only:
+    - main
+  when: manual
+
+rollback-production:
+  stage: deploy
+  script:
+    - echo "Rolling back production deployment..."
+    - echo "Restoring previous version..."
+    - echo "Rollback completed"
+  environment:
+    name: production
+    action: rollback
+  when: manual
+  only:
+    - main

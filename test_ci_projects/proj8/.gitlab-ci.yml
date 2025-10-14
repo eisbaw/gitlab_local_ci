@@ -1,0 +1,207 @@
+stages:
+  - build
+  - test
+  - deploy
+  - cleanup
+
+variables:
+  DEPLOY_ENV: "staging"
+
+# Job that runs only on main branch
+build_main:
+  stage: build
+  script:
+    - echo "Building on main branch"
+    - echo "Build artifacts created"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Job that runs on all branches except main
+build_feature:
+  stage: build
+  script:
+    - echo "Building feature branch: $CI_COMMIT_BRANCH"
+    - echo "Feature build completed"
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
+
+# Job for merge request pipelines only
+test_mr:
+  stage: test
+  script:
+    - echo "Running tests for merge request"
+    - echo "MR pipeline ID: $CI_MERGE_REQUEST_IID"
+    - echo "Source branch: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+    - echo "Target branch: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# Job with multiple rule conditions (OR logic)
+test_comprehensive:
+  stage: test
+  script:
+    - echo "Running comprehensive tests"
+    - echo "Test suite completed"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# Job that runs only when specific files change
+test_backend:
+  stage: test
+  script:
+    - echo "Running backend tests"
+    - echo "Backend tests passed"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/*.rb"
+        - "**/*.py"
+        - "**/*.go"
+
+# Job that runs only when frontend files change
+test_frontend:
+  stage: test
+  script:
+    - echo "Running frontend tests"
+    - echo "Frontend tests passed"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/*.js"
+        - "**/*.jsx"
+        - "**/*.ts"
+        - "**/*.tsx"
+        - "**/*.vue"
+
+# Manual job that can be triggered on any branch
+deploy_staging:
+  stage: deploy
+  script:
+    - echo "Deploying to staging environment"
+    - echo "Deployment completed to: $DEPLOY_ENV"
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+  environment:
+    name: staging
+
+# Job that runs automatically on main, manual elsewhere
+deploy_production:
+  stage: deploy
+  script:
+    - echo "Deploying to production"
+    - echo "Production deployment completed"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_COMMIT_TAG
+      when: on_success
+  environment:
+    name: production
+
+# Job that runs on success of previous jobs
+notify_success:
+  stage: deploy
+  script:
+    - echo "All tests passed, sending success notification"
+    - echo "Notification sent to team"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_success
+
+# Job that runs only on failure
+notify_failure:
+  stage: cleanup
+  script:
+    - echo "Pipeline failed, sending failure notification"
+    - echo "Failure details sent to team"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_failure
+
+# Job that always runs regardless of previous job status
+cleanup_always:
+  stage: cleanup
+  script:
+    - echo "Performing cleanup operations"
+    - echo "Temporary files removed"
+    - echo "Resources released"
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: always
+
+# Job with complex rule conditions using exists
+security_scan:
+  stage: test
+  script:
+    - echo "Running security scan"
+    - echo "Security scan completed"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      exists:
+        - Dockerfile
+        - "**/*.dockerfile"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - Dockerfile
+
+# Job that runs only on tags
+release:
+  stage: deploy
+  script:
+    - echo "Creating release for tag: $CI_COMMIT_TAG"
+    - echo "Release artifacts generated"
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# Job with allow_failure and manual trigger
+experimental_test:
+  stage: test
+  script:
+    - echo "Running experimental tests"
+    - echo "This may fail without blocking pipeline"
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+      allow_failure: true
+
+# Job that runs on schedule pipelines
+nightly_build:
+  stage: build
+  script:
+    - echo "Running nightly build"
+    - echo "Nightly build completed"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+# Job with variable-based conditions
+deploy_custom:
+  stage: deploy
+  script:
+    - echo "Deploying to custom environment: $CUSTOM_ENV"
+  rules:
+    - if: $CUSTOM_ENV != null
+      when: manual
+
+# Job combining multiple conditions
+integration_test:
+  stage: test
+  script:
+    - echo "Running integration tests"
+    - echo "Integration tests completed"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+# Job that prevents running on certain conditions
+skip_on_draft:
+  stage: test
+  script:
+    - echo "Running full test suite"
+    - echo "Tests completed"
+  rules:
+    - if: $CI_MERGE_REQUEST_TITLE =~ /^(Draft|WIP):/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"

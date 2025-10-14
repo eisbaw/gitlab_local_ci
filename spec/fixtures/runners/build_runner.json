@@ -1,0 +1,31 @@
+{
+  "id": 3,
+  "description": "Build Runner for CI/CD",
+  "active": true,
+  "is_shared": false,
+  "ip_address": "127.0.0.1",
+  "name": "build-runner-1",
+  "online": true,
+  "status": "online",
+  "token": "mock-runner-token-3",
+  "tag_list": [
+    "build",
+    "docker",
+    "linux"
+  ],
+  "run_untagged": false,
+  "locked": false,
+  "access_level": "not_protected",
+  "maximum_timeout": 7200,
+  "executor": "docker",
+  "executor_config": {
+    "image": "alpine:latest",
+    "privileged": false,
+    "volumes": [
+      "/cache",
+      "/builds"
+    ]
+  },
+  "max_jobs": 3,
+  "job_count": 0
+}

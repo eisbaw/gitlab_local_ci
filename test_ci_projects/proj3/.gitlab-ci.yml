@@ -1,0 +1,31 @@
+stages:
+  - test
+  - deploy
+
+unit_tests:
+  stage: test
+  script:
+    - echo "Running unit tests..."
+    - sleep 2
+    - echo "Unit tests passed"
+
+integration_tests:
+  stage: test
+  script:
+    - echo "Running integration tests..."
+    - sleep 3
+    - echo "Integration tests passed"
+
+lint:
+  stage: test
+  script:
+    - echo "Running linter..."
+    - sleep 1
+    - echo "Linting passed"
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying application..."
+    - sleep 2
+    - echo "Deployment complete"

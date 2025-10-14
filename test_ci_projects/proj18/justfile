@@ -1,0 +1,20 @@
+CLI := "../../bin/gitlab_ci_cli"
+CI_FILE := ".gitlab-ci.yml"
+GITLAB_DIR := "../../gitlab"
+RUNNERS_DIR := "../../runners"
+
+# Lint the GitLab CI configuration
+lint:
+    {{CLI}} lint --entry {{CI_FILE}} --gitlab-dir {{GITLAB_DIR}}
+
+# Generate DAG visualization
+dag:
+    {{CLI}} dag --entry {{CI_FILE}} --gitlab-dir {{GITLAB_DIR}}
+
+# Perform dry-run simulation
+dry-run:
+    {{CLI}} dry-run --entry {{CI_FILE}} --gitlab-dir {{GITLAB_DIR}} --runners {{RUNNERS_DIR}}
+
+# Run all tests (lint, dag, dry-run) in sequence
+test: lint dag dry-run
+    @echo "All tests completed successfully"

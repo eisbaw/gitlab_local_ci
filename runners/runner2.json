@@ -1,0 +1,6 @@
+{
+  "id": "runner-2",
+  "tags": ["kubernetes", "production"],
+  "executor": "docker",
+  "max_jobs": 4
+}

@@ -1,0 +1,21 @@
+{
+  "id": "runner_001",
+  "description": "Docker runner on host1",
+  "active": true,
+  "tags": ["docker", "linux", "amd64"],
+  "run_untagged": true,
+  "locked": false,
+  "access_level": "not_protected",
+  "maximum_timeout": 3600,
+  "executor": "docker",
+  "executor_config": {
+    "image": "alpine:latest",
+    "privileged": false,
+    "volumes": ["/cache"]
+  },
+  "concurrent": 4,
+  "capacity": {
+    "running_jobs": 2,
+    "max_jobs": 4
+  }
+}

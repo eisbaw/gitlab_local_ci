@@ -1,0 +1,136 @@
+# frozen_string_literal: true
+
+require 'json'
+
+# RunnerFleet manages a collection of mock runners and handles
+# runner discovery, availability checking, and job assignment
+class RunnerFleet
+  attr_reader :runners
+
+  # Initialize an empty runner fleet
+  def initialize
+    @runners = []
+  end
+
+  # Load runner configurations from a directory
+  #
+  # @param directory [String] Path to directory containing runner JSON files
+  # @return [Integer] Number of runners loaded
+  # @raise [ArgumentError] if directory does not exist or is not a directory
+  def load_runners(directory)
+    # Fail-fast: Validate directory exists and is actually a directory
+    unless Dir.exist?(directory)
+      raise ArgumentError, "directory does not exist: #{directory}"
+    end
+
+    unless File.directory?(directory)
+      raise ArgumentError, "not a directory: #{directory}"
+    end
+
+    # Find all JSON files in the directory
+    json_files = Dir.glob(File.join(directory, "*.json"))
+
+    loaded_count = 0
+
+    json_files.each do |file_path|
+      begin
+        # Read and parse JSON file
+        content = File.read(file_path)
+        runner_data = JSON.parse(content)
+
+        # Validate required fields before creating runner
+        validate_runner_data(runner_data, file_path)
+
+        # Create MockRunner instance and add to fleet
+        runner = MockRunner.new(runner_data)
+        @runners << runner
+        loaded_count += 1
+
+      rescue JSON::ParserError => e
+        # Fail verbosely but continue processing other files
+        warn "Skipping invalid JSON in #{file_path}: #{e.message}"
+      rescue ArgumentError => e
+        # Validation errors are logged but don't stop loading
+        warn "Skipping invalid runner in #{file_path}: #{e.message}"
+      rescue StandardError => e
+        # Catch any unexpected errors and log them
+        warn "Error loading runner from #{file_path}: #{e.message}"
+      end
+    end
+
+    loaded_count
+  end
+
+  # Find an available runner that can handle the given job
+  #
+  # @param job [MockJob] Job to find a runner for
+  # @return [MockRunner, nil] Available runner or nil if none available
+  # @raise [ArgumentError] if job is nil
+  def find_available_runner(job)
+    # Fail-fast: Validate input
+    raise ArgumentError, "job cannot be nil" if job.nil?
+
+    # Iterate through runners and return first match
+    # Pure function: no side effects, order-dependent but deterministic
+    @runners.each do |runner|
+      # Check both tag compatibility and capacity
+      # Order matters: tag check is cheaper than capacity check
+      if runner.can_handle?(job) && runner.has_capacity?
+        return runner
+      end
+    end
+
+    # Explicit: Return nil when no runner available
+    nil
+  end
+
+  private
+
+  # Validate runner data has all required fields
+  #
+  # @param runner_data [Hash] Parsed JSON data
+  # @param file_path [String] File path for error messages
+  # @raise [ArgumentError] if required fields are missing or invalid
+  def validate_runner_data(runner_data, file_path)
+    # Validate ID field (required)
+    unless runner_data.key?('id')
+      raise ArgumentError, "missing required field: id"
+    end
+
+    unless runner_data['id'].is_a?(String) || runner_data['id'].is_a?(Integer)
+      raise ArgumentError, "field 'id' must be a string or integer"
+    end
+
+    # Validate tags field (required, accept both 'tags' and 'tag_list')
+    tags = runner_data['tags'] || runner_data['tag_list']
+    unless tags
+      raise ArgumentError, "missing required field: tags (or tag_list)"
+    end
+
+    unless tags.is_a?(Array)
+      raise ArgumentError, "field 'tags' (or 'tag_list') must be an array"
+    end
+
+    # Validate executor field (required)
+    unless runner_data.key?('executor')
+      raise ArgumentError, "missing required field: executor"
+    end
+
+    unless runner_data['executor'].is_a?(String)
+      raise ArgumentError, "field 'executor' must be a string"
+    end
+
+    # Validate max_jobs field (required, accept both 'max_jobs' and 'concurrent')
+    max_jobs = runner_data['max_jobs'] || runner_data['concurrent']
+    unless max_jobs
+      raise ArgumentError, "missing required field: max_jobs (or concurrent)"
+    end
+
+    unless max_jobs.is_a?(Integer) && max_jobs >= 1
+      raise ArgumentError, "field 'max_jobs' (or 'concurrent') must be a positive integer"
+    end
+
+    # All validations passed
+    true
+  end
+end

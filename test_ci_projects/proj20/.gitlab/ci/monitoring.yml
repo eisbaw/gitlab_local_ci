@@ -1,0 +1,49 @@
+# Child pipeline for monitoring setup after production deployment
+# Triggered from main pipeline
+
+stages:
+  - setup
+  - verify
+
+variables:
+  MONITORING_STACK: "prometheus-grafana"
+
+setup:prometheus:
+  stage: setup
+  image: alpine:latest
+  script:
+    - echo "Setting up Prometheus for deployment ${DEPLOYMENT_ID}"
+    - echo "Environment: ${ENVIRONMENT}"
+    - echo "Configuring scrape targets for all services"
+    - echo "Prometheus setup completed"
+
+setup:grafana:
+  stage: setup
+  image: alpine:latest
+  script:
+    - echo "Setting up Grafana dashboards"
+    - echo "Importing dashboard configurations"
+    - echo "Setting up alerts and notifications"
+    - echo "Grafana setup completed"
+
+setup:alertmanager:
+  stage: setup
+  image: alpine:latest
+  script:
+    - echo "Configuring AlertManager"
+    - echo "Setting up routing rules and receivers"
+    - echo "AlertManager setup completed"
+
+verify:monitoring:
+  stage: verify
+  image: alpine:latest
+  needs:
+    - setup:prometheus
+    - setup:grafana
+    - setup:alertmanager
+  script:
+    - echo "Verifying monitoring stack health"
+    - echo "Checking Prometheus metrics collection"
+    - echo "Verifying Grafana dashboards are accessible"
+    - echo "Testing AlertManager connectivity"
+    - echo "Monitoring verification completed successfully"

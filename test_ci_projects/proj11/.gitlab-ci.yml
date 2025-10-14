@@ -1,0 +1,94 @@
+# Main GitLab CI configuration demonstrating include directives
+# This file includes other YAML files and shows job overriding
+
+stages:
+  - build
+  - test
+  - deploy
+
+# Include external CI configuration files
+include:
+  # Local includes using relative paths
+  - local: '.gitlab/ci/build.yml'
+  - local: '.gitlab/ci/test.yml'
+  - local: '.gitlab/ci/deploy.yml'
+
+# Global variables available to all jobs
+variables:
+  PROJECT_NAME: "proj11-include-demo"
+  VERSION: "1.0.0"
+
+# Default settings for all jobs
+default:
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+# Override a job from the included files
+# This demonstrates how to extend and modify included jobs
+build-app:
+  # Inherit from the included build-app job
+  variables:
+    BUILD_TYPE: "optimized"
+  script:
+    # Override the script from build.yml
+    - echo "Building application with overrides..."
+    - echo "Build type: ${BUILD_TYPE}"
+    - mkdir -p build
+    - echo "app-v${VERSION}-optimized" > build/app.txt
+    - echo "Build completed with custom configuration"
+  after_script:
+    - echo "Custom post-build step"
+    - ls -la build/
+
+# Override specific attributes of included job
+integration-tests:
+  # Override just the allow_failure attribute
+  allow_failure: true
+  script:
+    # Keep most of original but add extra steps
+    - echo "Running integration tests (with override)..."
+    - echo "Test suite: Integration Tests (Extended)"
+    - echo "Running additional smoke tests..."
+    - echo "Tests passed: 50/50"
+    - echo "All integration tests passed"
+
+# Add a completely new job not in included files
+code-quality:
+  stage: test
+  script:
+    - echo "Running code quality checks..."
+    - echo "Analyzing code style..."
+    - echo "Checking for code smells..."
+    - echo "Quality score: A+"
+  dependencies:
+    - build-app
+  allow_failure: true
+
+# Override deploy-production with additional requirements
+deploy-production:
+  before_script:
+    - echo "Preparing production deployment with extra checks..."
+    - echo "Verifying all tests passed..."
+    - echo "Checking deployment prerequisites..."
+  script:
+    - echo "Deploying to production environment (verified)..."
+    - echo "Target: www.example.com"
+    - echo "Running pre-deployment health checks..."
+    - echo "Production deployment completed successfully"
+  after_script:
+    - echo "Running post-deployment verification..."
+    - echo "Sending deployment notification..."
+
+# Additional job to demonstrate composition
+verify-includes:
+  stage: .pre
+  script:
+    - echo "Verifying CI configuration includes..."
+    - echo "Main config: .gitlab-ci.yml"
+    - echo "Included: .gitlab/ci/build.yml"
+    - echo "Included: .gitlab/ci/test.yml"
+    - echo "Included: .gitlab/ci/deploy.yml"
+    - echo "All includes loaded successfully"

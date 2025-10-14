@@ -1,0 +1,143 @@
+stages:
+  - build
+  - test
+  - integration
+  - deploy
+
+# Build jobs - no dependencies, run in parallel
+build:frontend:
+  stage: build
+  script:
+    - echo "Building frontend..."
+    - sleep 2
+    - echo "Frontend build complete"
+  artifacts:
+    paths:
+      - dist/frontend/
+    expire_in: 1 hour
+
+build:backend:
+  stage: build
+  script:
+    - echo "Building backend..."
+    - sleep 2
+    - echo "Backend build complete"
+  artifacts:
+    paths:
+      - dist/backend/
+    expire_in: 1 hour
+
+build:database:
+  stage: build
+  script:
+    - echo "Building database migrations..."
+    - sleep 1
+    - echo "Database migrations ready"
+  artifacts:
+    paths:
+      - dist/migrations/
+    expire_in: 1 hour
+
+# Test jobs - each only needs its specific build job
+# These can start immediately after their dependency completes,
+# without waiting for all build jobs to finish
+test:frontend:unit:
+  stage: test
+  needs:
+    - build:frontend
+  script:
+    - echo "Running frontend unit tests..."
+    - sleep 2
+    - echo "Frontend tests passed"
+
+test:frontend:e2e:
+  stage: test
+  needs:
+    - build:frontend
+  script:
+    - echo "Running frontend E2E tests..."
+    - sleep 3
+    - echo "Frontend E2E tests passed"
+
+test:backend:unit:
+  stage: test
+  needs:
+    - build:backend
+  script:
+    - echo "Running backend unit tests..."
+    - sleep 2
+    - echo "Backend tests passed"
+
+test:backend:api:
+  stage: test
+  needs:
+    - build:backend
+    - build:database
+  script:
+    - echo "Running backend API tests with database..."
+    - sleep 3
+    - echo "API tests passed"
+
+# Integration tests need multiple components
+integration:smoke:
+  stage: integration
+  needs:
+    - build:frontend
+    - build:backend
+  script:
+    - echo "Running smoke tests..."
+    - sleep 2
+    - echo "Smoke tests passed"
+
+integration:full:
+  stage: integration
+  needs:
+    - test:frontend:unit
+    - test:backend:unit
+    - test:backend:api
+  script:
+    - echo "Running full integration tests..."
+    - sleep 4
+    - echo "Integration tests passed"
+
+# Deploy jobs can start as soon as their dependencies are met
+deploy:staging:frontend:
+  stage: deploy
+  needs:
+    - build:frontend
+    - test:frontend:unit
+    - integration:smoke
+  script:
+    - echo "Deploying frontend to staging..."
+    - sleep 2
+    - echo "Frontend deployed to staging"
+  environment:
+    name: staging/frontend
+
+deploy:staging:backend:
+  stage: deploy
+  needs:
+    - build:backend
+    - test:backend:api
+    - integration:smoke
+  script:
+    - echo "Deploying backend to staging..."
+    - sleep 2
+    - echo "Backend deployed to staging"
+  environment:
+    name: staging/backend
+
+# Production deployment needs everything
+deploy:production:
+  stage: deploy
+  needs:
+    - integration:full
+    - deploy:staging:frontend
+    - deploy:staging:backend
+  script:
+    - echo "Deploying to production..."
+    - sleep 3
+    - echo "Deployed to production"
+  environment:
+    name: production
+  when: manual

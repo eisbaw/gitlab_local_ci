@@ -1,0 +1,38 @@
+stages:
+  - build
+  - test
+
+variables:
+  CHILD1_VAR: "child1_default"
+
+child1_build:
+  stage: build
+  script:
+    - echo "Child1 Build Stage"
+    - echo "PARENT_VAR=${PARENT_VAR}"
+    - echo "CHILD_VAR=${CHILD_VAR}"
+    - echo "ENVIRONMENT=${ENVIRONMENT}"
+    - echo "CHILD1_VAR=${CHILD1_VAR}"
+    - echo "Building in child1 pipeline..."
+  artifacts:
+    paths:
+      - build/child1/
+    expire_in: 1 hour
+
+child1_test:
+  stage: test
+  script:
+    - echo "Child1 Test Stage"
+    - echo "Running tests for child1..."
+    - echo "Using CHILD_VAR=${CHILD_VAR}"
+  dependencies:
+    - child1_build
+
+child1_integration:
+  stage: test
+  script:
+    - echo "Child1 Integration Tests"
+    - echo "Environment: ${ENVIRONMENT}"
+    - '[ "${ENVIRONMENT}" = "development" ] && echo "Running dev integration tests"'
+  rules:
+    - if: '$ENVIRONMENT == "development"'

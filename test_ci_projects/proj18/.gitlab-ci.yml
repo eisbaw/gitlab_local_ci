@@ -1,0 +1,160 @@
+stages:
+  - build
+  - deploy_staging
+  - deploy_production
+  - cleanup
+
+variables:
+  DEPLOY_VERSION: "v1.0.0"
+
+# Build job - no resource group needed
+build:
+  stage: build
+  script:
+    - echo "Building application version ${DEPLOY_VERSION}"
+    - echo "Build artifacts created"
+    - mkdir -p dist
+    - echo "app-${DEPLOY_VERSION}" > dist/app.tar.gz
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 hour
+
+# Staging deployment jobs - share same resource group
+deploy_staging_app:
+  stage: deploy_staging
+  resource_group: staging/deployment
+  environment:
+    name: staging
+    url: https://staging.example.com
+    auto_stop_in: 1 day
+    on_stop: stop_staging
+  script:
+    - echo "Deploying to staging environment"
+    - echo "Resource group 'staging/deployment' ensures only one staging deploy at a time"
+    - sleep 2
+    - echo "Application deployed to staging"
+    - echo "Environment URL: https://staging.example.com"
+  needs:
+    - build
+
+deploy_staging_database:
+  stage: deploy_staging
+  resource_group: staging/deployment
+  environment:
+    name: staging
+    url: https://staging.example.com
+    auto_stop_in: 1 day
+  script:
+    - echo "Deploying database migrations to staging"
+    - echo "Waiting for staging/deployment resource group lock"
+    - sleep 2
+    - echo "Database migrations applied to staging"
+  needs:
+    - build
+  when: manual
+
+# Production deployment jobs - different resource group
+deploy_production_app:
+  stage: deploy_production
+  resource_group: production/deployment
+  environment:
+    name: production
+    url: https://production.example.com
+    auto_stop_in: 30 days
+    on_stop: stop_production
+  script:
+    - echo "Deploying to production environment"
+    - echo "Resource group 'production/deployment' ensures safe production deploys"
+    - sleep 3
+    - echo "Application deployed to production"
+    - echo "Environment URL: https://production.example.com"
+  needs:
+    - deploy_staging_app
+  when: manual
+  only:
+    - master
+    - main
+
+deploy_production_database:
+  stage: deploy_production
+  resource_group: production/deployment
+  environment:
+    name: production
+    url: https://production.example.com
+    auto_stop_in: 30 days
+  script:
+    - echo "Deploying database migrations to production"
+    - echo "Waiting for production/deployment resource group lock"
+    - sleep 3
+    - echo "Database migrations applied to production"
+  needs:
+    - deploy_staging_database
+    - deploy_production_app
+  when: manual
+  only:
+    - master
+    - main
+
+# Production hotfix deployment - same resource group as regular production
+deploy_production_hotfix:
+  stage: deploy_production
+  resource_group: production/deployment
+  environment:
+    name: production
+    url: https://production.example.com
+  script:
+    - echo "Deploying emergency hotfix to production"
+    - echo "Must wait for production/deployment resource group"
+    - sleep 2
+    - echo "Hotfix deployed successfully"
+  when: manual
+  only:
+    - hotfix/*
+
+# Environment cleanup jobs
+stop_staging:
+  stage: cleanup
+  resource_group: staging/deployment
+  environment:
+    name: staging
+    action: stop
+  script:
+    - echo "Stopping staging environment"
+    - echo "Cleaning up staging resources"
+    - sleep 1
+    - echo "Staging environment stopped"
+  when: manual
+
+stop_production:
+  stage: cleanup
+  resource_group: production/deployment
+  environment:
+    name: production
+    action: stop
+  script:
+    - echo "Stopping production environment"
+    - echo "Cleaning up production resources"
+    - sleep 2
+    - echo "Production environment stopped"
+  when: manual
+  only:
+    - master
+    - main
+
+# Monitoring job - separate resource group
+deploy_monitoring:
+  stage: deploy_production
+  resource_group: monitoring/deployment
+  environment:
+    name: monitoring
+    url: https://monitoring.example.com
+    auto_stop_in: 7 days
+  script:
+    - echo "Deploying monitoring stack"
+    - echo "Resource group 'monitoring/deployment' separate from app deployments"
+    - sleep 1
+    - echo "Monitoring deployed"
+  needs:
+    - deploy_production_app
+  when: manual

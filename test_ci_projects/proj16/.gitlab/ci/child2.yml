@@ -1,0 +1,45 @@
+stages:
+  - prepare
+  - deploy
+  - verify
+
+variables:
+  CHILD2_VAR: "child2_default"
+
+child2_prepare:
+  stage: prepare
+  script:
+    - echo "Child2 Prepare Stage"
+    - echo "PARENT_VAR=${PARENT_VAR}"
+    - echo "CHILD_VAR=${CHILD_VAR}"
+    - echo "ENVIRONMENT=${ENVIRONMENT}"
+    - echo "CHILD2_VAR=${CHILD2_VAR}"
+    - echo "Preparing deployment..."
+
+child2_deploy:
+  stage: deploy
+  script:
+    - echo "Child2 Deploy Stage"
+    - echo "Deploying to ${ENVIRONMENT}..."
+    - echo "Using CHILD_VAR=${CHILD_VAR}"
+  dependencies:
+    - child2_prepare
+  environment:
+    name: ${ENVIRONMENT}
+    action: start
+
+child2_verify:
+  stage: verify
+  script:
+    - echo "Child2 Verify Stage"
+    - echo "Verifying deployment in ${ENVIRONMENT}..."
+    - '[ "${ENVIRONMENT}" = "production" ] && echo "Running production smoke tests"'
+  rules:
+    - if: '$ENVIRONMENT == "production"'
+
+child2_rollback:
+  stage: verify
+  script:
+    - echo "Child2 Rollback Stage"
+    - echo "This job only runs on failure"
+  when: on_failure

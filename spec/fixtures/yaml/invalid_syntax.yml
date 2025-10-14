@@ -1,0 +1,30 @@
+# Invalid YAML syntax for error handling tests
+stages:
+  - build
+  - test
+
+variables:
+  INVALID_VAR: "missing quote
+
+build_job:
+  stage: build
+  script:
+    - echo "Building"
+  artifacts:
+    paths:
+      - build/
+    expire_in: [this is invalid]
+
+test_job:
+  stage: test
+  script:
+    - echo "Testing
+  dependencies
+    - build_job
+
+# Improper indentation and missing colons
+deploy_job
+  stage deploy
+  script:
+    echo "This line is broken"
+  - another broken line

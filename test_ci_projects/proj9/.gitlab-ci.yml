@@ -1,0 +1,166 @@
+---
+# Test project for cache configuration and key generation
+# Tests: global cache, job-specific overrides, static/dynamic keys, policies
+
+# Global cache definition - applies to all jobs unless overridden
+cache:
+  key: global-cache-key
+  paths:
+    - .cache/
+    - vendor/
+  policy: pull-push
+
+stages:
+  - build
+  - test
+  - deploy
+
+# Job using global cache (inherits from global definition)
+build:default-cache:
+  stage: build
+  script:
+    - echo "Using global cache configuration"
+    - mkdir -p .cache vendor
+    - echo "build artifacts" > .cache/build.txt
+    - echo "vendor libs" > vendor/libs.txt
+
+# Job with static cache key override
+build:static-cache:
+  stage: build
+  cache:
+    key: static-build-cache
+    paths:
+      - build/
+      - .npm/
+    policy: push
+  script:
+    - echo "Using static cache key"
+    - mkdir -p build .npm
+    - echo "build output" > build/app.js
+    - echo "npm cache" > .npm/cache.txt
+
+# Job with dynamic cache key using CI variable
+build:dynamic-cache:
+  stage: build
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-build
+    paths:
+      - dist/
+      - node_modules/
+    policy: push
+  script:
+    - echo "Using dynamic cache key with branch name"
+    - echo "Branch: $CI_COMMIT_REF_SLUG"
+    - mkdir -p dist node_modules
+    - echo "distribution" > dist/bundle.js
+    - echo "dependencies" > node_modules/.cache
+
+# Job with multiple cache entries
+test:multi-cache:
+  stage: test
+  cache:
+    - key: ${CI_COMMIT_REF_SLUG}-gems
+      paths:
+        - vendor/ruby
+      policy: pull
+    - key: ${CI_COMMIT_REF_SLUG}-pip
+      paths:
+        - .pip-cache
+      policy: pull
+    - key: static-test-data
+      paths:
+        - test/fixtures
+      policy: pull
+  script:
+    - echo "Using multiple cache entries"
+    - echo "Testing with cached dependencies"
+    - ls -la vendor/ruby || echo "Ruby cache not found"
+    - ls -la .pip-cache || echo "Pip cache not found"
+    - ls -la test/fixtures || echo "Test fixtures not found"
+
+# Job with pull-only policy (read-only cache)
+test:pull-only:
+  stage: test
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-build
+    paths:
+      - dist/
+    policy: pull
+  script:
+    - echo "Using pull-only cache policy"
+    - ls -la dist/ || echo "No cached dist found"
+    - echo "Running tests with cached build artifacts"
+
+# Job with push-only policy (write-only cache)
+build:push-only:
+  stage: build
+  cache:
+    key: dependencies-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .bundler/
+      - .yarn/
+    policy: push
+  script:
+    - echo "Using push-only cache policy"
+    - mkdir -p .bundler .yarn
+    - echo "bundler cache" > .bundler/config
+    - echo "yarn cache" > .yarn/cache.txt
+    - echo "Only writing to cache, not reading"
+
+# Job with cache key including multiple variables
+deploy:complex-cache-key:
+  stage: deploy
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-${CI_JOB_NAME}-v1
+    paths:
+      - .deploy-cache/
+    policy: pull-push
+  script:
+    - echo "Using complex cache key with job name and version"
+    - mkdir -p .deploy-cache
+    - echo "deployment state" > .deploy-cache/state.txt
+
+# Job that disables cache
+deploy:no-cache:
+  stage: deploy
+  cache: {}
+  script:
+    - echo "This job has cache disabled"
+    - echo "No cache will be used or saved"
+
+# Job with files-based cache key (key changes when files change)
+build:files-cache:
+  stage: build
+  cache:
+    key:
+      files:
+        - Gemfile.lock
+        - package-lock.json
+      prefix: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - vendor/bundle
+      - node_modules/
+    policy: pull-push
+  script:
+    - echo "Cache key based on lockfile checksums"
+    - echo "Key changes when dependencies change"
+    - mkdir -p vendor/bundle node_modules
+    - echo "gems" > vendor/bundle/cache.txt
+    - echo "npm packages" > node_modules/.package-lock.json
+
+# Job combining global cache with additional cache
+test:combined-cache:
+  stage: test
+  cache:
+    - key: global-cache-key
+      paths:
+        - .cache/
+      policy: pull
+    - key: ${CI_COMMIT_REF_SLUG}-test
+      paths:
+        - coverage/
+      policy: push
+  script:
+    - echo "Using both global and job-specific cache"
+    - mkdir -p coverage
+    - echo "test coverage" > coverage/index.html

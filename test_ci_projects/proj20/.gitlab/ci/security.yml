@@ -1,0 +1,45 @@
+# Security-focused CI configuration
+# This file is included by the main .gitlab-ci.yml
+
+.security_base:
+  stage: security
+  allow_failure: true
+  artifacts:
+    expire_in: 1 week
+
+# Container image scanning
+security:container:scan:
+  extends: .security_base
+  image: aquasec/trivy:latest
+  needs: []
+  parallel:
+    matrix:
+      - IMAGE:
+          - frontend
+          - backend
+          - api
+          - workers
+  script:
+    - echo "Scanning ${IMAGE} container image for vulnerabilities"
+    - trivy image --format json --output ${IMAGE}-scan.json ${DOCKER_IMAGE_BASE}/${IMAGE}:latest || true
+  artifacts:
+    paths:
+      - "*-scan.json"
+  rules:
+    - if: '$ENABLE_SECURITY_SCANNING == "true" && $CI_COMMIT_BRANCH == "main"'
+
+# License compliance check
+security:license:check:
+  extends: .security_base
+  image: licensefinder/license_finder:latest
+  needs: []
+  script:
+    - license_finder report --format json > license-report.json || true
+    - echo "License compliance check completed"
+  artifacts:
+    paths:
+      - license-report.json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual

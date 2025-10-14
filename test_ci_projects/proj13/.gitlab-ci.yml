@@ -1,0 +1,221 @@
+# Test project for extends keyword functionality
+# Demonstrates:
+# - Hidden job templates (starting with .)
+# - Single-level extends
+# - Multi-level extends (inheritance chains)
+# - Value overriding
+# - Array merging behavior
+
+# Base template - foundation for all jobs
+.base:
+  image: alpine:latest
+  tags:
+    - docker
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+  before_script:
+    - echo "Base before_script"
+    - apk add --no-cache curl
+
+# Build template - extends base
+.build_template:
+  extends: .base
+  stage: build
+  tags:
+    - docker
+    - build
+  before_script:
+    - echo "Build template before_script"
+    - apk add --no-cache build-base git
+  script:
+    - echo "Default build script"
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 hour
+
+# Test template - extends base
+.test_template:
+  extends: .base
+  stage: test
+  tags:
+    - docker
+    - test
+  before_script:
+    - echo "Test template before_script"
+    - apk add --no-cache python3 py3-pip
+  script:
+    - echo "Default test script"
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+
+# Deploy template - extends base with additional security
+.deploy_template:
+  extends: .base
+  stage: deploy
+  tags:
+    - docker
+    - deploy
+  before_script:
+    - echo "Deploy template before_script"
+    - apk add --no-cache openssh-client
+  only:
+    - main
+    - master
+  environment:
+    name: production
+    url: https://example.com
+
+# Advanced template - multi-level extends
+.advanced_build:
+  extends: .build_template
+  variables:
+    BUILD_TYPE: "advanced"
+    OPTIMIZATION: "enabled"
+  after_script:
+    - echo "Advanced build cleanup"
+    - rm -rf /tmp/*
+
+# Stages definition
+stages:
+  - build
+  - test
+  - deploy
+
+# Concrete jobs using extends
+
+# Simple extend - uses build template as-is
+build_simple:
+  extends: .build_template
+  script:
+    - echo "Building simple application"
+    - mkdir -p build
+    - echo "binary" > build/app
+
+# Override script and add variables
+build_complex:
+  extends: .build_template
+  variables:
+    BUILD_ENV: "production"
+    OPTIMIZATION_LEVEL: "3"
+  script:
+    - echo "Building complex application with optimizations"
+    - echo "BUILD_ENV=$BUILD_ENV"
+    - mkdir -p build
+    - echo "optimized_binary" > build/app_optimized
+  artifacts:
+    paths:
+      - build/
+    expire_in: 2 hours
+
+# Multi-level extends
+build_advanced:
+  extends: .advanced_build
+  variables:
+    BUILD_TYPE: "super_advanced"  # Override from .advanced_build
+    EXTRA_FLAGS: "--strict"
+  script:
+    - echo "Building with advanced template"
+    - echo "BUILD_TYPE=$BUILD_TYPE"
+    - echo "OPTIMIZATION=$OPTIMIZATION"
+    - mkdir -p build
+    - echo "advanced_binary" > build/app_advanced
+
+# Test job with simple extend
+test_unit:
+  extends: .test_template
+  script:
+    - echo "Running unit tests"
+    - python3 -c "print('All unit tests passed')"
+  dependencies:
+    - build_simple
+
+# Test job overriding coverage regex
+test_integration:
+  extends: .test_template
+  script:
+    - echo "Running integration tests"
+    - echo "Coverage: 85.5%"
+  coverage: '/Coverage:\s+(\d+\.\d+%)/'
+  dependencies:
+    - build_complex
+
+# Test with additional before_script (should replace, not merge)
+test_e2e:
+  extends: .test_template
+  before_script:
+    - echo "E2E specific setup - replaces template before_script"
+    - apk add --no-cache chromium chromium-chromedriver
+  script:
+    - echo "Running end-to-end tests"
+    - echo "Browser tests completed"
+  dependencies:
+    - build_advanced
+
+# Deploy with override
+deploy_staging:
+  extends: .deploy_template
+  environment:
+    name: staging
+    url: https://staging.example.com
+  only:
+    - develop
+    - /^feature\/.*$/
+  script:
+    - echo "Deploying to staging environment"
+    - echo "Deployment successful"
+
+# Deploy with multiple overrides
+deploy_production:
+  extends: .deploy_template
+  variables:
+    DEPLOY_STRATEGY: "blue-green"
+    HEALTH_CHECK_TIMEOUT: "300"
+  before_script:
+    - echo "Production deploy setup"
+    - apk add --no-cache openssh-client aws-cli
+  script:
+    - echo "Deploying to production with $DEPLOY_STRATEGY strategy"
+    - echo "Running health checks"
+    - echo "Production deployment successful"
+  only:
+    - master
+  when: manual
+
+# Job extending from multiple templates (using YAML merge)
+deploy_canary:
+  extends: .deploy_template
+  variables:
+    DEPLOY_STRATEGY: "canary"
+    CANARY_PERCENTAGE: "10"
+  environment:
+    name: production-canary
+    url: https://canary.example.com
+  script:
+    - echo "Deploying canary release"
+    - echo "Canary percentage: $CANARY_PERCENTAGE%"
+  when: manual
+  allow_failure: true
+
+# Override retry behavior
+build_no_retry:
+  extends: .build_template
+  retry: 0
+  script:
+    - echo "Building without retry capability"
+    - mkdir -p build
+    - echo "no_retry_binary" > build/app_no_retry
+
+# Extending and adding new fields
+test_security:
+  extends: .test_template
+  script:
+    - echo "Running security scans"
+    - echo "Vulnerability check passed"
+  allow_failure: true
+  timeout: 30m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: always
+    - when: manual

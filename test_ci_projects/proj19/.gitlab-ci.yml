@@ -1,0 +1,252 @@
+# Complex DAG Structure - Microservices Build/Test Flow
+# This configuration demonstrates:
+# - Diamond dependency patterns
+# - Multiple needs dependencies
+# - Mix of stage-based and needs-based dependencies
+# - Realistic microservices architecture workflow
+
+stages:
+  - prepare
+  - build
+  - test
+  - integration
+  - security
+  - deploy
+  - verify
+
+# ============================================================================
+# PREPARE STAGE - Foundation layer
+# ============================================================================
+
+prepare:environment:
+  stage: prepare
+  script:
+    - echo "Setting up build environment"
+    - echo "Loading configuration from vault"
+    - sleep 1
+
+prepare:dependencies:
+  stage: prepare
+  script:
+    - echo "Downloading and caching dependencies"
+    - echo "npm install, pip install, etc."
+    - sleep 1
+
+# ============================================================================
+# BUILD STAGE - Parallel microservice builds
+# ============================================================================
+
+build:api-gateway:
+  stage: build
+  needs:
+    - prepare:environment
+    - prepare:dependencies
+  script:
+    - echo "Building API Gateway service"
+    - echo "Compiling TypeScript, running webpack"
+    - sleep 2
+
+build:auth-service:
+  stage: build
+  needs:
+    - prepare:environment
+    - prepare:dependencies
+  script:
+    - echo "Building Authentication Service"
+    - echo "Compiling Go binaries"
+    - sleep 2
+
+build:user-service:
+  stage: build
+  needs:
+    - prepare:environment
+    - prepare:dependencies
+  script:
+    - echo "Building User Service"
+    - echo "Building Java Spring Boot application"
+    - sleep 2
+
+build:payment-service:
+  stage: build
+  needs:
+    - prepare:environment
+    - prepare:dependencies
+  script:
+    - echo "Building Payment Service"
+    - echo "Compiling Python FastAPI service"
+    - sleep 2
+
+build:notification-service:
+  stage: build
+  needs:
+    - prepare:environment
+    - prepare:dependencies
+  script:
+    - echo "Building Notification Service"
+    - echo "Building Node.js microservice"
+    - sleep 2
+
+# ============================================================================
+# TEST STAGE - Diamond dependency pattern starts here
+# ============================================================================
+
+test:api-gateway:
+  stage: test
+  needs:
+    - build:api-gateway
+  script:
+    - echo "Running API Gateway unit tests"
+    - echo "Jest test suite"
+    - sleep 2
+
+test:auth-service:
+  stage: test
+  needs:
+    - build:auth-service
+  script:
+    - echo "Running Auth Service unit tests"
+    - echo "Go test coverage"
+    - sleep 2
+
+test:user-service:
+  stage: test
+  needs:
+    - build:user-service
+  script:
+    - echo "Running User Service unit tests"
+    - echo "JUnit test suite"
+    - sleep 2
+
+test:payment-service:
+  stage: test
+  needs:
+    - build:payment-service
+  script:
+    - echo "Running Payment Service unit tests"
+    - echo "pytest with coverage"
+    - sleep 2
+
+test:notification-service:
+  stage: test
+  needs:
+    - build:notification-service
+  script:
+    - echo "Running Notification Service unit tests"
+    - echo "Mocha test suite"
+    - sleep 2
+
+# ============================================================================
+# INTEGRATION STAGE - Diamond pattern converges
+# Multiple dependencies creating complex DAG
+# ============================================================================
+
+integration:auth-flow:
+  stage: integration
+  needs:
+    - test:api-gateway
+    - test:auth-service
+    - test:user-service
+  script:
+    - echo "Testing authentication flow integration"
+    - echo "API Gateway -> Auth Service -> User Service"
+    - sleep 3
+
+integration:payment-flow:
+  stage: integration
+  needs:
+    - test:api-gateway
+    - test:payment-service
+    - test:user-service
+  script:
+    - echo "Testing payment flow integration"
+    - echo "API Gateway -> Payment Service -> User Service"
+    - sleep 3
+
+integration:notification-flow:
+  stage: integration
+  needs:
+    - test:notification-service
+    - test:user-service
+    - test:payment-service
+  script:
+    - echo "Testing notification flow integration"
+    - echo "Payment Service triggers -> Notification Service"
+    - sleep 3
+
+# ============================================================================
+# SECURITY STAGE - Parallel security checks
+# ============================================================================
+
+security:sast:
+  stage: security
+  needs:
+    - build:api-gateway
+    - build:auth-service
+    - build:user-service
+    - build:payment-service
+    - build:notification-service
+  script:
+    - echo "Running SAST security analysis"
+    - echo "Scanning all service codebases for vulnerabilities"
+    - sleep 2
+
+security:dependency-scan:
+  stage: security
+  needs:
+    - prepare:dependencies
+  script:
+    - echo "Scanning dependencies for known vulnerabilities"
+    - echo "Checking npm audit, safety, etc."
+    - sleep 2
+
+# ============================================================================
+# DEPLOY STAGE - Complex convergence point
+# Requires all tests and security checks to pass
+# ============================================================================
+
+deploy:staging:
+  stage: deploy
+  needs:
+    - integration:auth-flow
+    - integration:payment-flow
+    - integration:notification-flow
+    - security:sast
+    - security:dependency-scan
+  script:
+    - echo "Deploying all services to staging environment"
+    - echo "Updating Kubernetes manifests"
+    - echo "Rolling out with zero downtime"
+    - sleep 3
+
+# ============================================================================
+# VERIFY STAGE - Final validation
+# ============================================================================
+
+verify:e2e-tests:
+  stage: verify
+  needs:
+    - deploy:staging
+  script:
+    - echo "Running end-to-end tests on staging"
+    - echo "Simulating real user workflows"
+    - echo "Testing complete microservices ecosystem"
+    - sleep 3
+
+verify:smoke-tests:
+  stage: verify
+  needs:
+    - deploy:staging
+  script:
+    - echo "Running smoke tests"
+    - echo "Verifying critical paths are functional"
+    - sleep 2
+
+verify:performance-tests:
+  stage: verify
+  needs:
+    - deploy:staging
+  script:
+    - echo "Running performance tests"
+    - echo "Load testing with k6"
+    - echo "Measuring response times and throughput"
+    - sleep 3

@@ -1,0 +1,114 @@
+stages:
+  - test
+  - security
+  - quality
+
+# Test job with JUnit reports and coverage
+unit-tests:
+  stage: test
+  image: ruby:3.0
+  script:
+    - echo "Running unit tests with coverage..."
+    - bundle install
+    - bundle exec rspec --format RspecJunitFormatter --out rspec.xml
+    - echo "Coverage: 85.5%"
+  coverage: '/Coverage: \d+\.\d+%/'
+  artifacts:
+    reports:
+      junit: rspec.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/coverage.xml
+    paths:
+      - coverage/
+    expire_in: 30 days
+
+# Integration tests with coverage extraction
+integration-tests:
+  stage: test
+  image: python:3.9
+  script:
+    - echo "Running integration tests..."
+    - pip install pytest pytest-cov
+    - pytest --cov=src --cov-report=xml:coverage.xml --cov-report=term
+    - echo "Total coverage: 92.3 percent"
+  coverage: '/Total coverage: (\d+\.\d+)/'
+  artifacts:
+    reports:
+      junit: test-results.xml
+      cobertura: coverage.xml
+    expire_in: 1 week
+
+# Code quality analysis
+code-quality:
+  stage: quality
+  image: node:16
+  script:
+    - echo "Running code quality checks..."
+    - npm install -g eslint
+    - eslint src/ --format json --output-file gl-code-quality-report.json || true
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    paths:
+      - gl-code-quality-report.json
+
+# SAST security scanning
+sast:
+  stage: security
+  image: returntocorp/semgrep
+  script:
+    - echo "Running SAST analysis..."
+    - semgrep --config=auto --gitlab-sast --output gl-sast-report.json src/ || true
+  artifacts:
+    reports:
+      sast: gl-sast-report.json
+
+# Multiple coverage regex patterns
+coverage-formats:
+  stage: test
+  image: alpine:latest
+  script:
+    - echo "Testing various coverage formats..."
+    - echo "Line coverage: 78.9%"
+    - echo "Branch coverage: 65.4%"
+    - echo "Function coverage: 91.2%"
+  coverage: '/Line coverage: (\d+\.\d+)%/'
+
+# Combined reports job
+full-test-suite:
+  stage: test
+  image: node:16
+  script:
+    - echo "Running comprehensive test suite..."
+    - npm install
+    - npm run test:coverage
+    - echo "Code coverage is 88.7%"
+  coverage: '/Code coverage is (\d+\.\d+)%/'
+  artifacts:
+    reports:
+      junit:
+        - test-results/unit.xml
+        - test-results/integration.xml
+      cobertura: coverage/cobertura-coverage.xml
+      codequality: code-quality-report.json
+    paths:
+      - coverage/
+      - test-results/
+    when: always
+    expire_in: 2 weeks
+
+# Go coverage example
+go-tests:
+  stage: test
+  image: golang:1.19
+  script:
+    - echo "Running Go tests with coverage..."
+    - go test -v -coverprofile=coverage.out ./...
+    - go tool cover -func=coverage.out
+    - echo "total: (statements) 94.5%"
+  coverage: '/total:.*\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      junit: report.xml
+      cobertura: coverage.xml

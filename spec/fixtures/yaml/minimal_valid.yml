@@ -1,0 +1,4 @@
+# Minimal valid GitLab CI configuration
+test_job:
+  script:
+    - echo "Hello World"

@@ -1,0 +1,41 @@
+# Frontend-specific CI configuration
+# This file is included by the main .gitlab-ci.yml
+
+.frontend_base:
+  image: node:20-alpine
+  cache:
+    key: "frontend-deps-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - services/frontend/node_modules/
+      - services/frontend/.npm/
+  before_script:
+    - cd services/frontend
+    - npm ci --cache .npm --prefer-offline
+
+# Additional frontend-specific jobs can be defined here
+audit:frontend:dependencies:
+  extends: .frontend_base
+  stage: security
+  needs: []
+  script:
+    - npm audit --audit-level=moderate
+  allow_failure: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+bundle:frontend:analyze:
+  extends: .frontend_base
+  stage: quality
+  needs: ["build:frontend"]
+  script:
+    - npm run build -- --stats
+    - npx webpack-bundle-analyzer dist/stats.json --mode static --report bundle-report.html
+  artifacts:
+    paths:
+      - services/frontend/bundle-report.html
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual

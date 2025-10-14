@@ -1,0 +1,28 @@
+# Build stage jobs
+.build-template:
+  stage: build
+  before_script:
+    - echo "Preparing build environment..."
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 hour
+
+build-app:
+  extends: .build-template
+  script:
+    - echo "Building application..."
+    - mkdir -p build
+    - echo "app-v1.0.0" > build/app.txt
+    - echo "Build completed successfully"
+
+build-docker:
+  extends: .build-template
+  script:
+    - echo "Building Docker image..."
+    - mkdir -p build
+    - echo "docker-image:latest" > build/docker.txt
+    - echo "Docker build completed"
+  only:
+    - main
+    - develop

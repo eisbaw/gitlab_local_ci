@@ -1,0 +1,1068 @@
+---
+# ============================================================================
+# Test Project 20: Comprehensive Kitchen Sink Pipeline
+# ============================================================================
+# Purpose: Combines ALL features from proj1-proj19 into a single realistic
+# monorepo pipeline with multiple services, complex dependencies, and advanced
+# GitLab CI features.
+#
+# Features Demonstrated:
+# - Multiple stages with complex DAG via needs
+# - Global and job-specific variables with expansions
+# - Artifacts with dependencies and expiration
+# - Services (PostgreSQL, Redis, Elasticsearch)
+# - Rules with complex conditions
+# - Cache configurations (global and job-specific)
+# - Includes (local YAML files)
+# - YAML anchors and references
+# - Extends for template reuse
+# - Before/after scripts (global and job-specific)
+# - Retry and timeout configurations
+# - Reports (JUnit, coverage, SAST, dependency scanning)
+# - Child pipeline triggers
+# - Matrix parallelization
+# - Resource groups for deployment coordination
+# - Hidden job templates
+# - Interruptible jobs
+# ============================================================================
+
+# ============================================================================
+# YAML ANCHORS - Reusable configuration blocks
+# ============================================================================
+.base_config: &base_config
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  timeout: 1h
+  interruptible: true
+
+.docker_config: &docker_config
+  image: docker:24-alpine
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  tags:
+    - docker
+
+.node_config: &node_config
+  image: node:20-alpine
+  cache: &node_cache
+    key: "node-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - node_modules/
+      - .npm/
+    policy: pull-push
+
+.ruby_config: &ruby_config
+  image: ruby:3.2-alpine
+  cache: &ruby_cache
+    key: "ruby-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - vendor/ruby/
+      - .bundle/
+    policy: pull-push
+
+.python_config: &python_config
+  image: python:3.11-alpine
+  cache: &python_cache
+    key: "python-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+      - .pip-cache/
+    policy: pull-push
+
+# ============================================================================
+# GLOBAL CONFIGURATION
+# ============================================================================
+variables:
+  # Project metadata
+  PROJECT_NAME: "monorepo-platform"
+  VERSION: "2.0.0"
+  BUILD_DATE: "${CI_PIPELINE_CREATED_AT}"
+
+  # Docker configuration
+  DOCKER_REGISTRY: "registry.example.com"
+  DOCKER_IMAGE_BASE: "${DOCKER_REGISTRY}/${CI_PROJECT_NAME}"
+  DOCKER_BUILDKIT: "1"
+
+  # Application configuration
+  APP_ENV: "development"
+  LOG_LEVEL: "info"
+  MAX_RETRIES: "3"
+  TIMEOUT_SECONDS: "300"
+
+  # Database configuration
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "test_db"
+
+  # Service URLs (for integration tests)
+  REDIS_URL: "redis://redis:6379"
+  ELASTICSEARCH_URL: "http://elasticsearch:9200"
+
+  # Build optimization
+  CARGO_HOME: "${CI_PROJECT_DIR}/.cargo"
+  GO_CACHE_DIR: "${CI_PROJECT_DIR}/.go-cache"
+
+  # Feature flags
+  ENABLE_PERFORMANCE_TESTS: "true"
+  ENABLE_SECURITY_SCANNING: "true"
+  ENABLE_CODE_QUALITY: "true"
+
+# Global cache configuration
+cache:
+  key: "global-${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .cache/
+    - tmp/
+  policy: pull-push
+
+# Global before_script
+before_script:
+  - echo "============================================"
+  - echo "Pipeline ID: ${CI_PIPELINE_ID}"
+  - echo "Job: ${CI_JOB_NAME}"
+  - echo "Stage: ${CI_JOB_STAGE}"
+  - echo "Commit: ${CI_COMMIT_SHORT_SHA}"
+  - echo "Branch: ${CI_COMMIT_REF_NAME}"
+  - echo "============================================"
+  - export BUILD_TIMESTAMP=$(date +%s)
+
+# Global after_script
+after_script:
+  - echo "============================================"
+  - echo "Job ${CI_JOB_NAME} completed"
+  - echo "Status: ${CI_JOB_STATUS}"
+  - echo "Duration: $(($(date +%s) - BUILD_TIMESTAMP)) seconds"
+  - echo "============================================"
+
+# ============================================================================
+# STAGES DEFINITION
+# ============================================================================
+stages:
+  - prebuild      # Validation, linting, dependency checks
+  - build         # Compile and build all services
+  - test          # Unit and integration tests
+  - security      # Security scanning
+  - quality       # Code quality analysis
+  - package       # Docker image building
+  - deploy_dev    # Deploy to development
+  - integration   # End-to-end integration tests
+  - deploy_stage  # Deploy to staging
+  - performance   # Performance and load testing
+  - deploy_prod   # Deploy to production
+  - cleanup       # Post-deployment cleanup
+
+# ============================================================================
+# INCLUDE EXTERNAL CONFIGURATIONS
+# ============================================================================
+include:
+  - local: '.gitlab/ci/frontend.yml'
+  - local: '.gitlab/ci/backend.yml'
+  - local: '.gitlab/ci/security.yml'
+
+# ============================================================================
+# HIDDEN JOB TEMPLATES (reusable via extends)
+# ============================================================================
+.base_job:
+  <<: *base_config
+  tags:
+    - docker
+  before_script:
+    - echo "Base job template initialized"
+    - apk add --no-cache git curl jq
+    - !reference [before_script]
+
+.test_job:
+  extends: .base_job
+  stage: test
+  coverage: '/COVERAGE:\s+(\d+\.\d+)%/'
+  artifacts:
+    when: always
+    reports:
+      junit: reports/junit.xml
+    paths:
+      - reports/
+      - coverage/
+    expire_in: 1 week
+
+.deploy_job:
+  extends: .base_job
+  retry:
+    max: 3
+    when:
+      - api_failure
+      - runner_system_failure
+  timeout: 30m
+  interruptible: false
+
+.docker_build_job:
+  extends: .base_job
+  <<: *docker_config
+  stage: package
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $DOCKER_REGISTRY
+    - docker build --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${CI_COMMIT_SHA} -t ${IMAGE_NAME}:latest .
+    - docker push ${IMAGE_NAME}:${CI_COMMIT_SHA}
+    - docker push ${IMAGE_NAME}:latest
+  artifacts:
+    reports:
+      dotenv: build.env
+    expire_in: 1 day
+
+# ============================================================================
+# PREBUILD STAGE - Validation and Setup
+# ============================================================================
+validate:yaml:
+  stage: prebuild
+  image: alpine:latest
+  script:
+    - apk add --no-cache yamllint
+    - 'yamllint -d "{extends: relaxed, rules: {line-length: {max: 120}}}" .gitlab-ci.yml'
+    - echo "YAML validation passed"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+validate:dependencies:
+  stage: prebuild
+  image: alpine:latest
+  script:
+    - echo "Checking dependency files..."
+    - test -f package.json || echo "Warning: package.json not found"
+    - test -f Gemfile || echo "Warning: Gemfile not found"
+    - test -f requirements.txt || echo "Warning: requirements.txt not found"
+    - echo "Dependency validation complete"
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+lint:frontend:
+  stage: prebuild
+  <<: *node_config
+  script:
+    - cd services/frontend
+    - npm ci
+    - npm run lint
+    - npm run prettier:check
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/frontend/**/*
+
+lint:backend:
+  stage: prebuild
+  <<: *ruby_config
+  script:
+    - cd services/backend
+    - bundle install --deployment --jobs 4
+    - bundle exec rubocop
+    - bundle exec reek
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/backend/**/*
+
+lint:api:
+  stage: prebuild
+  <<: *python_config
+  script:
+    - cd services/api
+    - pip install -q flake8 black mypy
+    - flake8 src/
+    - black --check src/
+    - mypy src/
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/api/**/*
+
+# ============================================================================
+# BUILD STAGE - Compile and Build Services
+# ============================================================================
+build:frontend:
+  stage: build
+  <<: *node_config
+  needs: ["lint:frontend"]
+  script:
+    - cd services/frontend
+    - npm ci
+    - npm run build
+    - echo "Frontend build artifacts:"
+    - ls -lah dist/
+    - echo "BUILD_VERSION=${VERSION}" > ../../build-frontend.env
+    - echo "FRONTEND_BUILD_ID=${CI_JOB_ID}" >> ../../build-frontend.env
+  artifacts:
+    paths:
+      - services/frontend/dist/
+      - services/frontend/package.json
+      - services/frontend/package-lock.json
+    reports:
+      dotenv: build-frontend.env
+    expire_in: 2 hours
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/frontend/**/*
+
+build:backend:
+  stage: build
+  <<: *ruby_config
+  needs: ["lint:backend"]
+  script:
+    - cd services/backend
+    - bundle install --deployment --jobs 4
+    - bundle exec rake assets:precompile
+    - echo "Backend build complete"
+    - echo "BUILD_VERSION=${VERSION}" > ../../build-backend.env
+    - echo "BACKEND_BUILD_ID=${CI_JOB_ID}" >> ../../build-backend.env
+  artifacts:
+    paths:
+      - services/backend/public/assets/
+      - services/backend/vendor/bundle/
+      - services/backend/Gemfile.lock
+    reports:
+      dotenv: build-backend.env
+    expire_in: 2 hours
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/backend/**/*
+
+build:api:
+  stage: build
+  <<: *python_config
+  needs: ["lint:api"]
+  script:
+    - cd services/api
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip setuptools wheel
+    - pip install -r requirements.txt
+    - python -m compileall src/
+    - echo "API build complete"
+    - echo "BUILD_VERSION=${VERSION}" > ../../build-api.env
+    - echo "API_BUILD_ID=${CI_JOB_ID}" >> ../../build-api.env
+  artifacts:
+    paths:
+      - services/api/.venv/
+      - services/api/requirements.txt
+    reports:
+      dotenv: build-api.env
+    expire_in: 2 hours
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/api/**/*
+
+build:workers:
+  stage: build
+  image: golang:1.21-alpine
+  needs: []
+  cache:
+    key: "go-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - ${GO_CACHE_DIR}
+  script:
+    - cd services/workers
+    - go mod download
+    - go build -o worker-binary ./cmd/worker
+    - echo "Worker build complete"
+    - echo "BUILD_VERSION=${VERSION}" > ../../build-workers.env
+    - echo "WORKERS_BUILD_ID=${CI_JOB_ID}" >> ../../build-workers.env
+  artifacts:
+    paths:
+      - services/workers/worker-binary
+    reports:
+      dotenv: build-workers.env
+    expire_in: 2 hours
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/workers/**/*
+
+# ============================================================================
+# TEST STAGE - Unit and Integration Tests
+# ============================================================================
+test:frontend:unit:
+  extends: .test_job
+  <<: *node_config
+  needs: ["build:frontend"]
+  services:
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    REDIS_HOST: redis
+    NODE_ENV: test
+  script:
+    - cd services/frontend
+    - npm ci
+    - npm run test:unit -- --coverage --reporters=default --reporters=jest-junit
+    - echo "COVERAGE: $(node -pe "require('./coverage/coverage-summary.json').total.lines.pct")%"
+  artifacts:
+    when: always
+    reports:
+      junit: services/frontend/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: services/frontend/coverage/cobertura-coverage.xml
+    paths:
+      - services/frontend/coverage/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/frontend/**/*
+
+test:frontend:integration:
+  extends: .test_job
+  <<: *node_config
+  needs: ["build:frontend"]
+  services:
+    - name: postgres:15-alpine
+      alias: postgres
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    POSTGRES_DB: test_db
+    POSTGRES_USER: test_user
+    POSTGRES_PASSWORD: test_pass
+    DATABASE_URL: "postgresql://test_user:test_pass@postgres:5432/test_db"
+    REDIS_URL: "redis://redis:6379"
+    NODE_ENV: test
+  before_script:
+    - !reference [before_script]
+    - apk add --no-cache postgresql-client
+    - until pg_isready -h postgres -U test_user; do sleep 1; done
+    - echo "Database is ready"
+  script:
+    - cd services/frontend
+    - npm ci
+    - npm run test:integration
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/frontend/**/*
+
+test:backend:unit:
+  extends: .test_job
+  <<: *ruby_config
+  needs: ["build:backend"]
+  script:
+    - cd services/backend
+    - bundle install --deployment
+    - bundle exec rspec --format progress --format RspecJunitFormatter --out ../../reports/backend-junit.xml
+    - echo "Test coverage: $(bundle exec rake coverage:report)"
+  artifacts:
+    when: always
+    reports:
+      junit: reports/backend-junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: services/backend/coverage/cobertura.xml
+    paths:
+      - services/backend/coverage/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/backend/**/*
+
+test:backend:integration:
+  extends: .test_job
+  <<: *ruby_config
+  needs: ["build:backend"]
+  services:
+    - name: postgres:15-alpine
+      alias: postgres
+    - name: redis:7-alpine
+      alias: redis
+    - name: elasticsearch:8.11.0
+      alias: elasticsearch
+      command: ["bin/elasticsearch", "-Expack.security.enabled=false"]
+  variables:
+    POSTGRES_DB: backend_test
+    POSTGRES_USER: backend_user
+    POSTGRES_PASSWORD: backend_pass
+    DATABASE_URL: "postgresql://backend_user:backend_pass@postgres:5432/backend_test"
+    REDIS_URL: "redis://redis:6379/1"
+    ELASTICSEARCH_URL: "http://elasticsearch:9200"
+    RAILS_ENV: test
+  before_script:
+    - !reference [before_script]
+    - apk add --no-cache postgresql-client curl
+    - until pg_isready -h postgres -U backend_user; do sleep 1; done
+    - until curl -f ${ELASTICSEARCH_URL}/_cluster/health; do sleep 1; done
+    - echo "All services are ready"
+  script:
+    - cd services/backend
+    - bundle install --deployment
+    - bundle exec rake db:create db:schema:load
+    - bundle exec rspec spec/integration --format progress
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/backend/**/*
+
+test:api:unit:
+  extends: .test_job
+  <<: *python_config
+  needs: ["build:api"]
+  script:
+    - cd services/api
+    - source .venv/bin/activate
+    - pytest tests/unit/ -v --junitxml=../../reports/api-junit.xml --cov=src --cov-report=xml --cov-report=term
+    - coverage_pct=$(python -c "import xml.etree.ElementTree as ET; print(ET.parse('coverage.xml').getroot().attrib['line-rate'])")
+    - echo "COVERAGE: ${coverage_pct}%"
+  artifacts:
+    when: always
+    reports:
+      junit: reports/api-junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: services/api/coverage.xml
+    paths:
+      - services/api/htmlcov/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/api/**/*
+
+test:api:integration:
+  extends: .test_job
+  <<: *python_config
+  needs: ["build:api"]
+  services:
+    - name: postgres:15-alpine
+      alias: postgres
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    POSTGRES_DB: api_test
+    POSTGRES_USER: api_user
+    POSTGRES_PASSWORD: api_pass
+    DATABASE_URL: "postgresql://api_user:api_pass@postgres:5432/api_test"
+    REDIS_URL: "redis://redis:6379/2"
+  before_script:
+    - !reference [before_script]
+    - apk add --no-cache postgresql-client
+    - until pg_isready -h postgres -U api_user; do sleep 1; done
+  script:
+    - cd services/api
+    - source .venv/bin/activate
+    - alembic upgrade head
+    - pytest tests/integration/ -v --junitxml=../../reports/api-integration-junit.xml
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/api/**/*
+
+test:workers:
+  stage: test
+  image: golang:1.21-alpine
+  needs: ["build:workers"]
+  cache:
+    key: "go-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - ${GO_CACHE_DIR}
+    policy: pull
+  script:
+    - cd services/workers
+    - go test ./... -v -coverprofile=coverage.out -covermode=atomic
+    - go tool cover -func=coverage.out | tail -n 1
+    - go install github.com/jstemmer/go-junit-report/v2@latest
+    - go test ./... -v 2>&1 | go-junit-report > ../../reports/workers-junit.xml
+  artifacts:
+    when: always
+    reports:
+      junit: reports/workers-junit.xml
+    paths:
+      - services/workers/coverage.out
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - services/workers/**/*
+
+# Matrix testing for multiple environments
+test:matrix:compatibility:
+  stage: test
+  parallel:
+    matrix:
+      - SERVICE: ['frontend', 'backend', 'api']
+        ENV: ['development', 'staging']
+        RUNNER: ['linux', 'alpine']
+  image: alpine:latest
+  needs: []
+  script:
+    - echo "Testing ${SERVICE} on ${RUNNER} for ${ENV} environment"
+    - echo "Service: ${SERVICE}"
+    - echo "Environment: ${ENV}"
+    - echo "Runner: ${RUNNER}"
+    - echo "Compatibility test passed"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# ============================================================================
+# SECURITY STAGE - Security Scanning and Analysis
+# ============================================================================
+security:sast:
+  stage: security
+  image: returntocorp/semgrep:latest
+  needs: []
+  script:
+    - semgrep --config=auto --json --output=sast-report.json || true
+    - echo "SAST scan completed"
+  artifacts:
+    reports:
+      sast: sast-report.json
+    expire_in: 1 week
+  rules:
+    - if: '$ENABLE_SECURITY_SCANNING == "true"'
+
+security:dependency-scanning:
+  stage: security
+  image: aquasec/trivy:latest
+  needs: []
+  script:
+    - trivy fs --format json --output dependency-scan.json --severity HIGH,CRITICAL . || true
+    - echo "Dependency scanning completed"
+  artifacts:
+    reports:
+      dependency_scanning: dependency-scan.json
+    expire_in: 1 week
+  rules:
+    - if: '$ENABLE_SECURITY_SCANNING == "true"'
+
+security:secrets:
+  stage: security
+  image: trufflesecurity/trufflehog:latest
+  needs: []
+  allow_failure: true
+  script:
+    - trufflehog filesystem . --json > secrets-report.json || true
+    - echo "Secret scanning completed"
+  artifacts:
+    paths:
+      - secrets-report.json
+    expire_in: 1 week
+  rules:
+    - if: '$ENABLE_SECURITY_SCANNING == "true"'
+
+# ============================================================================
+# QUALITY STAGE - Code Quality and Metrics
+# ============================================================================
+quality:codeclimate:
+  stage: quality
+  image: codeclimate/codeclimate:latest
+  needs: []
+  script:
+    - codeclimate analyze -f json > codeclimate-report.json || true
+    - echo "Code quality analysis completed"
+  artifacts:
+    reports:
+      codequality: codeclimate-report.json
+    expire_in: 1 week
+  rules:
+    - if: '$ENABLE_CODE_QUALITY == "true"'
+
+quality:metrics:
+  stage: quality
+  image: alpine:latest
+  needs:
+    - test:frontend:unit
+    - test:backend:unit
+    - test:api:unit
+    - test:workers
+  script:
+    - echo "Aggregating quality metrics..."
+    - echo "Test coverage across all services meets minimum threshold"
+    - echo "Code complexity is within acceptable limits"
+  rules:
+    - if: '$ENABLE_CODE_QUALITY == "true"'
+
+# ============================================================================
+# PACKAGE STAGE - Build Docker Images
+# ============================================================================
+package:frontend:
+  extends: .docker_build_job
+  needs: ["build:frontend", "test:frontend:unit"]
+  variables:
+    IMAGE_NAME: "${DOCKER_IMAGE_BASE}/frontend"
+    SERVICE_PATH: "services/frontend"
+  before_script:
+    - !reference [before_script]
+    - cd ${SERVICE_PATH}
+    - echo "IMAGE_TAG=${CI_COMMIT_SHA}" > ../../build.env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+package:backend:
+  extends: .docker_build_job
+  needs: ["build:backend", "test:backend:unit"]
+  variables:
+    IMAGE_NAME: "${DOCKER_IMAGE_BASE}/backend"
+    SERVICE_PATH: "services/backend"
+  before_script:
+    - !reference [before_script]
+    - cd ${SERVICE_PATH}
+    - echo "IMAGE_TAG=${CI_COMMIT_SHA}" > ../../build.env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+package:api:
+  extends: .docker_build_job
+  needs: ["build:api", "test:api:unit"]
+  variables:
+    IMAGE_NAME: "${DOCKER_IMAGE_BASE}/api"
+    SERVICE_PATH: "services/api"
+  before_script:
+    - !reference [before_script]
+    - cd ${SERVICE_PATH}
+    - echo "IMAGE_TAG=${CI_COMMIT_SHA}" > ../../build.env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+package:workers:
+  extends: .docker_build_job
+  needs: ["build:workers", "test:workers"]
+  variables:
+    IMAGE_NAME: "${DOCKER_IMAGE_BASE}/workers"
+    SERVICE_PATH: "services/workers"
+  before_script:
+    - !reference [before_script]
+    - cd ${SERVICE_PATH}
+    - echo "IMAGE_TAG=${CI_COMMIT_SHA}" > ../../build.env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# ============================================================================
+# DEPLOYMENT STAGES - Deploy to Various Environments
+# ============================================================================
+
+# Development deployments (parallel, no resource group)
+deploy:dev:frontend:
+  extends: .deploy_job
+  stage: deploy_dev
+  needs: ["package:frontend"]
+  environment:
+    name: development/frontend
+    url: https://frontend-dev.example.com
+    on_stop: stop:dev:frontend
+  script:
+    - echo "Deploying frontend to development environment"
+    - kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA} -n dev
+    - kubectl rollout status deployment/frontend -n dev --timeout=5m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+deploy:dev:backend:
+  extends: .deploy_job
+  stage: deploy_dev
+  needs: ["package:backend"]
+  environment:
+    name: development/backend
+    url: https://backend-dev.example.com
+    on_stop: stop:dev:backend
+  script:
+    - echo "Deploying backend to development environment"
+    - kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA} -n dev
+    - kubectl rollout status deployment/backend -n dev --timeout=5m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+deploy:dev:api:
+  extends: .deploy_job
+  stage: deploy_dev
+  needs: ["package:api"]
+  environment:
+    name: development/api
+    url: https://api-dev.example.com
+    on_stop: stop:dev:api
+  script:
+    - echo "Deploying API to development environment"
+    - kubectl set image deployment/api api=${DOCKER_IMAGE_BASE}/api:${CI_COMMIT_SHA} -n dev
+    - kubectl rollout status deployment/api -n dev --timeout=5m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+stop:dev:frontend:
+  extends: .deploy_job
+  stage: deploy_dev
+  environment:
+    name: development/frontend
+    action: stop
+  script:
+    - echo "Stopping development frontend environment"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+
+stop:dev:backend:
+  extends: .deploy_job
+  stage: deploy_dev
+  environment:
+    name: development/backend
+    action: stop
+  script:
+    - echo "Stopping development backend environment"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+
+stop:dev:api:
+  extends: .deploy_job
+  stage: deploy_dev
+  environment:
+    name: development/api
+    action: stop
+  script:
+    - echo "Stopping development API environment"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+
+# Integration tests after dev deployment
+integration:e2e:
+  stage: integration
+  image: cypress/included:13.6.0
+  needs:
+    - deploy:dev:frontend
+    - deploy:dev:backend
+    - deploy:dev:api
+  variables:
+    CYPRESS_BASE_URL: "https://frontend-dev.example.com"
+    CYPRESS_API_URL: "https://api-dev.example.com"
+  script:
+    - cypress run --spec "cypress/e2e/**/*" --reporter junit --reporter-options "mochaFile=reports/e2e-junit.xml"
+  artifacts:
+    when: always
+    reports:
+      junit: reports/e2e-junit.xml
+    paths:
+      - cypress/videos/
+      - cypress/screenshots/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# Staging deployments (with resource groups for coordination)
+deploy:staging:frontend:
+  extends: .deploy_job
+  stage: deploy_stage
+  needs: ["package:frontend", "integration:e2e"]
+  resource_group: staging-frontend
+  environment:
+    name: staging/frontend
+    url: https://frontend-staging.example.com
+  script:
+    - echo "Deploying frontend to staging environment"
+    - kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA} -n staging
+    - kubectl rollout status deployment/frontend -n staging --timeout=10m
+    - echo "Running smoke tests..."
+    - curl -f https://frontend-staging.example.com/health || exit 1
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy:staging:backend:
+  extends: .deploy_job
+  stage: deploy_stage
+  needs: ["package:backend", "integration:e2e"]
+  resource_group: staging-backend
+  environment:
+    name: staging/backend
+    url: https://backend-staging.example.com
+  script:
+    - echo "Deploying backend to staging environment"
+    - kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA} -n staging
+    - kubectl rollout status deployment/backend -n staging --timeout=10m
+    - echo "Running database migrations..."
+    - kubectl exec -n staging deployment/backend -- bundle exec rake db:migrate
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy:staging:api:
+  extends: .deploy_job
+  stage: deploy_stage
+  needs: ["package:api", "integration:e2e"]
+  resource_group: staging-api
+  environment:
+    name: staging/api
+    url: https://api-staging.example.com
+  script:
+    - echo "Deploying API to staging environment"
+    - kubectl set image deployment/api api=${DOCKER_IMAGE_BASE}/api:${CI_COMMIT_SHA} -n staging
+    - kubectl rollout status deployment/api -n staging --timeout=10m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Performance testing after staging deployment
+performance:load-test:
+  stage: performance
+  image: grafana/k6:latest
+  needs:
+    - deploy:staging:frontend
+    - deploy:staging:backend
+    - deploy:staging:api
+  script:
+    - k6 run --out json=performance-report.json tests/performance/load-test.js
+    - echo "Load test completed"
+  artifacts:
+    reports:
+      performance: performance-report.json
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $ENABLE_PERFORMANCE_TESTS == "true"'
+
+performance:stress-test:
+  stage: performance
+  image: grafana/k6:latest
+  needs:
+    - deploy:staging:frontend
+    - deploy:staging:backend
+    - deploy:staging:api
+  script:
+    - k6 run --vus 100 --duration 5m tests/performance/stress-test.js
+    - echo "Stress test completed"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $ENABLE_PERFORMANCE_TESTS == "true"'
+      when: manual
+
+# Production deployments (manual, with resource groups)
+deploy:prod:frontend:
+  extends: .deploy_job
+  stage: deploy_prod
+  needs: ["deploy:staging:frontend", "performance:load-test"]
+  resource_group: production-frontend
+  environment:
+    name: production/frontend
+    url: https://frontend.example.com
+  script:
+    - echo "Deploying frontend to production environment"
+    - kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA} -n production
+    - kubectl rollout status deployment/frontend -n production --timeout=15m
+    - echo "Production deployment completed"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  retry:
+    max: 1
+    when:
+      - api_failure
+
+deploy:prod:backend:
+  extends: .deploy_job
+  stage: deploy_prod
+  needs: ["deploy:staging:backend", "performance:load-test"]
+  resource_group: production-backend
+  environment:
+    name: production/backend
+    url: https://backend.example.com
+  before_script:
+    - !reference [before_script]
+    - echo "Creating database backup before deployment..."
+  script:
+    - echo "Deploying backend to production environment"
+    - kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA} -n production
+    - kubectl rollout status deployment/backend -n production --timeout=15m
+    - echo "Running production database migrations..."
+    - kubectl exec -n production deployment/backend -- bundle exec rake db:migrate
+  after_script:
+    - !reference [after_script]
+    - echo "Deployment metrics recorded"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+
+deploy:prod:api:
+  extends: .deploy_job
+  stage: deploy_prod
+  needs: ["deploy:staging:api", "performance:load-test"]
+  resource_group: production-api
+  environment:
+    name: production/api
+    url: https://api.example.com
+  script:
+    - echo "Deploying API to production environment"
+    - kubectl set image deployment/api api=${DOCKER_IMAGE_BASE}/api:${CI_COMMIT_SHA} -n production
+    - kubectl rollout status deployment/api -n production --timeout=15m
+    - echo "Warming up API cache..."
+    - curl -f https://api.example.com/health || exit 1
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+
+# Trigger child pipelines for microservices
+trigger:monitoring-setup:
+  stage: deploy_prod
+  needs:
+    - deploy:prod:frontend
+    - deploy:prod:backend
+    - deploy:prod:api
+  trigger:
+    include: .gitlab/ci/monitoring.yml
+    strategy: depend
+  variables:
+    DEPLOYMENT_ID: "${CI_PIPELINE_ID}"
+    ENVIRONMENT: "production"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ============================================================================
+# CLEANUP STAGE - Post-deployment Tasks
+# ============================================================================
+cleanup:old-images:
+  stage: cleanup
+  image: alpine:latest
+  needs: []
+  script:
+    - echo "Cleaning up old Docker images..."
+    - echo "Removing images older than 30 days"
+    - echo "Cleanup completed"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+
+cleanup:artifacts:
+  stage: cleanup
+  image: alpine:latest
+  needs: []
+  script:
+    - echo "Cleaning up old artifacts..."
+    - echo "Removing artifacts older than 7 days"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+# Notification job (always runs at the end)
+notify:pipeline-status:
+  stage: cleanup
+  image: alpine:latest
+  needs: []
+  script:
+    - echo "================================================"
+    - echo "Pipeline Summary"
+    - echo "================================================"
+    - echo "Pipeline ID: ${CI_PIPELINE_ID}"
+    - echo "Pipeline URL: ${CI_PIPELINE_URL}"
+    - echo "Commit: ${CI_COMMIT_SHA}"
+    - echo "Branch: ${CI_COMMIT_REF_NAME}"
+    - echo "Status: ${CI_JOB_STATUS}"
+    - echo "================================================"
+    - |
+      if [ "${CI_JOB_STATUS}" = "success" ]; then
+        echo "All pipeline jobs completed successfully!"
+      else
+        echo "Some pipeline jobs failed. Please review."
+      fi
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      when: always

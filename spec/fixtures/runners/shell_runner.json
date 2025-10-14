@@ -1,0 +1,22 @@
+{
+  "id": 2,
+  "description": "Shell Runner for CI/CD",
+  "active": true,
+  "is_shared": false,
+  "ip_address": "127.0.0.1",
+  "name": "shell-runner-1",
+  "online": true,
+  "status": "online",
+  "token": "mock-runner-token-2",
+  "tag_list": [
+    "shell",
+    "linux"
+  ],
+  "run_untagged": true,
+  "locked": false,
+  "access_level": "not_protected",
+  "maximum_timeout": 3600,
+  "executor": "shell",
+  "max_jobs": 2,
+  "job_count": 0
+}
