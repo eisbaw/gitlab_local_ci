@@ -158,21 +158,15 @@ RSpec.describe MockJob do
   describe '#transition_to' do
     let(:job) { described_class.new(basic_job_data) }
 
-    it 'should raise NotImplementedError' do
-      expect do
-        job.transition_to(MockJob::STATUS_RUNNING)
-      end.to raise_error(NotImplementedError, /transition_to not yet implemented/)
-    end
-
-    context 'when implemented' do
-      xit 'should transition from pending to running' do
+    context 'valid transitions' do
+      it 'should transition from pending to running' do
         result = job.transition_to(MockJob::STATUS_RUNNING)
 
         expect(result).to be true
         expect(job.status).to eq(MockJob::STATUS_RUNNING)
       end
 
-      xit 'should transition from running to completed' do
+      it 'should transition from running to completed' do
         job.instance_variable_set(:@status, MockJob::STATUS_RUNNING)
 
         result = job.transition_to(MockJob::STATUS_COMPLETED)
@@ -181,7 +175,7 @@ RSpec.describe MockJob do
         expect(job.status).to eq(MockJob::STATUS_COMPLETED)
       end
 
-      xit 'should transition from running to failed' do
+      it 'should transition from running to failed' do
         job.instance_variable_set(:@status, MockJob::STATUS_RUNNING)
 
         result = job.transition_to(MockJob::STATUS_FAILED)
@@ -190,13 +184,13 @@ RSpec.describe MockJob do
         expect(job.status).to eq(MockJob::STATUS_FAILED)
       end
 
-      xit 'should reject invalid state transition from pending to completed' do
+      it 'should reject invalid state transition from pending to completed' do
         expect do
           job.transition_to(MockJob::STATUS_COMPLETED)
         end.to raise_error(ArgumentError, /invalid transition/)
       end
 
-      xit 'should reject transition from completed to running' do
+      it 'should reject transition from completed to running' do
         job.instance_variable_set(:@status, MockJob::STATUS_COMPLETED)
 
         expect do
@@ -204,7 +198,7 @@ RSpec.describe MockJob do
         end.to raise_error(ArgumentError, /invalid transition/)
       end
 
-      xit 'should allow transition from any state to canceled' do
+      it 'should allow transition from any state to canceled' do
         # Cancellation should be allowed from any state
         [MockJob::STATUS_PENDING, MockJob::STATUS_RUNNING].each do |status|
           test_job = described_class.new(basic_job_data)
@@ -217,21 +211,21 @@ RSpec.describe MockJob do
         end
       end
 
-      xit 'should allow transition to skipped from pending' do
+      it 'should allow transition to skipped from pending' do
         result = job.transition_to(MockJob::STATUS_SKIPPED)
 
         expect(result).to be true
         expect(job.status).to eq(MockJob::STATUS_SKIPPED)
       end
 
-      xit 'should handle transition to same state as no-op' do
+      it 'should handle transition to same state as no-op' do
         result = job.transition_to(MockJob::STATUS_PENDING)
 
         expect(result).to be true
         expect(job.status).to eq(MockJob::STATUS_PENDING)
       end
 
-      xit 'should handle unknown status with error' do
+      it 'should handle unknown status with error' do
         expect do
           job.transition_to(:unknown_status)
         end.to raise_error(ArgumentError, /unknown status/)

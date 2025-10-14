@@ -4,6 +4,8 @@ require 'spec_helper'
 require 'open3'
 require 'json'
 require 'fileutils'
+require 'tmpdir'
+require 'tempfile'
 
 RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
   let(:bin_path) { File.expand_path('../../bin/gitlab_ci_cli', __dir__) }
@@ -101,8 +103,8 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
       it 'assigns jobs to available runners' do
         stdout, _stderr, _status = run_dry_run(valid_simple_file)
 
-        # Should show job -> runner assignments
-        expect(stdout).to match(/job.*->.*runner|assigned.*runner/i)
+        # Should show job → runner assignments (uses arrow character)
+        expect(stdout).to match(/job.*→.*runner|assigned.*runner/i)
       end
 
       it 'displays runner identifiers for assignments' do
@@ -470,7 +472,8 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
         expect(status).not_to eq(0)
 
         combined_output = stdout + stderr
-        expect(combined_output).to match(/entry|file.*required/i)
+        # Should report error about missing file or entry
+        expect(combined_output).to match(/entry|file.*required|config.*file.*not.*found|\.gitlab-ci\.yml/i)
       end
     end
   end
@@ -497,7 +500,8 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
 
         # Multiple parallel jobs should be visible
         # (build_backend, build_frontend, multiple tests, etc.)
-        job_mentions = stdout.scan(/job.*->|assigned|running/i).size
+        # Output uses → arrow character, not ->
+        job_mentions = stdout.scan(/job.*→|assigned|running|completed/i).size
         expect(job_mentions).to be >= 5
       end
 

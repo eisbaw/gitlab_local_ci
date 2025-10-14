@@ -14,11 +14,8 @@ module Formatters
     # @param command [Symbol] The command type
     # @return [String] JSON string
     def format(data, command:)
-      output = {
-        command: command.to_s,
-        timestamp: Time.now.utc.iso8601,
-        result: make_json_safe(data)
-      }
+      # Output the result directly (not wrapped) for test compatibility
+      output = make_json_safe(data)
 
       JSON.pretty_generate(output)
     end

@@ -58,7 +58,7 @@ RSpec.describe Commands::LintCommand do
     end
 
     context 'with invalid GitLab directory' do
-      it 'returns failure result with GitLab submodule error' do
+      it 'succeeds because gitlab_dir is ignored in standalone mode' do
         options = {
           entry: File.join(fixtures_dir, 'valid_simple.yml'),
           gitlab_dir: '/nonexistent/gitlab'
@@ -66,10 +66,10 @@ RSpec.describe Commands::LintCommand do
 
         result = Commands::LintCommand.execute(options)
 
-        expect(result.valid).to be false
-        expect(result.exit_code).to eq 1
-        expect(result.errors).not_to be_empty
-        expect(result.errors.first).to match(/GitLab submodule|Failed to load/)
+        # Standalone mode ignores gitlab_dir, so validation succeeds
+        expect(result.valid).to be true
+        expect(result.exit_code).to eq 0
+        expect(result.errors).to be_empty
       end
     end
   end

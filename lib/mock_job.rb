@@ -17,27 +17,22 @@ class MockJob
   # Initialize a mock job from job data
   # Supports both keyword arguments and hash parameter for flexibility
   #
-  # @param id [Integer] Job ID
-  # @param name [String] Job name
-  # @param stage [String] Stage name
-  # @param script [Array<String>] Script commands
-  # @param image [String, nil] Docker image
-  # @param services [Array, nil] Docker services
-  # @param artifacts [Hash, nil] Artifact configuration
-  # @param variables [Hash] Job variables
-  # @param tags [Array<String>] Runner tags
-  # @param needs [Array<String>] Job dependencies
-  def initialize(id:, name:, stage:, script:, image: nil, services: [], artifacts: nil, variables: {}, tags: [], needs: [])
-    @id = id
-    @name = name
-    @stage = stage
-    @script = script
-    @image = image
-    @services = services
-    @artifacts = artifacts
-    @variables = variables
-    @tag_list = tags
-    @needs = needs
+  # @param data [Hash] Job data with string or symbol keys
+  def initialize(data)
+    # Handle both string and symbol keys
+    @id = data['id'] || data[:id]
+    @name = data['name'] || data[:name]
+    @stage = data['stage'] || data[:stage]
+    @script = data['script'] || data[:script] || []
+    @image = data['image'] || data[:image]
+    @services = data['services'] || data[:services] || []
+    @artifacts = data['artifacts'] || data[:artifacts]
+    @variables = data['variables'] || data[:variables] || {}
+
+    # Handle both 'tags' and 'tag_list' keys
+    @tag_list = data['tag_list'] || data[:tag_list] || data['tags'] || data[:tags] || []
+
+    @needs = data['needs'] || data[:needs] || []
     @status = STATUS_PENDING
 
     # TODO: Parse additional job configuration
@@ -51,7 +46,7 @@ class MockJob
   # @param new_status [Symbol] New status to transition to
   # @return [Boolean] True if transition successful
   def transition_to(new_status)
-    # Fail-fast: Validate input
+    # Validate input
     valid_statuses = [
       STATUS_PENDING,
       STATUS_RUNNING,
@@ -62,33 +57,33 @@ class MockJob
     ]
 
     unless valid_statuses.include?(new_status)
-      raise ArgumentError, "Invalid status: #{new_status}. Must be one of: #{valid_statuses.join(', ')}"
+      raise ArgumentError, "unknown status: #{new_status}. Must be one of: #{valid_statuses.join(', ')}"
     end
+
+    # Handle same-state transition as no-op
+    return true if @status == new_status
 
     # Validate state transition is valid
     # Valid transitions:
     # pending -> running, canceled, skipped
     # running -> completed, failed, canceled
-    # Other transitions are invalid (can't restart completed jobs, etc.)
+    # Terminal states (completed, failed, canceled, skipped) cannot transition
     case @status
     when STATUS_PENDING
       unless [STATUS_RUNNING, STATUS_CANCELED, STATUS_SKIPPED].include?(new_status)
-        raise ArgumentError, "Cannot transition from pending to #{new_status}"
+        raise ArgumentError, "invalid transition from pending to #{new_status}"
       end
     when STATUS_RUNNING
       unless [STATUS_COMPLETED, STATUS_FAILED, STATUS_CANCELED].include?(new_status)
-        raise ArgumentError, "Cannot transition from running to #{new_status}"
+        raise ArgumentError, "invalid transition from running to #{new_status}"
       end
     when STATUS_COMPLETED, STATUS_FAILED, STATUS_CANCELED, STATUS_SKIPPED
       # Terminal states - no transitions allowed
-      raise ArgumentError, "Cannot transition from terminal state #{@status} to #{new_status}"
+      raise ArgumentError, "invalid transition from terminal state #{@status} to #{new_status}"
     end
 
     # Update status
     @status = new_status
-
-    # TODO: Emit state change event when event system is implemented
-
     true
   end
 

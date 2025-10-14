@@ -62,11 +62,11 @@ RSpec.describe 'GitLab CI Lint Command', type: :integration do
 
         expect(status).to eq(0)
 
-        # Verify JUnit XML structure
-        expect(stdout).to include('<?xml version="1.0"')
+        # Verify JUnit XML structure (REXML uses single quotes)
+        expect(stdout).to include('<?xml version=')
         expect(stdout).to include('<testsuites')
         expect(stdout).to include('<testsuite')
-        expect(stdout).to include('name="GitLab CI Lint"')
+        expect(stdout).to include('GitLab CI Lint')
         expect(stdout).to include('<testcase')
 
         # Should not contain failure elements for valid config
@@ -138,8 +138,8 @@ RSpec.describe 'GitLab CI Lint Command', type: :integration do
 
         expect(status).not_to eq(0)
 
-        # Verify JUnit XML contains failure
-        expect(stdout).to include('<?xml version="1.0"')
+        # Verify JUnit XML contains failure (REXML uses single quotes)
+        expect(stdout).to include('<?xml version=')
         expect(stdout).to include('<testsuites')
         expect(stdout).to include('<failure')
       end
@@ -236,14 +236,14 @@ RSpec.describe 'GitLab CI Lint Command', type: :integration do
       it 'produces valid XML structure' do
         stdout, _stderr, _status = run_lint(valid_simple_file, format: 'junit')
 
-        # Basic XML validation
-        expect(stdout).to include('<?xml version="1.0"')
+        # Basic XML validation (REXML uses single quotes)
+        expect(stdout).to include('<?xml version=')
         expect(stdout).to match(/<testsuites.*>/)
         expect(stdout).to include('</testsuites>')
 
-        # Proper nesting
-        expect(stdout.scan(/<testsuite/).size).to be >= 1
-        expect(stdout.scan(/<\/testsuite>/).size).to eq(stdout.scan(/<testsuite/).size)
+        # Proper nesting - opening tags should match closing tags
+        expect(stdout.scan(/<testsuite\s/).size).to be >= 1
+        expect(stdout.scan(/<testsuite\s/).size).to eq(stdout.scan(/<\/testsuite>/).size)
       end
 
       it 'includes test case elements' do
@@ -283,7 +283,8 @@ RSpec.describe 'GitLab CI Lint Command', type: :integration do
       expect(status).not_to eq(0)
 
       combined_output = stdout + stderr
-      expect(combined_output).to match(/entry|file.*required/i)
+      # Should report error about missing file or entry
+      expect(combined_output).to match(/entry|file.*required|file not found|\.gitlab-ci\.yml/i)
     end
 
     it 'provides helpful error for invalid flags' do

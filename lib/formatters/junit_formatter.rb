@@ -36,7 +36,7 @@ module Formatters
 
       testsuites = doc.add_element('testsuites')
       testsuite = testsuites.add_element('testsuite', {
-        'name' => 'gitlab_ci_cli',
+        'name' => 'GitLab CI Lint',
         'tests' => '1',
         'failures' => data[:valid] ? '0' : '1',
         'time' => '0'
