@@ -17,6 +17,8 @@ coverage/
 .coverage
 
 # Build artifacts
-*.png
 tmp/
 .DS_Store
+
+# Demo artifacts
+dags/
