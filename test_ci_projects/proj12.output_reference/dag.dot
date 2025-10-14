@@ -1,0 +1,160 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    _build_job_base [label=".build_job_base"];
+    build_app [label="build:app"];
+    build_library [label="build:library"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    _base_config [label=".base_config"];
+    _docker_config [label=".docker_config"];
+    _cache_config [label=".cache_config"];
+    _artifacts_config [label=".artifacts_config"];
+    _base_job [label=".base_job"];
+    _test_job_base [label=".test_job_base"];
+    _on_merge_request [label=".on_merge_request"];
+    _on_main_branch [label=".on_main_branch"];
+    _rule_set_standard [label=".rule_set_standard"];
+    test_unit [label="test:unit"];
+    security_scan [label="security:scan"];
+    _complex_matrix [label=".complex_matrix"];
+    test_matrix [label="test:matrix"];
+  }
+
+  subgraph cluster_integration {
+    label="integration";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_integration [label="test:integration"];
+    test_e2e [label="test:e2e"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_staging [label="deploy:staging"];
+    deploy_production [label="deploy:production"];
+  }
+
+  _build_job_base -> _base_config;
+  build_app -> _base_config;
+  build_library -> _base_config;
+  _build_job_base -> _docker_config;
+  build_app -> _docker_config;
+  build_library -> _docker_config;
+  _build_job_base -> _cache_config;
+  build_app -> _cache_config;
+  build_library -> _cache_config;
+  _build_job_base -> _artifacts_config;
+  build_app -> _artifacts_config;
+  build_library -> _artifacts_config;
+  _build_job_base -> _base_job;
+  build_app -> _base_job;
+  build_library -> _base_job;
+  _build_job_base -> _test_job_base;
+  build_app -> _test_job_base;
+  build_library -> _test_job_base;
+  _build_job_base -> _on_merge_request;
+  build_app -> _on_merge_request;
+  build_library -> _on_merge_request;
+  _build_job_base -> _on_main_branch;
+  build_app -> _on_main_branch;
+  build_library -> _on_main_branch;
+  _build_job_base -> _rule_set_standard;
+  build_app -> _rule_set_standard;
+  build_library -> _rule_set_standard;
+  _build_job_base -> test_unit;
+  build_app -> test_unit;
+  build_library -> test_unit;
+  _base_config -> test_integration;
+  _docker_config -> test_integration;
+  _cache_config -> test_integration;
+  _artifacts_config -> test_integration;
+  _base_job -> test_integration;
+  _test_job_base -> test_integration;
+  _build_job_base -> test_integration;
+  _on_merge_request -> test_integration;
+  _on_main_branch -> test_integration;
+  _rule_set_standard -> test_integration;
+  build_app -> test_integration;
+  build_library -> test_integration;
+  test_unit -> test_integration;
+  security_scan -> test_integration;
+  _complex_matrix -> test_integration;
+  test_matrix -> test_integration;
+  _base_config -> test_e2e;
+  _docker_config -> test_e2e;
+  _cache_config -> test_e2e;
+  _artifacts_config -> test_e2e;
+  _base_job -> test_e2e;
+  _test_job_base -> test_e2e;
+  _build_job_base -> test_e2e;
+  _on_merge_request -> test_e2e;
+  _on_main_branch -> test_e2e;
+  _rule_set_standard -> test_e2e;
+  build_app -> test_e2e;
+  build_library -> test_e2e;
+  test_unit -> test_e2e;
+  security_scan -> test_e2e;
+  _complex_matrix -> test_e2e;
+  test_matrix -> test_e2e;
+  _base_config -> deploy_staging;
+  _docker_config -> deploy_staging;
+  _cache_config -> deploy_staging;
+  _artifacts_config -> deploy_staging;
+  _base_job -> deploy_staging;
+  _test_job_base -> deploy_staging;
+  _build_job_base -> deploy_staging;
+  _on_merge_request -> deploy_staging;
+  _on_main_branch -> deploy_staging;
+  _rule_set_standard -> deploy_staging;
+  build_app -> deploy_staging;
+  build_library -> deploy_staging;
+  test_unit -> deploy_staging;
+  test_integration -> deploy_staging;
+  test_e2e -> deploy_staging;
+  security_scan -> deploy_staging;
+  _complex_matrix -> deploy_staging;
+  test_matrix -> deploy_staging;
+  _base_config -> deploy_production;
+  _docker_config -> deploy_production;
+  _cache_config -> deploy_production;
+  _artifacts_config -> deploy_production;
+  _base_job -> deploy_production;
+  _test_job_base -> deploy_production;
+  _build_job_base -> deploy_production;
+  _on_merge_request -> deploy_production;
+  _on_main_branch -> deploy_production;
+  _rule_set_standard -> deploy_production;
+  build_app -> deploy_production;
+  build_library -> deploy_production;
+  test_unit -> deploy_production;
+  test_integration -> deploy_production;
+  test_e2e -> deploy_production;
+  security_scan -> deploy_production;
+  _complex_matrix -> deploy_production;
+  test_matrix -> deploy_production;
+  _build_job_base -> security_scan;
+  build_app -> security_scan;
+  build_library -> security_scan;
+  _build_job_base -> _complex_matrix;
+  build_app -> _complex_matrix;
+  build_library -> _complex_matrix;
+  _build_job_base -> test_matrix;
+  build_app -> test_matrix;
+  build_library -> test_matrix;
+}

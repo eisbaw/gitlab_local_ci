@@ -1,0 +1,44 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_postgres [label="test:postgres"];
+    test_redis [label="test:redis"];
+    test_mysql [label="test:mysql"];
+    test_mongodb [label="test:mongodb"];
+    test_custom_service [label="test:custom-service"];
+  }
+
+  subgraph cluster_integration {
+    label="integration";
+    style=filled;
+    fillcolor=lightgrey;
+
+    integration_full_stack [label="integration:full-stack"];
+  }
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_docker [label="build:docker"];
+  }
+
+  test_postgres -> integration_full_stack;
+  test_redis -> integration_full_stack;
+  test_mysql -> integration_full_stack;
+  test_mongodb -> integration_full_stack;
+  test_custom_service -> integration_full_stack;
+  test_postgres -> build_docker;
+  test_redis -> build_docker;
+  integration_full_stack -> build_docker;
+  test_mysql -> build_docker;
+  test_mongodb -> build_docker;
+  test_custom_service -> build_docker;
+}

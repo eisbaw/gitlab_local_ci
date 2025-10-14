@@ -1,0 +1,71 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    _build_template [label=".build_template"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    _base [label=".base"];
+    _test_template [label=".test_template"];
+    _advanced_build [label=".advanced_build"];
+    build_simple [label="build_simple"];
+    build_complex [label="build_complex"];
+    build_advanced [label="build_advanced"];
+    test_unit [label="test_unit"];
+    test_integration [label="test_integration"];
+    test_e2e [label="test_e2e"];
+    deploy_staging [label="deploy_staging"];
+    deploy_production [label="deploy_production"];
+    deploy_canary [label="deploy_canary"];
+    build_no_retry [label="build_no_retry"];
+    test_security [label="test_security"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    _deploy_template [label=".deploy_template"];
+  }
+
+  _build_template -> _base;
+  _build_template -> _test_template;
+  _base -> _deploy_template;
+  _build_template -> _deploy_template;
+  _test_template -> _deploy_template;
+  _advanced_build -> _deploy_template;
+  build_simple -> _deploy_template;
+  build_complex -> _deploy_template;
+  build_advanced -> _deploy_template;
+  test_unit -> _deploy_template;
+  test_integration -> _deploy_template;
+  test_e2e -> _deploy_template;
+  deploy_staging -> _deploy_template;
+  deploy_production -> _deploy_template;
+  deploy_canary -> _deploy_template;
+  build_no_retry -> _deploy_template;
+  test_security -> _deploy_template;
+  _build_template -> _advanced_build;
+  _build_template -> build_simple;
+  _build_template -> build_complex;
+  _build_template -> build_advanced;
+  _build_template -> test_unit;
+  _build_template -> test_integration;
+  _build_template -> test_e2e;
+  _build_template -> deploy_staging;
+  _build_template -> deploy_production;
+  _build_template -> deploy_canary;
+  _build_template -> build_no_retry;
+  _build_template -> test_security;
+}

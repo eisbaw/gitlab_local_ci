@@ -1,0 +1,67 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_default_cache [label="build:default-cache"];
+    build_static_cache [label="build:static-cache"];
+    build_dynamic_cache [label="build:dynamic-cache"];
+    build_push_only [label="build:push-only"];
+    build_files_cache [label="build:files-cache"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_multi_cache [label="test:multi-cache"];
+    test_pull_only [label="test:pull-only"];
+    test_combined_cache [label="test:combined-cache"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_complex_cache_key [label="deploy:complex-cache-key"];
+    deploy_no_cache [label="deploy:no-cache"];
+  }
+
+  build_default_cache -> test_multi_cache;
+  build_static_cache -> test_multi_cache;
+  build_dynamic_cache -> test_multi_cache;
+  build_push_only -> test_multi_cache;
+  build_files_cache -> test_multi_cache;
+  build_default_cache -> test_pull_only;
+  build_static_cache -> test_pull_only;
+  build_dynamic_cache -> test_pull_only;
+  build_push_only -> test_pull_only;
+  build_files_cache -> test_pull_only;
+  build_default_cache -> deploy_complex_cache_key;
+  build_static_cache -> deploy_complex_cache_key;
+  build_dynamic_cache -> deploy_complex_cache_key;
+  test_multi_cache -> deploy_complex_cache_key;
+  test_pull_only -> deploy_complex_cache_key;
+  build_push_only -> deploy_complex_cache_key;
+  build_files_cache -> deploy_complex_cache_key;
+  test_combined_cache -> deploy_complex_cache_key;
+  build_default_cache -> deploy_no_cache;
+  build_static_cache -> deploy_no_cache;
+  build_dynamic_cache -> deploy_no_cache;
+  test_multi_cache -> deploy_no_cache;
+  test_pull_only -> deploy_no_cache;
+  build_push_only -> deploy_no_cache;
+  build_files_cache -> deploy_no_cache;
+  test_combined_cache -> deploy_no_cache;
+  build_default_cache -> test_combined_cache;
+  build_static_cache -> test_combined_cache;
+  build_dynamic_cache -> test_combined_cache;
+  build_push_only -> test_combined_cache;
+  build_files_cache -> test_combined_cache;
+}

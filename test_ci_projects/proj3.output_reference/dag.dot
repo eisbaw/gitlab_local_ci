@@ -1,0 +1,26 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    unit_tests [label="unit_tests"];
+    integration_tests [label="integration_tests"];
+    lint [label="lint"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy [label="deploy"];
+  }
+
+  unit_tests -> deploy;
+  integration_tests -> deploy;
+  lint -> deploy;
+}

@@ -9,9 +9,6 @@ echo ""
 PROJECTS_DIR="test_ci_projects"
 TOTAL_PROJECTS=20
 
-# Projects with interesting DAG structures
-DAG_PROJECTS=(4 11 16 19 20)
-
 # Check if gitlab_ci_cli is available
 if ! command -v gitlab_ci_cli &> /dev/null; then
     echo "Error: gitlab_ci_cli not found in PATH"
@@ -57,19 +54,17 @@ generate_reference() {
     # JUnit format
     gitlab_ci_cli lint --entry "$config" --format junit > "$output_dir/lint.junit.xml" 2>&1 || true
 
-    # Generate DAG output if this is a DAG project
-    if [[ " ${DAG_PROJECTS[@]} " =~ " ${proj_num} " ]]; then
-        # DOT format
-        set +e  # Don't exit on error
-        gitlab_ci_cli dag --entry "$config" > "$output_dir/dag.dot" 2>&1
-        echo $? > "$output_dir/dag.exit_code"
-        set -e
+    # Generate DAG output for all projects
+    # DOT format
+    set +e  # Don't exit on error
+    gitlab_ci_cli dag --entry "$config" > "$output_dir/dag.dot" 2>&1
+    echo $? > "$output_dir/dag.exit_code"
+    set -e
 
-        # PNG visualization (if dot is available)
-        if command -v dot &> /dev/null; then
-            if [ -s "$output_dir/dag.dot" ]; then
-                dot -Tpng "$output_dir/dag.dot" -o "$output_dir/dag.png" 2>/dev/null || true
-            fi
+    # PNG visualization (if dot is available and DAG generation succeeded)
+    if command -v dot &> /dev/null; then
+        if [ -s "$output_dir/dag.dot" ] && [ "$(cat "$output_dir/dag.exit_code")" -eq 0 ]; then
+            dot -Tpng "$output_dir/dag.dot" -o "$output_dir/dag.png" 2>/dev/null || true
         fi
     fi
 
@@ -102,10 +97,8 @@ echo "  - lint.txt          (text format output)"
 echo "  - lint.json         (JSON format output)"
 echo "  - lint.junit.xml    (JUnit XML format output)"
 echo "  - lint.exit_code    (command exit code)"
-echo "  - metadata.txt      (generation metadata)"
-echo ""
-echo "Projects with DAG visualizations (4, 11, 16, 19, 20) also have:"
 echo "  - dag.dot           (Graphviz DOT format)"
-echo "  - dag.png           (PNG visualization)"
-echo "  - dag.exit_code     (command exit code)"
+echo "  - dag.exit_code     (DAG command exit code)"
+echo "  - dag.png           (PNG visualization, if DAG generation succeeded)"
+echo "  - metadata.txt      (generation metadata)"
 echo ""

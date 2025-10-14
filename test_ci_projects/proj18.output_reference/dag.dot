@@ -1,0 +1,65 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build [label="build"];
+  }
+
+  subgraph cluster_deploy_staging {
+    label="deploy_staging";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_staging_app [label="deploy_staging_app"];
+    deploy_staging_database [label="deploy_staging_database"];
+  }
+
+  subgraph cluster_deploy_production {
+    label="deploy_production";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_production_app [label="deploy_production_app"];
+    deploy_production_database [label="deploy_production_database"];
+    deploy_production_hotfix [label="deploy_production_hotfix"];
+    deploy_monitoring [label="deploy_monitoring"];
+  }
+
+  subgraph cluster_cleanup {
+    label="cleanup";
+    style=filled;
+    fillcolor=lightgrey;
+
+    stop_staging [label="stop_staging"];
+    stop_production [label="stop_production"];
+  }
+
+  build -> deploy_staging_app;
+  build -> deploy_staging_database;
+  deploy_staging_app -> deploy_production_app;
+  deploy_staging_database -> deploy_production_database;
+  deploy_production_app -> deploy_production_database;
+  build -> deploy_production_hotfix;
+  deploy_staging_app -> deploy_production_hotfix;
+  deploy_staging_database -> deploy_production_hotfix;
+  build -> stop_staging;
+  deploy_staging_app -> stop_staging;
+  deploy_staging_database -> stop_staging;
+  deploy_production_app -> stop_staging;
+  deploy_production_database -> stop_staging;
+  deploy_production_hotfix -> stop_staging;
+  deploy_monitoring -> stop_staging;
+  build -> stop_production;
+  deploy_staging_app -> stop_production;
+  deploy_staging_database -> stop_production;
+  deploy_production_app -> stop_production;
+  deploy_production_database -> stop_production;
+  deploy_production_hotfix -> stop_production;
+  deploy_monitoring -> stop_production;
+  deploy_production_app -> deploy_monitoring;
+}

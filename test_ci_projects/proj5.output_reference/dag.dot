@@ -1,0 +1,50 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_vars_test {
+    label="vars_test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_variables [label="test_variables"];
+    variable_manipulation [label="variable_manipulation"];
+    env_specific_vars [label="env_specific_vars"];
+    test_precedence [label="test_precedence"];
+  }
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_app [label="build_app"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    unit_tests [label="unit_tests"];
+    integration_tests [label="integration_tests"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_staging [label="deploy_staging"];
+  }
+
+  test_variables -> build_app;
+  variable_manipulation -> build_app;
+  env_specific_vars -> build_app;
+  test_precedence -> build_app;
+  build_app -> unit_tests;
+  build_app -> integration_tests;
+  build_app -> deploy_staging;
+  unit_tests -> deploy_staging;
+  integration_tests -> deploy_staging;
+}

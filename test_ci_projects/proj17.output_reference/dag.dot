@@ -1,0 +1,63 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_matrix [label="test:matrix"];
+    integration_test [label="integration:test"];
+    unit_test_parallel [label="unit:test:parallel"];
+    e2e_test [label="e2e:test"];
+    stress_test [label="stress:test"];
+    lint_files [label="lint:files"];
+    performance_test [label="performance:test"];
+    test_microservices [label="test:microservices"];
+  }
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_multiarch [label="build:multiarch"];
+    process_data [label="process:data"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_cloud [label="deploy:cloud"];
+  }
+
+  test_matrix -> build_multiarch;
+  integration_test -> build_multiarch;
+  unit_test_parallel -> build_multiarch;
+  e2e_test -> build_multiarch;
+  stress_test -> build_multiarch;
+  lint_files -> build_multiarch;
+  performance_test -> build_multiarch;
+  test_microservices -> build_multiarch;
+  test_matrix -> deploy_cloud;
+  integration_test -> deploy_cloud;
+  unit_test_parallel -> deploy_cloud;
+  e2e_test -> deploy_cloud;
+  build_multiarch -> deploy_cloud;
+  stress_test -> deploy_cloud;
+  lint_files -> deploy_cloud;
+  performance_test -> deploy_cloud;
+  process_data -> deploy_cloud;
+  test_microservices -> deploy_cloud;
+  test_matrix -> process_data;
+  integration_test -> process_data;
+  unit_test_parallel -> process_data;
+  e2e_test -> process_data;
+  stress_test -> process_data;
+  lint_files -> process_data;
+  performance_test -> process_data;
+  test_microservices -> process_data;
+}

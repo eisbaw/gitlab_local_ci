@@ -1,0 +1,78 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_app [label="build:app"];
+    build_assets [label="build:assets"];
+    build_package [label="build:package"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_unit [label="test:unit"];
+    test_coverage [label="test:coverage"];
+    test_integration [label="test:integration"];
+    test_debug [label="test:debug"];
+  }
+
+  subgraph cluster_report {
+    label="report";
+    style=filled;
+    fillcolor=lightgrey;
+
+    report_summary [label="report:summary"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_staging [label="deploy:staging"];
+    deploy_docs [label="deploy:docs"];
+  }
+
+  build_app -> test_unit;
+  build_assets -> test_unit;
+  build_package -> test_unit;
+  build_app -> test_coverage;
+  build_assets -> test_coverage;
+  build_package -> test_coverage;
+  build_app -> test_integration;
+  build_assets -> test_integration;
+  build_package -> test_integration;
+  build_app -> report_summary;
+  build_assets -> report_summary;
+  test_unit -> report_summary;
+  test_coverage -> report_summary;
+  test_integration -> report_summary;
+  test_debug -> report_summary;
+  build_package -> report_summary;
+  build_app -> deploy_staging;
+  build_assets -> deploy_staging;
+  test_unit -> deploy_staging;
+  test_coverage -> deploy_staging;
+  test_integration -> deploy_staging;
+  report_summary -> deploy_staging;
+  test_debug -> deploy_staging;
+  build_package -> deploy_staging;
+  build_app -> deploy_docs;
+  build_assets -> deploy_docs;
+  test_unit -> deploy_docs;
+  test_coverage -> deploy_docs;
+  test_integration -> deploy_docs;
+  report_summary -> deploy_docs;
+  test_debug -> deploy_docs;
+  build_package -> deploy_docs;
+  build_app -> test_debug;
+  build_assets -> test_debug;
+  build_package -> test_debug;
+}

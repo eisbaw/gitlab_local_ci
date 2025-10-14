@@ -1,0 +1,90 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    build_basic_retry [label="build:basic-retry"];
+    build_conditional_retry [label="build:conditional-retry"];
+    build_selective_retry [label="build:selective-retry"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    test_with_timeout [label="test:with-timeout"];
+    test_short_timeout [label="test:short-timeout"];
+    test_interruptible [label="test:interruptible"];
+    test_non_interruptible [label="test:non-interruptible"];
+    test_complex_retry [label="test:complex-retry"];
+    test_long_running [label="test:long-running"];
+    test_precise_timeout [label="test:precise-timeout"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    deploy_production [label="deploy:production"];
+    deploy_staging [label="deploy:staging"];
+    deploy_complex [label="deploy:complex"];
+  }
+
+  build_basic_retry -> test_with_timeout;
+  build_conditional_retry -> test_with_timeout;
+  build_selective_retry -> test_with_timeout;
+  build_basic_retry -> test_short_timeout;
+  build_conditional_retry -> test_short_timeout;
+  build_selective_retry -> test_short_timeout;
+  build_basic_retry -> test_interruptible;
+  build_conditional_retry -> test_interruptible;
+  build_selective_retry -> test_interruptible;
+  build_basic_retry -> test_non_interruptible;
+  build_conditional_retry -> test_non_interruptible;
+  build_selective_retry -> test_non_interruptible;
+  build_basic_retry -> test_complex_retry;
+  build_conditional_retry -> test_complex_retry;
+  build_selective_retry -> test_complex_retry;
+  build_basic_retry -> deploy_production;
+  build_conditional_retry -> deploy_production;
+  build_selective_retry -> deploy_production;
+  test_with_timeout -> deploy_production;
+  test_short_timeout -> deploy_production;
+  test_interruptible -> deploy_production;
+  test_non_interruptible -> deploy_production;
+  test_complex_retry -> deploy_production;
+  test_long_running -> deploy_production;
+  test_precise_timeout -> deploy_production;
+  build_basic_retry -> deploy_staging;
+  build_conditional_retry -> deploy_staging;
+  build_selective_retry -> deploy_staging;
+  test_with_timeout -> deploy_staging;
+  test_short_timeout -> deploy_staging;
+  test_interruptible -> deploy_staging;
+  test_non_interruptible -> deploy_staging;
+  test_complex_retry -> deploy_staging;
+  test_long_running -> deploy_staging;
+  test_precise_timeout -> deploy_staging;
+  build_basic_retry -> deploy_complex;
+  build_conditional_retry -> deploy_complex;
+  build_selective_retry -> deploy_complex;
+  test_with_timeout -> deploy_complex;
+  test_short_timeout -> deploy_complex;
+  test_interruptible -> deploy_complex;
+  test_non_interruptible -> deploy_complex;
+  test_complex_retry -> deploy_complex;
+  test_long_running -> deploy_complex;
+  test_precise_timeout -> deploy_complex;
+  build_basic_retry -> test_long_running;
+  build_conditional_retry -> test_long_running;
+  build_selective_retry -> test_long_running;
+  build_basic_retry -> test_precise_timeout;
+  build_conditional_retry -> test_precise_timeout;
+  build_selective_retry -> test_precise_timeout;
+}

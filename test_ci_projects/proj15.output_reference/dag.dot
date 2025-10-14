@@ -1,0 +1,44 @@
+digraph pipeline {
+  rankdir="LR";
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    unit_tests [label="unit-tests"];
+    integration_tests [label="integration-tests"];
+    coverage_formats [label="coverage-formats"];
+    full_test_suite [label="full-test-suite"];
+    go_tests [label="go-tests"];
+  }
+
+  subgraph cluster_security {
+    label="security";
+    style=filled;
+    fillcolor=lightgrey;
+
+    sast [label="sast"];
+  }
+
+  subgraph cluster_quality {
+    label="quality";
+    style=filled;
+    fillcolor=lightgrey;
+
+    code_quality [label="code-quality"];
+  }
+
+  unit_tests -> code_quality;
+  integration_tests -> code_quality;
+  sast -> code_quality;
+  coverage_formats -> code_quality;
+  full_test_suite -> code_quality;
+  go_tests -> code_quality;
+  unit_tests -> sast;
+  integration_tests -> sast;
+  coverage_formats -> sast;
+  full_test_suite -> sast;
+  go_tests -> sast;
+}
