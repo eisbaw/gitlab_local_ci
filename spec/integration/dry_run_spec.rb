@@ -110,8 +110,8 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
       it 'displays runner identifiers for assignments' do
         stdout, _stderr, _status = run_dry_run(valid_simple_file)
 
-        # Should mention specific runner (from fixtures)
-        expect(stdout).to match(/runner[-_]?\w+/i)
+        # Should mention runner assignments with runner IDs
+        expect(stdout).to match(/Runner\s+['"][\w-]+['"]/i)
       end
 
       it 'assigns multiple jobs when runner has capacity' do
@@ -120,7 +120,8 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
           id: 'high-capacity-runner',
           tags: ['docker', 'linux'],
           max_jobs: 10,
-          run_untagged: true
+          run_untagged: true,
+          executor: 'docker'
         }]) do |tmpdir|
           stdout, _stderr, status = run_dry_run(valid_with_needs_file, runners_dir: tmpdir)
 
@@ -154,8 +155,8 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
         pipeline_file.close
 
         with_temp_runner_fleet([
-          { id: 'docker-runner', tags: ['docker'], max_jobs: 1, run_untagged: false },
-          { id: 'shell-runner', tags: ['shell'], max_jobs: 1, run_untagged: false }
+          { id: 'docker-runner', tags: ['docker'], max_jobs: 1, run_untagged: false, executor: 'docker' },
+          { id: 'shell-runner', tags: ['shell'], max_jobs: 1, run_untagged: false, executor: 'shell' }
         ]) do |tmpdir|
           stdout, _stderr, status = run_dry_run(pipeline_file.path, runners_dir: tmpdir)
 
@@ -183,7 +184,7 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
         pipeline_file.close
 
         with_temp_runner_fleet([
-          { id: 'untagged-runner', tags: [], max_jobs: 1, run_untagged: true }
+          { id: 'untagged-runner', tags: [], max_jobs: 1, run_untagged: true, executor: 'shell' }
         ]) do |tmpdir|
           stdout, _stderr, status = run_dry_run(pipeline_file.path, runners_dir: tmpdir)
 
@@ -202,7 +203,8 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
           id: 'limited-runner',
           tags: ['docker'],
           max_jobs: 1,
-          run_untagged: true
+          run_untagged: true,
+          executor: 'docker'
         }]) do |tmpdir|
           stdout, _stderr, _status = run_dry_run(valid_with_needs_file, runners_dir: tmpdir)
 
@@ -229,7 +231,7 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
         pipeline_file.close
 
         with_temp_runner_fleet([
-          { id: 'normal-runner', tags: ['docker'], max_jobs: 1, run_untagged: false }
+          { id: 'normal-runner', tags: ['docker'], max_jobs: 1, run_untagged: false, executor: 'docker' }
         ]) do |tmpdir|
           stdout, stderr, _status = run_dry_run(pipeline_file.path, runners_dir: tmpdir)
 
@@ -244,9 +246,9 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
 
       it 'handles multiple runners with different capacities' do
         with_temp_runner_fleet([
-          { id: 'runner-1', tags: ['docker'], max_jobs: 1, run_untagged: true },
-          { id: 'runner-2', tags: ['docker'], max_jobs: 2, run_untagged: true },
-          { id: 'runner-3', tags: ['docker'], max_jobs: 1, run_untagged: true }
+          { id: 'runner-1', tags: ['docker'], max_jobs: 1, run_untagged: true, executor: 'docker' },
+          { id: 'runner-2', tags: ['docker'], max_jobs: 2, run_untagged: true, executor: 'docker' },
+          { id: 'runner-3', tags: ['docker'], max_jobs: 1, run_untagged: true, executor: 'docker' }
         ]) do |tmpdir|
           stdout, _stderr, status = run_dry_run(valid_with_needs_file, runners_dir: tmpdir)
 

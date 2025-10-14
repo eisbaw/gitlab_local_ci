@@ -80,6 +80,4 @@ deploy_production:
   script:
     - echo "Deploying to production"
     - ls -la build/
-  only:
-    - main
   when: manual

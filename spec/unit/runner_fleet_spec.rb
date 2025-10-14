@@ -19,27 +19,21 @@ RSpec.describe RunnerFleet do
     let(:fleet) { described_class.new }
     let(:fixtures_dir) { File.join(fixtures_path, 'runners') }
 
-    it 'should raise NotImplementedError' do
-      expect do
-        fleet.load_runners(fixtures_dir)
-      end.to raise_error(NotImplementedError, /load_runners not yet implemented/)
-    end
-
-    context 'when implemented' do
-      xit 'should load runners from directory containing JSON files' do
+    context 'implementation tests' do
+      it 'should load runners from directory containing JSON files' do
         count = fleet.load_runners(fixtures_dir)
 
         expect(count).to be > 0
         expect(fleet.runners.size).to eq(count)
       end
 
-      xit 'should create MockRunner instances for each JSON file' do
+      it 'should create MockRunner instances for each JSON file' do
         fleet.load_runners(fixtures_dir)
 
         expect(fleet.runners).to all(be_a(MockRunner))
       end
 
-      xit 'should return count of loaded runners' do
+      it 'should return count of loaded runners' do
         count = fleet.load_runners(fixtures_dir)
 
         expect(count).to eq(fleet.runners.size)
@@ -129,13 +123,7 @@ RSpec.describe RunnerFleet do
     end
     let(:job) { MockJob.new(job_data) }
 
-    it 'should raise NotImplementedError' do
-      expect do
-        fleet.find_available_runner(job)
-      end.to raise_error(NotImplementedError, /find_available_runner not yet implemented/)
-    end
-
-    context 'when implemented' do
+    context 'implementation tests' do
       let(:runner1) do
         MockRunner.new({
           'id' => 1,

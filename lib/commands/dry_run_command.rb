@@ -107,8 +107,7 @@ module GitlabCiCli
         runner_count = fleet.load_runners(@options[:runners])
 
         if runner_count == 0
-          log_warning("No runners found in #{@options[:runners]}")
-          log_warning("Jobs may remain in pending state indefinitely")
+          raise "No runners found in #{@options[:runners]}"
         else
           log_info("Loaded #{runner_count} runner(s)") if @options[:verbose]
         end
@@ -121,6 +120,15 @@ module GitlabCiCli
       # @return [Pipeline, nil] Created pipeline or nil on error
       def create_pipeline
         config_content = File.read(@options[:entry])
+
+        # Display variables in verbose mode
+        if @options[:verbose] && !@options[:variables].empty?
+          log_info("Variables:")
+          @options[:variables].each do |key, value|
+            log_info("  #{key}=#{value}")
+          end
+          log_info("")
+        end
 
         pipeline = @server.create_pipeline(
           config_content,
@@ -146,6 +154,8 @@ module GitlabCiCli
 
         # Track job start times and durations for simulation
         job_timers = {}
+        # Track which runner is executing which job
+        job_to_runner = {}
 
         while !pipeline_finished?(pipeline) && iteration < MAX_ITERATIONS
           # Process pipeline state transitions
@@ -154,7 +164,8 @@ module GitlabCiCli
           # Process pending jobs - attempt to assign to runners
           pending_jobs = get_pending_jobs(pipeline)
           pending_jobs.each do |job|
-            assign_job_to_runner(job, simulation_time)
+            runner = assign_job_to_runner(job, simulation_time)
+            job_to_runner[job.id] = runner if runner
           end
 
           # Process running jobs - check if they should complete
@@ -168,7 +179,8 @@ module GitlabCiCli
             if simulation_time >= timer[:start] + timer[:duration]
               complete_job(job, simulation_time)
               # Release runner capacity
-              release_runner_for_job(job)
+              runner = job_to_runner[job.id]
+              release_runner_for_job(job, runner)
             end
           end
 
@@ -234,6 +246,7 @@ module GitlabCiCli
       #
       # @param job [MockJob] Job to assign
       # @param time [Integer] Current simulation time
+      # @return [MockRunner, nil] Assigned runner or nil if no runner available
       def assign_job_to_runner(job, time)
         runner = @fleet.find_available_runner(job)
 
@@ -243,8 +256,10 @@ module GitlabCiCli
           job.transition_to(MockJob::STATUS_RUNNING)
 
           log_info("[T+#{time}s] Job '#{job.name}' → Runner '#{runner.id}'")
+          runner
         else
           log_warning("[T+#{time}s] Job '#{job.name}' waiting (no eligible runner)")
+          nil
         end
       end
 
@@ -260,9 +275,14 @@ module GitlabCiCli
       # Release runner capacity for completed job
       #
       # @param job [MockJob] Completed job
-      def release_runner_for_job(job)
-        runner = @fleet.runners.find { |r| r.running_jobs.positive? }
-        runner&.release_job(job)
+      # @param runner [MockRunner] Runner that was executing the job
+      # @raise [RuntimeError] If runner is nil (indicates state tracking error)
+      def release_runner_for_job(job, runner)
+        unless runner
+          raise "Failed to release job '#{job.name}': no runner tracked for this job"
+        end
+
+        runner.release_job(job)
       end
 
       # Output final pipeline status

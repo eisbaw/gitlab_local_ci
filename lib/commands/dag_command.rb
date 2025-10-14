@@ -136,8 +136,14 @@ class DagCommand
     # Determine job stage - default to 'test' if not specified
     stage = job_config['stage'] || 'test'
 
-    # Extract needs dependencies (empty array if not specified)
+    # Extract needs dependencies
+    # Important: we need to track whether 'needs' was explicitly set
+    # to differentiate between:
+    # - No needs key (nil) -> implicit stage dependencies
+    # - needs: [] -> explicit empty dependencies
+    # - needs: [jobs] -> explicit dependencies
     needs = extract_needs(job_config['needs'])
+    has_explicit_needs = job_config.key?('needs')
 
     # Extract script (required for actual jobs, but we're just visualizing)
     script = job_config['script'] || []
@@ -146,6 +152,7 @@ class DagCommand
       name: name,
       stage: stage,
       needs: needs,
+      has_explicit_needs: has_explicit_needs,
       script: script
     }
   end
@@ -279,15 +286,61 @@ class DagCommand
       lines << ''
     end
 
-    # Generate edges for needs dependencies
-    pipeline[:jobs].each_value do |job|
-      job[:needs].each do |dependency|
-        lines << "  #{sanitize_id(dependency)} -> #{sanitize_id(job[:name])};"
-      end
+    # Generate edges for dependencies
+    # Two types of dependencies:
+    # 1. Explicit 'needs' dependencies
+    # 2. Implicit stage-based dependencies (for jobs without 'needs')
+    edges = generate_dependency_edges(pipeline)
+    edges.each do |edge|
+      lines << "  #{sanitize_id(edge[:from])} -> #{sanitize_id(edge[:to])};"
     end
 
     lines << '}'
     lines.join("\n")
+  end
+
+  # Generate dependency edges based on both explicit needs and implicit stage ordering
+  #
+  # GitLab CI/CD behavior:
+  # - Jobs with explicit 'needs' only depend on those specified jobs
+  # - Jobs without 'needs' implicitly depend on all jobs in previous stages
+  # - Jobs with 'needs: []' have no dependencies
+  #
+  # @param pipeline [Hash] Pipeline structure
+  # @return [Array<Hash>] Array of edges with :from and :to keys
+  def generate_dependency_edges(pipeline)
+    edges = []
+    stages = pipeline[:stages]
+    jobs = pipeline[:jobs]
+
+    jobs.each_value do |job|
+      if job[:has_explicit_needs]
+        # Job has explicit needs - use those
+        job[:needs].each do |dependency|
+          edges << { from: dependency, to: job[:name] }
+        end
+      else
+        # Job has no explicit needs - add implicit stage dependencies
+        # Find all jobs in previous stages
+        job_stage_index = stages.index(job[:stage])
+        next unless job_stage_index && job_stage_index > 0
+
+        # Get all previous stages
+        previous_stages = stages[0...job_stage_index]
+
+        # Find all jobs in those previous stages
+        previous_stage_jobs = jobs.values.select do |other_job|
+          previous_stages.include?(other_job[:stage])
+        end
+
+        # Create edges from all previous stage jobs to this job
+        previous_stage_jobs.each do |prev_job|
+          edges << { from: prev_job[:name], to: job[:name] }
+        end
+      end
+    end
+
+    edges
   end
 
   # Group jobs by their stage

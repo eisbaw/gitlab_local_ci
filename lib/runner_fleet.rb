@@ -33,29 +33,17 @@ class RunnerFleet
     loaded_count = 0
 
     json_files.each do |file_path|
-      begin
-        # Read and parse JSON file
-        content = File.read(file_path)
-        runner_data = JSON.parse(content)
+      # Read and parse JSON file
+      content = File.read(file_path)
+      runner_data = JSON.parse(content)
 
-        # Validate required fields before creating runner
-        validate_runner_data(runner_data, file_path)
+      # Validate required fields before creating runner
+      validate_runner_data(runner_data, file_path)
 
-        # Create MockRunner instance and add to fleet
-        runner = MockRunner.new(runner_data)
-        @runners << runner
-        loaded_count += 1
-
-      rescue JSON::ParserError => e
-        # Fail verbosely but continue processing other files
-        warn "Skipping invalid JSON in #{file_path}: #{e.message}"
-      rescue ArgumentError => e
-        # Validation errors are logged but don't stop loading
-        warn "Skipping invalid runner in #{file_path}: #{e.message}"
-      rescue StandardError => e
-        # Catch any unexpected errors and log them
-        warn "Error loading runner from #{file_path}: #{e.message}"
-      end
+      # Create MockRunner instance and add to fleet
+      runner = MockRunner.new(runner_data)
+      @runners << runner
+      loaded_count += 1
     end
 
     loaded_count

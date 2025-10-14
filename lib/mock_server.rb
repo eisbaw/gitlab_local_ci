@@ -34,10 +34,16 @@ class MockServer
   #
   # @param gitlab_path [String] Path to the GitLab CE git submodule (not used in standalone mode)
   def initialize(gitlab_path = nil)
+    # Validate gitlab_path if provided and not empty
+    if gitlab_path && !gitlab_path.empty? && !Dir.exist?(gitlab_path)
+      raise ArgumentError, "GitLab lib directory not found at: #{gitlab_path}"
+    end
+
     @gitlab_path = gitlab_path
     @event_queue = []
     @pipelines = {}
     @pipeline_counter = 0
+    @pipeline_statuses = {} # Track last known status for each pipeline
   end
 
   # Create a pipeline from a YAML configuration
@@ -57,6 +63,9 @@ class MockServer
     if job_configs.empty?
       raise ConfigurationError, "No jobs defined in configuration"
     end
+
+    # Validate job configurations
+    validate_job_configs(job_configs)
 
     # Validate DAG for circular dependencies
     validate_dag(job_configs)
@@ -161,6 +170,44 @@ class MockServer
     end.compact
   end
 
+  # Validate job configurations
+  #
+  # @param job_configs [Hash] Job configurations
+  def validate_job_configs(job_configs)
+    errors = []
+
+    # Known valid job keys
+    valid_keys = %w[
+      script before_script after_script stage image services
+      artifacts cache dependencies variables tags when
+      allow_failure retry timeout parallel extends needs rules
+      environment coverage resource_group release inherit
+      interruptible only except
+    ]
+
+    job_configs.each do |job_name, job_config|
+      # Validate script is present and not empty
+      script = job_config['script'] || job_config[:script]
+      if script.nil?
+        errors << "Job '#{job_name}' is missing required 'script' field"
+      elsif script.is_a?(Array) && script.empty?
+        errors << "Job '#{job_name}' has empty 'script' array"
+      end
+
+      # Check for unknown keys
+      job_config.each_key do |key|
+        key_str = key.to_s
+        unless valid_keys.include?(key_str)
+          errors << "Job '#{job_name}' has unknown key: '#{key_str}'"
+        end
+      end
+    end
+
+    unless errors.empty?
+      raise ConfigurationError, "Configuration errors:\n  - #{errors.join("\n  - ")}"
+    end
+  end
+
   # Validate pipeline DAG for circular dependencies
   #
   # Uses depth-first search to detect cycles
@@ -174,7 +221,7 @@ class MockServer
       next if visited[job_name]
 
       if has_cycle?(job_name, job_configs, visited, rec_stack)
-        raise ConfigurationError, "Circular dependency detected involving job '#{job_name}'"
+        raise ConfigurationError, "circular dependency detected involving job '#{job_name}'"
       end
     end
   end
@@ -217,25 +264,20 @@ class MockServer
   # Determines pipeline status based on job states and emits events
   #
   # @param pipeline [MockPipeline] Pipeline to process
-  # @return [Boolean] True if state changed
+  # @return [Boolean] True if state changed since last call
   def process_pipeline(pipeline)
-    old_status = pipeline.status
+    # Get last known status (from previous call) or default to pending
+    old_status = @pipeline_statuses[pipeline.id] || MockPipeline::STATE_PENDING
 
-    # Determine new status based on job states
-    new_status = if pipeline.has_pending_jobs?
-                   if pipeline.status == MockPipeline::STATE_PENDING
-                     MockPipeline::STATE_RUNNING
-                   else
-                     pipeline.status
-                   end
-                 else
-                   # No pending jobs - pipeline complete
-                   MockPipeline::STATE_SUCCESS
-                 end
+    # Get current status based on job states
+    # Note: Job state transitions are managed externally (e.g., by DryRunCommand)
+    # This method only observes state changes and emits events
+    new_status = pipeline.status
+
+    # Update tracked status
+    @pipeline_statuses[pipeline.id] = new_status
 
     if new_status != old_status
-      pipeline.transition_to(new_status)
-
       # Emit appropriate event
       event_type = case new_status
                    when MockPipeline::STATE_RUNNING
