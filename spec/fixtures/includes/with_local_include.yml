@@ -1,0 +1,12 @@
+include:
+  - local: extra_jobs.yml
+
+stages:
+  - build
+  - test
+  - deploy
+
+build:
+  stage: build
+  script:
+    - echo "Build"
