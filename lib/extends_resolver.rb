@@ -114,11 +114,19 @@ class ExtendsResolver
         resolved_parent = resolve_job_extends(parent_name, parent_config, jobs, templates, visited.dup)
 
         # Merge parent into result
-        merged = merge_job_config(merged, resolved_parent)
+        begin
+          merged = merge_job_config(merged, resolved_parent)
+        rescue TypeError => e
+          raise "Error merging parent '#{parent_name}' into job '#{job_name}': #{e.message}"
+        end
       end
 
       # Finally, merge the job's own config (overrides parents)
-      result = merge_job_config(merged, job_config)
+      begin
+        result = merge_job_config(merged, job_config)
+      rescue TypeError => e
+        raise "Error merging job config for '#{job_name}': #{e.message}"
+      end
 
       # Remove extends key from result
       result.delete('extends')
@@ -141,16 +149,23 @@ class ExtendsResolver
       if key == 'extends'
         # Skip extends key - we're resolving it
         next
-      elsif key == 'variables'
-        # Variables are deep-merged
+      elsif key == 'variables' && value.is_a?(Hash)
+        # Variables are deep-merged (only if it's actually a hash)
         result[key] = merge_variables(result[key] || {}, value)
       elsif key == 'artifacts' && value.is_a?(Hash)
         # Artifacts has special merge logic
         result[key] = merge_artifacts(result[key] || {}, value)
       elsif MERGE_KEYS.include?(key) && value.is_a?(Array)
         # These keys are concatenated (array merge)
-        base_array = result[key] || []
-        result[key] = base_array + value
+        # Ensure base is also an array (or nil)
+        base_value = result[key]
+        if base_value && !base_value.is_a?(Array)
+          # Base value exists but is not an array - replace it
+          result[key] = deep_dup(value)
+        else
+          base_array = base_value || []
+          result[key] = base_array + value
+        end
       elsif result[key].is_a?(Hash) && value.is_a?(Hash)
         # Nested hashes are recursively merged
         result[key] = merge_job_config(result[key], value)

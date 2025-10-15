@@ -353,16 +353,16 @@ module Commands
         validate_script(job_name, job_config['script'], errors)
       end
 
-      # Validate stage reference if present
-      if job_config['stage']
+      # Validate stage reference if present (skip for template jobs)
+      if job_config['stage'] && !job_name.start_with?('.')
         stage = job_config['stage']
         unless stages.include?(stage)
           errors << "Job '#{job_name}' references undefined stage '#{stage}'"
         end
       end
 
-      # Validate needs dependencies
-      if job_config['needs']
+      # Validate needs dependencies (skip for template jobs)
+      if job_config['needs'] && !job_name.start_with?('.')
         validate_needs(job_name, job_config['needs'], all_job_names, errors)
       end
 
@@ -407,6 +407,12 @@ module Commands
       end
 
       needs.each do |need|
+        # Skip YAML reference tags (parsed as arrays like [".template", "needs"])
+        # These are GitLab's !reference syntax that gets resolved at runtime
+        if need.is_a?(Array) && need.length == 2 && need[0].is_a?(String) && need[1].is_a?(String)
+          next
+        end
+
         # Needs can be string (job name) or hash (with job key)
         needed_job = case need
                      when String
@@ -420,7 +426,10 @@ module Commands
         if needed_job.nil?
           errors << "Job '#{job_name}' has invalid needs entry: #{need.inspect}"
         elsif !all_job_names.include?(needed_job)
-          errors << "Job '#{job_name}' needs undefined job '#{needed_job}'"
+          # Skip validation for jobs with slashes - these are from external project includes
+          unless needed_job.include?('/')
+            errors << "Job '#{job_name}' needs undefined job '#{needed_job}'"
+          end
         end
       end
     end
