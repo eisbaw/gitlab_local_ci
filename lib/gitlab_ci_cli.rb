@@ -34,7 +34,7 @@ module GitlabCiCli
     VALID_PIPELINE_TYPES = %w[push merge_request schedule manual].freeze
     VALID_UNDEFINED_MODES = %w[warning error empty].freeze
     VALID_FORMATS = %w[text json junit].freeze
-    VALID_COMMANDS = %w[lint dag dry-run run help].freeze
+    VALID_COMMANDS = %w[lint dag dry-run run export-just help].freeze
 
     # Default values
     DEFAULTS = {
@@ -50,6 +50,10 @@ module GitlabCiCli
       variables: {},
       run_deps: 'excl',
       job_name: nil,
+      output: nil,
+      flat: false,
+      graph: false,
+      shell: 'bash',
     }.freeze
 
     def self.start(args)
@@ -131,6 +135,16 @@ module GitlabCiCli
           validate_enum(arg, value, %w[incl excl])
           options[:run_deps] = value
           i += 1
+        when '--output', '-o'
+          options[:output] = require_value(arg, args[i + 1])
+          i += 1
+        when '--flat'
+          options[:flat] = true
+        when '--graph'
+          options[:graph] = true
+        when '--shell'
+          options[:shell] = require_value(arg, args[i + 1])
+          i += 1
         else
           if arg.start_with?('--')
             raise ArgumentError, "Unknown flag: #{arg}"
@@ -192,7 +206,7 @@ module GitlabCiCli
       return if command == 'help'
 
       # Commands that need the entry file
-      if %w[lint dag dry-run run].include?(command)
+      if %w[lint dag dry-run run export-just].include?(command)
         entry = options[:entry]
         unless File.exist?(entry)
           raise ArgumentError, "Entry file not found: #{entry}"
@@ -221,6 +235,13 @@ module GitlabCiCli
           raise ArgumentError, "Job name required for 'run' command. Usage: gitlab_ci_cli run <job_name>"
         end
       end
+
+      # Export-just: default to --graph if neither specified
+      if command == 'export-just'
+        if !options[:flat] && !options[:graph]
+          options[:graph] = true # Default to graph mode
+        end
+      end
     end
 
     # Execute the specified command with options
@@ -238,6 +259,8 @@ module GitlabCiCli
         execute_dry_run(options)
       when 'run'
         execute_run(options)
+      when 'export-just'
+        execute_export_just(options)
       else
         # Should never reach here due to validation, but fail-fast anyway
         $stderr.puts "BUG: Unhandled command: #{command}"
@@ -263,6 +286,7 @@ module GitlabCiCli
             dag               Generate Graphviz DOT of pipeline DAG
             dry-run           Simulate pipeline execution against mock fleet
             run <job_name>    Execute a job locally (assumes tags/conditions match)
+            export-just       Export jobs as justfile recipes
             help              Show this help message
 
         OPTIONS:
@@ -278,6 +302,11 @@ module GitlabCiCli
             --format FORMAT   Output format: text|json|junit (default: text)
             --gitlab-dir DIR  Path to GitLab submodule (default: ./gitlab)
             --run-deps MODE   For 'run' command: incl (with deps) | excl (only job) (default: excl)
+            --output FILE     Output file for export-just (default: stdout)
+            -o FILE           Alias for --output
+            --flat            Export flat justfile (no dependencies)
+            --graph           Export with dependency graph (default)
+            --shell SHELL     Shell for recipes (default: bash)
             --help, -h        Show this help message
             --version, -v     Show version information
 
@@ -287,6 +316,8 @@ module GitlabCiCli
             gitlab_ci_cli dry-run --variables DEPLOY_ENV=staging
             gitlab_ci_cli run build-backend
             gitlab_ci_cli run test-unit --run-deps=incl
+            gitlab_ci_cli export-just --flat -o justfile.gitlab.flat
+            gitlab_ci_cli export-just --graph -o justfile.gitlab.graph
             gitlab_ci_cli lint --entry custom-ci.yml --verbose
 
         VERSION:
@@ -348,6 +379,19 @@ module GitlabCiCli
       require_relative 'commands/run_command'
 
       command = Commands::RunCommand.new(options[:job_name], options)
+      command.execute
+    rescue StandardError => e
+      $stderr.puts "Error: #{e.message}"
+      $stderr.puts e.backtrace.join("\n") if options[:verbose]
+      EXIT_COMMAND_FAILED
+    end
+
+    # Execute export-just command
+    # Returns: exit code
+    def self.execute_export_just(options)
+      require_relative 'commands/export_just_command'
+
+      command = Commands::ExportJustCommand.new(options)
       command.execute
     rescue StandardError => e
       $stderr.puts "Error: #{e.message}"

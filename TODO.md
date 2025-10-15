@@ -139,34 +139,85 @@ Issues identified in MPED architecture review:
 - [ ] Better error reporting for configuration issues
 
 ### Local Job Execution
-- [ ] **Run job locally with `run` command**
+- [x] **Run job locally with `run` command** ✅ IMPLEMENTED
   - New command: `./bin/gitlab_ci_cli run <job_name> [options]`
   - Execute a specific job from .gitlab-ci.yml locally
   - Assume all tags and conditions match (bypass runner requirements)
   - Execute actual scripts, not simulation
 
-- [ ] **Dependency control with `--run-deps` option**
+- [x] **Dependency control with `--run-deps` option** ✅ IMPLEMENTED
   - `--run-deps=excl` (default): Run only the named job, excluding dependencies
   - `--run-deps=incl`: Run job WITH all its dependencies (needs + stage dependencies)
   - Dependencies executed in topologically sorted order
   - Fails fast if circular dependencies detected
 
-- [ ] **Implementation requirements**
+- [x] **Implementation completed** ✅ IMPLEMENTED
   - Parse job configuration (script, before_script, after_script)
   - Resolve job dependencies from `needs` and stage order
   - Perform topological sort for dependency execution order
   - Execute scripts in local shell environment
   - Support for job variables and variable expansion
-  - Handle artifacts between dependent jobs (pass artifacts to next job)
   - Capture and display job output with timestamps
   - Exit with job's exit code (0 for success, non-zero for failure)
 
-- [ ] **Additional options to consider**
+- [ ] **Additional options to consider** (Future enhancements)
   - `--dry-run`: Show execution plan without running scripts
   - `--shell=bash|sh|zsh`: Specify shell for script execution
   - `--workdir=<path>`: Set working directory for job execution
   - `--artifacts-dir=<path>`: Directory to store job artifacts
   - `--interactive`: Pause before each job for user confirmation
+
+### Justfile Export
+- [x] **Export GitLab CI jobs as justfile recipes** ✅ IMPLEMENTED
+  - New command: `./bin/gitlab_ci_cli export-just [options]`
+  - Generates justfile recipes from .gitlab-ci.yml
+  - Two modes: `--flat` (no dependencies) and `--graph` (with dependencies)
+  - Assumes all tags and conditions match
+  - Compatible with `just` command runner
+
+- [x] **Flat mode (`--flat`)** ✅ IMPLEMENTED
+  - Generates independent recipes without dependencies
+  - Jobs listed alphabetically
+  - Includes metadata comments (stage, tags)
+  - Output: `justfile.gitlab.flat`
+
+- [x] **Graph mode (`--graph`)** ✅ IMPLEMENTED (default)
+  - Generates recipes with full dependency graph
+  - Explicit `needs` dependencies + implicit stage dependencies
+  - Topologically sorted execution order
+  - Output: `justfile.gitlab.graph`
+
+- [x] **Features implemented** ✅ IMPLEMENTED
+  - Combines before_script, script, after_script into single recipe
+  - Proper escaping for shell syntax
+  - Variable export support
+  - Metadata preservation in comments
+  - Valid justfile syntax output
+  - Generation timestamp and regeneration command in header
+
+**Usage Examples:**
+```bash
+# Export flat justfile (no dependencies)
+gitlab_ci_cli export-just --flat -o justfile.gitlab.flat
+
+# Export with dependency graph (default)
+gitlab_ci_cli export-just --graph -o justfile.gitlab.graph
+
+# Use exported justfile
+just --justfile justfile.gitlab.graph --list
+just --justfile justfile.gitlab.graph build-backend
+just --justfile justfile.gitlab.graph deploy-prod  # Runs dependencies too
+
+# Import in main justfile
+import? 'justfile.gitlab.graph'
+```
+
+**Benefits:**
+- Familiar `just` interface for developers
+- Tab completion and IDE support
+- Can mix CI jobs with local recipes
+- Offline development without GitLab instance
+- Fast local iteration
 
 ## Technical Debt
 
