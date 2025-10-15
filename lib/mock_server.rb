@@ -195,13 +195,16 @@ class MockServer
       artifacts cache dependencies variables tags when
       allow_failure retry timeout parallel extends needs rules
       environment coverage resource_group release inherit
-      interruptible only except
+      interruptible only except trigger pages
     ]
 
     job_configs.each do |job_name, job_config|
-      # Validate script is present and not empty
+      # Validate script is present (unless trigger or pages is defined)
       script = job_config['script'] || job_config[:script]
-      if script.nil?
+      trigger = job_config['trigger'] || job_config[:trigger]
+      pages = job_config['pages'] || job_config[:pages]
+
+      if script.nil? && trigger.nil? && pages.nil?
         errors << "Job '#{job_name}' is missing required 'script' field"
       elsif script.is_a?(Array) && script.empty?
         errors << "Job '#{job_name}' has empty 'script' array"

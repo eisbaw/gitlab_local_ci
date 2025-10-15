@@ -18,6 +18,9 @@ require_relative '../mock_server'
 require_relative '../runner_fleet'
 require_relative '../mock_runner'
 require_relative '../mock_job'
+require_relative '../include_processor'
+require_relative '../extends_resolver'
+require 'yaml'
 
 module GitlabCiCli
   module Commands
@@ -135,6 +138,14 @@ module GitlabCiCli
       def create_pipeline
         config_content = File.read(@options[:entry])
 
+        # Parse YAML and process includes
+        config = YAML.safe_load(config_content, permitted_classes: [Symbol], aliases: true)
+        config = process_includes(config)
+        config = resolve_extends(config)
+
+        # Convert back to YAML for server
+        processed_config_content = YAML.dump(config)
+
         # Display variables in verbose mode
         if @options[:verbose] && !@options[:variables].empty?
           log_info("Variables:")
@@ -145,7 +156,7 @@ module GitlabCiCli
         end
 
         pipeline = @server.create_pipeline(
-          config_content,
+          processed_config_content,
           ref: @options[:ref],
           variables: @options[:variables]
         )
@@ -157,6 +168,50 @@ module GitlabCiCli
       rescue StandardError => e
         log_error("Failed to create pipeline: #{e.message}")
         nil
+      end
+
+      # Process include directives in the configuration
+      #
+      # @param config [Hash] Parsed YAML configuration
+      # @return [Hash] Merged configuration with includes resolved
+      def process_includes(config)
+        return config unless config['include']
+
+        # Get project path from entry file directory
+        project_path = File.dirname(File.expand_path(@options[:entry]))
+
+        # Get GitLab templates path if GitLab submodule exists
+        gitlab_templates_path = nil
+        if Dir.exist?(@options[:gitlab_dir])
+          gitlab_templates_path = File.join(@options[:gitlab_dir], 'lib', 'gitlab', 'ci', 'templates')
+        end
+
+        # Create include processor
+        processor = IncludeProcessor.new(
+          project_path: project_path,
+          gitlab_templates_path: gitlab_templates_path
+        )
+
+        # Process includes
+        processor.process_includes(config)
+      rescue IncludeDepthExceededError => e
+        log_error("Include depth exceeded: #{e.depth} > #{e.max_depth}")
+        raise
+      rescue StandardError => e
+        log_error("Error processing includes: #{e.message}")
+        raise
+      end
+
+      # Resolve extends directives in the configuration
+      #
+      # @param config [Hash] Configuration with includes resolved
+      # @return [Hash] Configuration with extends resolved
+      def resolve_extends(config)
+        resolver = ExtendsResolver.new
+        resolver.resolve_extends(config)
+      rescue StandardError => e
+        log_error("Error resolving extends: #{e.message}")
+        raise
       end
 
       # Run simulation loop
