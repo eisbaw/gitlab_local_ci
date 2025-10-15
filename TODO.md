@@ -138,6 +138,36 @@ Issues identified in MPED architecture review:
 - [ ] Support for manual job triggering in simulation
 - [ ] Better error reporting for configuration issues
 
+### Local Job Execution
+- [ ] **Run job locally with `run` command**
+  - New command: `./bin/gitlab_ci_cli run <job_name> [options]`
+  - Execute a specific job from .gitlab-ci.yml locally
+  - Assume all tags and conditions match (bypass runner requirements)
+  - Execute actual scripts, not simulation
+
+- [ ] **Dependency control with `--run-deps` option**
+  - `--run-deps=excl` (default): Run only the named job, excluding dependencies
+  - `--run-deps=incl`: Run job WITH all its dependencies (needs + stage dependencies)
+  - Dependencies executed in topologically sorted order
+  - Fails fast if circular dependencies detected
+
+- [ ] **Implementation requirements**
+  - Parse job configuration (script, before_script, after_script)
+  - Resolve job dependencies from `needs` and stage order
+  - Perform topological sort for dependency execution order
+  - Execute scripts in local shell environment
+  - Support for job variables and variable expansion
+  - Handle artifacts between dependent jobs (pass artifacts to next job)
+  - Capture and display job output with timestamps
+  - Exit with job's exit code (0 for success, non-zero for failure)
+
+- [ ] **Additional options to consider**
+  - `--dry-run`: Show execution plan without running scripts
+  - `--shell=bash|sh|zsh`: Specify shell for script execution
+  - `--workdir=<path>`: Set working directory for job execution
+  - `--artifacts-dir=<path>`: Directory to store job artifacts
+  - `--interactive`: Pause before each job for user confirmation
+
 ## Technical Debt
 
 ### Code Quality
