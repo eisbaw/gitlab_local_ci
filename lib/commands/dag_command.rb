@@ -16,6 +16,7 @@
 
 require 'yaml'
 require 'json'
+require_relative '../include_processor'
 
 # DagCommand generates Graphviz DOT format visualizations of GitLab CI pipeline DAG
 #
@@ -60,6 +61,7 @@ class DagCommand
   def execute
     config_content = read_config_file(@entry)
     config = parse_yaml(config_content)
+    config = process_includes(config)
     pipeline = build_pipeline_structure(config)
     validate_dag(pipeline)
     generate_dot(pipeline)
@@ -91,6 +93,37 @@ class DagCommand
     raise InvalidConfigError, "Invalid YAML syntax: #{e.message}"
   rescue StandardError => e
     raise InvalidConfigError, "Failed to parse YAML: #{e.message}"
+  end
+
+  # Process include directives in the configuration
+  #
+  # @param config [Hash] Parsed YAML configuration
+  # @return [Hash] Merged configuration with includes resolved
+  # @raise [InvalidConfigError] if include processing fails
+  def process_includes(config)
+    return config unless config['include']
+
+    # Get project path from entry file directory
+    project_path = File.dirname(File.expand_path(@entry))
+
+    # Get GitLab templates path if GitLab submodule exists
+    gitlab_templates_path = nil
+    if Dir.exist?(@gitlab_dir)
+      gitlab_templates_path = File.join(@gitlab_dir, 'lib', 'gitlab', 'ci', 'templates')
+    end
+
+    # Create include processor
+    processor = IncludeProcessor.new(
+      project_path: project_path,
+      gitlab_templates_path: gitlab_templates_path
+    )
+
+    # Process includes
+    processor.process_includes(config)
+  rescue IncludeDepthExceededError => e
+    raise InvalidConfigError, "Include depth exceeded: #{e.depth} > #{e.max_depth}"
+  rescue StandardError => e
+    raise InvalidConfigError, "Error processing includes: #{e.message}"
   end
 
   # Build internal pipeline structure from parsed config
@@ -280,6 +313,7 @@ class DagCommand
     lines << 'digraph pipeline {'
     lines << '  rankdir="LR";'
     lines << '  ranksep=2;'
+    lines << '  compound=true;'
     lines << '  node [shape=box, style=filled, fillcolor=lightblue];'
     lines << ''
 
@@ -297,6 +331,10 @@ class DagCommand
       lines << "    fillcolor=lightgrey;"
       lines << ''
 
+      # Add invisible anchor node for compound edges
+      lines << "    __stage_anchor_#{sanitize_id(stage)} [style=invis, width=0, height=0];"
+      lines << ''
+
       # Add nodes for jobs in this stage
       stage_jobs.each do |job|
         tooltip = generate_job_tooltip(job)
@@ -309,11 +347,19 @@ class DagCommand
 
     # Generate edges for dependencies
     # Two types of dependencies:
-    # 1. Explicit 'needs' dependencies
-    # 2. Implicit stage-based dependencies (for jobs without 'needs')
+    # 1. Explicit 'needs' dependencies (individual job edges)
+    # 2. Implicit stage-based dependencies (stage cluster edges with ltail)
     edges = generate_dependency_edges(pipeline)
     edges.each do |edge|
-      lines << "  #{sanitize_id(edge[:from])} -> #{sanitize_id(edge[:to])};"
+      # Build edge attributes (ltail for compound edges, style for visual distinction)
+      edge_attrs = []
+      edge_attrs << "ltail=#{edge[:ltail]}" if edge[:ltail]
+      edge_attrs << "lhead=#{edge[:lhead]}" if edge[:lhead]
+      edge_attrs << "style=#{edge[:style]}" if edge[:style]
+
+      # Format edge with or without attributes
+      attrs_str = edge_attrs.empty? ? '' : " [#{edge_attrs.join(', ')}]"
+      lines << "  #{sanitize_id(edge[:from])} -> #{sanitize_id(edge[:to])}#{attrs_str};"
     end
 
     lines << '}'
@@ -327,8 +373,12 @@ class DagCommand
   # - Jobs without 'needs' implicitly depend on all jobs in previous stages
   # - Jobs with 'needs: []' have no dependencies
   #
+  # Visualization optimization:
+  # - For implicit stage dependencies, draw single edge from previous stage cluster
+  #   instead of individual edges from all jobs (reduces visual clutter)
+  #
   # @param pipeline [Hash] Pipeline structure
-  # @return [Array<Hash>] Array of edges with :from and :to keys
+  # @return [Array<Hash>] Array of edges with :from, :to, and optional :ltail keys
   def generate_dependency_edges(pipeline)
     edges = []
     stages = pipeline[:stages]
@@ -341,23 +391,23 @@ class DagCommand
           edges << { from: dependency, to: job[:name] }
         end
       else
-        # Job has no explicit needs - add implicit stage dependencies
-        # Find all jobs in previous stages
+        # Job has no explicit needs - add implicit stage dependency
+        # Instead of drawing edges from all previous jobs, draw a single edge
+        # from the immediate previous stage cluster (using compound graph ltail)
         job_stage_index = stages.index(job[:stage])
         next unless job_stage_index && job_stage_index > 0
 
-        # Get all previous stages
-        previous_stages = stages[0...job_stage_index]
+        # Get immediate previous stage
+        immediate_previous_stage = stages[job_stage_index - 1]
 
-        # Find all jobs in those previous stages
-        previous_stage_jobs = jobs.values.select do |other_job|
-          previous_stages.include?(other_job[:stage])
-        end
-
-        # Create edges from all previous stage jobs to this job
-        previous_stage_jobs.each do |prev_job|
-          edges << { from: prev_job[:name], to: job[:name] }
-        end
+        # Create stage-level edge using invisible anchor and ltail attribute
+        # This makes the edge appear to come from the entire stage cluster
+        edges << {
+          from: "__stage_anchor_#{sanitize_id(immediate_previous_stage)}",
+          to: job[:name],
+          ltail: "cluster_#{sanitize_id(immediate_previous_stage)}",
+          style: 'bold'
+        }
       end
     end
 
