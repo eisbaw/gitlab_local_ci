@@ -2,71 +2,114 @@
 
 ## Critical Issues
 
-### 1. Array Include Path Handling
+### 1. ✅ RESOLVED: Array Include Path Handling
 **Projects affected:** mesa, gstreamer
-**Error:** `undefined method 'start_with?' for an instance of Array`
-**Root cause:** Include processor doesn't handle array-type include specifications
-**Priority:** High
-**Fix needed:** Update `IncludeProcessor#fetch_local_include` to handle arrays of paths
+**Status:** RESOLVED - Both projects now pass all tests
+**Resolution:** Include processor correctly handles array-type specifications
 
 ### 2. External Template Resolution
 **Projects affected:** gitlab, gnome-builder
 **Errors:**
-- gitlab: `GitLab CI template not found: Jobs/Dependency-Scanning.latest.gitlab-ci.yml`
-- gnome-builder: `Project not found: gnome/citemplates`
+- gitlab: Component authentication required (gitlab.com)
+- gnome-builder: Component authentication required (gitlab.gnome.org)
 
-**Root cause:** Projects reference external GitLab templates and other projects that aren't available locally
+**Root cause:** Projects reference external components requiring authentication
 **Priority:** Medium
+**Status:** Cannot fix without credentials - expected limitation
 **Options:**
-- Add support for GitLab template catalog
-- Add fallback mechanism for missing templates
-- Document limitation and provide graceful degradation
+- Document limitation clearly
+- Provide graceful error messages (already implemented)
+- Support authentication tokens in future (if needed)
 
-### 3. YAML Extends/Anchors Jobs Missing Scripts
+### 3. ✅ RESOLVED: YAML Extends/Anchors Jobs Missing Scripts
 **Projects affected:** baserow, kicad, openrgb, veloren
-**Error:** Multiple jobs flagged as `missing required 'script' field`
-**Root cause:** Jobs use `extends:` to inherit script from templates, but validation runs before extends resolution
-**Priority:** Medium
-**Fix needed:** Implement proper extends resolution before job validation
+**Status:** RESOLVED - All projects now pass lint and dry-run tests
+**Resolution:** Implemented ExtendsResolver for proper template inheritance
 
 ## Medium Priority Issues
 
-### 4. Trigger Jobs Validation
-**Project affected:** baserow
-**Error:** `Job 'trigger-saas-build' has unknown key: 'trigger'`
-**Root cause:** Validation doesn't recognize `trigger` as valid alternative to `script`
-**Priority:** Medium
-**Fix needed:** Update `LintCommand::VALID_JOB_KEYWORDS` to include trigger-specific keys
+### 4. ✅ RESOLVED: Trigger Jobs Validation
+**Project affected:** baserow, gstreamer
+**Status:** RESOLVED - Trigger and pages jobs now recognized
+**Resolution:** Added `trigger` and `pages` to valid job keywords in MockServer
 
-### 5. Template-Only Configurations
+### 5. ✅ RESOLVED: Template-Only Configurations
 **Projects affected:** gitlab (Runner), kicad, veloren
-**Error:** `No jobs defined in configuration`
-**Root cause:** Some CI files only define templates/includes with no concrete jobs
-**Priority:** Low
-**Fix needed:** Better handling of template-only configurations (maybe just warnings instead of errors)
+**Status:** RESOLVED - Projects with templates now validate correctly
+**Resolution:** Skip validation for template jobs (starting with '.')
 
 ## Test Results Summary
 
-### Passing All Tests (3/11 = 27%)
+**Last Updated:** 2025-01-15
+
+### Overall Pass Rates
+- **Lint:** 9/11 (82%) - up from 3/11 (27%)
+- **DAG:** 11/11 (100%)
+- **Dry-Run:** 9/11 (82%) - up from 0/11 (0%)
+
+### Passing All Tests (9/11 = 82%)
+- ✓ baserow (959 lines)
 - ✓ fdroid (854 lines)
 - ✓ graphviz (1,397 lines)
+- ✓ gstreamer (1,184 lines)
 - ✓ inkscape (570 lines)
+- ✓ kicad (23 lines)
+- ✓ mesa (425 lines)
+- ✓ openrgb (593 lines)
+- ✓ veloren (45 lines)
 
-### Partial Pass (4/11)
+### Failing (2/11)
 | Project | Lint | DAG | Dry-Run | Main Issue |
 |---------|------|-----|---------|------------|
-| baserow | ✗ | ✓ | ✗ | Missing scripts (extends not resolved) |
-| kicad | ✗ | ✓ | ✗ | Missing scripts (extends not resolved) |
-| openrgb | ✗ | ✓ | ✗ | Missing scripts (extends not resolved) |
-| veloren | ✗ | ✓ | ✗ | Missing scripts (extends not resolved) |
+| gitlab | ✗ | ✓ | ✗ | Component authentication required |
+| gnome-builder | ✗ | ✓ | ✗ | Component authentication required |
 
-### Failing Multiple Tests (4/11)
-| Project | Lint | DAG | Dry-Run | Main Issue |
-|---------|------|-----|---------|------------|
-| gitlab | ✗ | ✗ | ✗ | Missing GitLab templates |
-| gnome-builder | ✗ | ✗ | ✗ | External project reference |
-| gstreamer | ✗ | ✗ | ✗ | Array include handling |
-| mesa | ✗ | ✗ | ✗ | Array include handling |
+**Note:** Both failures are due to external component authentication requirements, not implementation limitations.
+
+## Code Quality Improvements (MPED Review)
+
+### DAG Command Refactoring
+**File:** `lib/commands/dag_command.rb`
+**Priority:** Medium
+**Status:** Functional but needs MPED improvements
+
+Issues identified in MPED architecture review:
+
+1. **Silent Failure for Invalid Stages** (Line 389-390)
+   - **Issue:** Jobs referencing non-existent stages silently skip without error
+   - **Code:** `job_stage_index = stages.index(job[:stage]); next unless job_stage_index && job_stage_index > 0`
+   - **Fix needed:** Add explicit validation and fail-fast with clear error message
+   - **MPED principle violated:** Fail Fast and Verbosely
+
+2. **Missing Compound Graph Documentation** (Lines 316, 335, 397-402)
+   - **Issue:** Compound graph implementation lacks documentation of tightly coupled requirements
+   - **Details:** `compound=true`, invisible anchors, and `ltail` attributes must work together
+   - **Fix needed:** Add comprehensive comment block explaining Graphviz compound graph design
+   - **MPED principle violated:** Code Clarity and Maintainability
+
+3. **Fragile Anchor Node String Construction** (Lines 335, 398)
+   - **Issue:** Anchor node names built with string concatenation in two places
+   - **Code:** `"__stage_anchor_#{sanitize_id(stage)}"` duplicated
+   - **Fix needed:** Extract to `stage_anchor_id(stage)` helper method (single source of truth)
+   - **MPED principle violated:** Single Source of Truth
+
+4. **Undocumented Edge Data Structure** (Line 397-402)
+   - **Issue:** Edge hash schema `{ from:, to:, ltail:, lhead:, style: }` defined implicitly
+   - **Fix needed:** Document edge structure at top of `generate_dependency_edges` method
+   - **MPED principle violated:** Data Design Before Algorithms
+
+5. **Potential Empty Stage Cluster Bug** (Line 393-402)
+   - **Issue:** May create edges to non-existent clusters if previous stage has no jobs
+   - **Scenario:** Stage exists in `stages` array but has no jobs → no cluster created → dangling edge
+   - **Fix needed:** Check that previous stage has jobs before creating stage-level edge
+   - **MPED principle violated:** Fail Fast
+
+6. **Edge Attribute Formatting Logic** (Lines 354-362)
+   - **Issue:** Inline conditional logic for building edge attributes
+   - **Fix needed:** Extract to `format_edge_attributes(edge)` helper method
+   - **MPED principle violated:** Optimize for Readability First
+
+**Recommendation:** Create follow-up issue/PR to address these MPED concerns while maintaining current functionality.
 
 ## Enhancements
 
