@@ -208,10 +208,74 @@ module GitlabCiCli
       # @return [Hash] Configuration with extends resolved
       def resolve_extends(config)
         resolver = ExtendsResolver.new
-        resolver.resolve_extends(config)
+        resolved_config = resolver.resolve_extends(config)
+
+        # Expand variables in the configuration
+        expand_variables(resolved_config, @options[:variables])
       rescue StandardError => e
         log_error("Error resolving extends: #{e.message}")
         raise
+      end
+
+      # Extract job name from key_path for error messages
+      #
+      # @param key_path [Array] Path of keys (e.g., ["job_name", "tags"])
+      # @return [String] Job name or "unknown"
+      def extract_job_name_from_path(key_path)
+        # The job name is typically the first element in the path
+        # (e.g., ["test_job", "tags"] -> "test_job")
+        return "unknown" if key_path.empty?
+        key_path.first.to_s
+      end
+
+      # Recursively expand variables in configuration
+      #
+      # @param obj [Object] Configuration object (Hash, Array, String, etc.)
+      # @param variables [Hash] Variable substitutions
+      # @param key_path [Array] Path of keys leading to current object (for context)
+      # @return [Object] Configuration with variables expanded
+      def expand_variables(obj, variables, key_path = [])
+        case obj
+        when Hash
+          result = {}
+          obj.each do |key, value|
+            result[key] = expand_variables(value, variables, key_path + [key])
+          end
+          result
+        when Array
+          expanded_items = obj.map { |item| expand_variables(item, variables, key_path) }
+
+          # Only filter unexpanded variables from 'tags' arrays
+          # This is a workaround for jobs that use dynamic variables (e.g., ${RUNNER})
+          # which are not available during dry-run simulation
+          if key_path.last == 'tags' || key_path.last == :tags
+            filtered = []
+            expanded_items.each do |item|
+              if item.is_a?(String) && item.match?(/\$\{[^}]+\}|\$[A-Z_][A-Z0-9_]*/)
+                # Log warning about filtered unexpanded variable
+                job_name = extract_job_name_from_path(key_path)
+                log_warning("Filtered unexpanded variable from tags in job '#{job_name}': #{item}") if @options[:verbose]
+              else
+                filtered << item
+              end
+            end
+            filtered
+          else
+            expanded_items
+          end
+        when String
+          # Expand ${VAR} and $VAR syntax
+          # Use block form to avoid backreference issues with replacement string
+          expanded = obj.dup
+          variables.each do |key, value|
+            value_str = value.to_s
+            expanded = expanded.gsub(/\$\{#{Regexp.escape(key)}\}/) { value_str }
+            expanded = expanded.gsub(/\$#{Regexp.escape(key)}\b/) { value_str }
+          end
+          expanded
+        else
+          obj
+        end
       end
 
       # Run simulation loop
@@ -328,6 +392,18 @@ module GitlabCiCli
           runner
         else
           log_warning("[T+#{time}s] Job '#{job.name}' waiting (no eligible runner)")
+
+          if @options[:verbose]
+            # Show job tags and runner compatibility for debugging
+            job_tags = job.tag_list || []
+            log_info("  Job tags: #{job_tags.inspect}")
+            log_info("  Available runners:")
+            @fleet.runners.each do |r|
+              can_handle = r.can_handle?(job)
+              has_capacity = r.has_capacity?
+              log_info("    - #{r.id}: tags=#{r.tags.inspect}, can_handle=#{can_handle}, has_capacity=#{has_capacity}")
+            end
+          end
           nil
         end
       end
