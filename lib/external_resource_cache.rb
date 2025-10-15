@@ -117,12 +117,50 @@ class ExternalResourceCache
     download_project_file(project, file, ref)
   end
 
+  # Fetch a component from a GitLab instance
+  #
+  # Components are CI/CD templates stored in GitLab projects (GitLab 16.0+)
+  #
+  # @param fqdn [String] GitLab instance FQDN (e.g., "gitlab.com")
+  # @param project [String] Project path
+  # @param file [String] Component file path
+  # @param version [String] Component version/ref
+  # @return [String] Component content
+  # @raise [RuntimeError] If component cannot be fetched
+  def fetch_component(fqdn, project, file, version)
+    # Components are cached separately
+    cache_path = component_cache_path(fqdn, project, file, version)
+    if File.exist?(cache_path)
+      return File.read(cache_path)
+    end
+
+    # Download component from the specific GitLab instance
+    base_url = "https://#{fqdn}"
+    url = "#{base_url}/#{project}/-/raw/#{version}/#{file}"
+
+    content = download_file(url, "component: #{fqdn}/#{project}/#{file}@#{version}")
+
+    # Validate content is not HTML
+    if content.strip =~ /^<(!DOCTYPE|html|HTML)/i
+      raise "Response appears to be HTML (likely authentication required or component not found)"
+    end
+
+    # Save to cache
+    FileUtils.mkdir_p(File.dirname(cache_path))
+    File.write(cache_path, content)
+
+    content
+  rescue StandardError => e
+    raise "Failed to download component #{fqdn}/#{project}/#{file}@#{version}: #{e.message}"
+  end
+
   private
 
   # Ensure cache directories exist
   def ensure_cache_directories
     FileUtils.mkdir_p(File.join(@cache_root, 'templates'))
     FileUtils.mkdir_p(File.join(@cache_root, 'projects'))
+    FileUtils.mkdir_p(File.join(@cache_root, 'components'))
   end
 
   # Get cache path for a template
@@ -142,6 +180,17 @@ class ExternalResourceCache
   def project_file_cache_path(project, file, ref)
     # Use ref in path to cache different versions
     File.join(@cache_root, 'projects', project, ref, file)
+  end
+
+  # Get cache path for a component
+  #
+  # @param fqdn [String] GitLab instance FQDN
+  # @param project [String] Project path
+  # @param file [String] Component file
+  # @param version [String] Component version
+  # @return [String] Full path to cached component
+  def component_cache_path(fqdn, project, file, version)
+    File.join(@cache_root, 'components', fqdn, project, version, file)
   end
 
   # Download a template from gitlab.com

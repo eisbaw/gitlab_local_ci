@@ -15,6 +15,8 @@
 # limitations under the License.
 
 require 'yaml'
+require_relative '../include_processor'
+require_relative '../extends_resolver'
 
 module Commands
   # LintCommand validates GitLab CI YAML configuration using standalone validation
@@ -113,7 +115,15 @@ module Commands
       config = parse_yaml(file_content)
       return config if config.is_a?(Result) # Early return on parse error
 
-      # Step 3: Validate configuration structure
+      # Step 3: Process includes to merge external configurations
+      config = process_includes(config)
+      return config if config.is_a?(Result) # Early return on include error
+
+      # Step 4: Resolve extends directives
+      config = resolve_extends(config)
+      return config if config.is_a?(Result) # Early return on extends error
+
+      # Step 5: Validate configuration structure
       validate_configuration(config)
     rescue StandardError => e
       # Catch any unexpected errors and return them as validation failures
@@ -173,6 +183,59 @@ module Commands
       Result.new(
         valid: false,
         errors: ["Failed to parse YAML: #{e.message}"],
+        exit_code: 1
+      )
+    end
+
+    # Process include directives in the configuration
+    #
+    # @param config [Hash] Parsed YAML configuration
+    # @return [Hash, Result] Merged configuration with includes or error result
+    def process_includes(config)
+      return config unless config['include']
+
+      # Get project path from entry file directory
+      project_path = File.dirname(File.expand_path(@entry_path))
+
+      # Get GitLab templates path if GitLab submodule exists
+      gitlab_templates_path = nil
+      if Dir.exist?(@gitlab_dir)
+        gitlab_templates_path = File.join(@gitlab_dir, 'lib', 'gitlab', 'ci', 'templates')
+      end
+
+      # Create include processor
+      processor = IncludeProcessor.new(
+        project_path: project_path,
+        gitlab_templates_path: gitlab_templates_path
+      )
+
+      # Process includes
+      processor.process_includes(config)
+    rescue IncludeDepthExceededError => e
+      Result.new(
+        valid: false,
+        errors: ["Include depth exceeded: #{e.depth} > #{e.max_depth}"],
+        exit_code: 1
+      )
+    rescue StandardError => e
+      Result.new(
+        valid: false,
+        errors: ["Error processing includes: #{e.message}"],
+        exit_code: 1
+      )
+    end
+
+    # Resolve extends directives in the configuration
+    #
+    # @param config [Hash] Configuration with includes resolved
+    # @return [Hash, Result] Configuration with extends resolved or error result
+    def resolve_extends(config)
+      resolver = ExtendsResolver.new
+      resolver.resolve_extends(config)
+    rescue StandardError => e
+      Result.new(
+        valid: false,
+        errors: ["Error resolving extends: #{e.message}"],
         exit_code: 1
       )
     end

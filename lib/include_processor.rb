@@ -476,15 +476,56 @@ class IncludeProcessor
   # @return [String] Component contents
   def fetch_component_include(include_spec)
     component_ref = include_spec['component']
+    inputs = include_spec['inputs'] || {}
 
-    # Component syntax: <project>@<version>/<component>
-    # Example: gitlab.com/components/docker@1.0.0/build.yml
-    # This is a GitLab 16.0+ feature
+    # Component syntax: <fqdn>/<project-path>@<version>
+    # Example: gitlab.com/gitlab-org/components/danger-review@2.0.0
+    # The component template is assumed to be at templates/<component-name>.yml
 
-    # For now, components are not fully implemented
-    # They would require catalog API access
-    raise "Component includes are not yet supported: #{component_ref}. " \
-          "Components are a GitLab 16.0+ feature requiring catalog API access."
+    # Expand CI variables in component reference
+    expanded_ref = expand_ci_variables(component_ref)
+
+    # Parse component reference: <fqdn>/<project-parts>@<version>
+    match = expanded_ref.match(%r{^([^/]+)/(.+)@([^/@]+)$})
+    unless match
+      raise "Invalid component reference format: #{component_ref}. " \
+            "Expected format: <fqdn>/<project-path>@<version>"
+    end
+
+    fqdn = match[1]
+    full_path = match[2]  # e.g., "gitlab-org/components/danger-review/danger-review"
+    version = match[3]
+
+    # For components, the full path IS the project path
+    # Component file is typically template.yml at the root
+    project_path = full_path
+    component_file = "template.yml"
+
+    # Use external cache with the specific GitLab instance
+    @external_cache.fetch_component(fqdn, project_path, component_file, version)
+  rescue StandardError => e
+    raise "Failed to fetch component '#{component_ref}': #{e.message}"
+  end
+
+  # Expand CI variables in a string
+  #
+  # @param string [String] String potentially containing CI variables
+  # @return [String] String with variables expanded
+  def expand_ci_variables(string)
+    # Common CI variables
+    ci_vars = {
+      'CI_SERVER_FQDN' => ENV['CI_SERVER_FQDN'] || 'gitlab.com',
+      'CI_SERVER_HOST' => ENV['CI_SERVER_HOST'] || 'gitlab.com',
+      'CI_SERVER_URL' => ENV['CI_SERVER_URL'] || 'https://gitlab.com'
+    }
+
+    result = string.dup
+    ci_vars.each do |var_name, var_value|
+      result.gsub!("${#{var_name}}", var_value)
+      result.gsub!("$#{var_name}", var_value)
+    end
+
+    result
   end
 
   # Deep merge two configuration hashes
