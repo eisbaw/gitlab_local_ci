@@ -350,12 +350,18 @@ class DagCommand
     # 1. Explicit 'needs' dependencies (individual job edges)
     # 2. Implicit stage-based dependencies (stage cluster edges with ltail)
     edges = generate_dependency_edges(pipeline)
+
+    # Assign colors to edges based on source node
+    # All edges from the same source get the same color for visual clarity
+    source_colors = assign_edge_colors(edges)
+
     edges.each do |edge|
-      # Build edge attributes (ltail for compound edges, style for visual distinction)
+      # Build edge attributes (ltail for compound edges, style for visual distinction, color by source)
       edge_attrs = []
       edge_attrs << "ltail=#{edge[:ltail]}" if edge[:ltail]
       edge_attrs << "lhead=#{edge[:lhead]}" if edge[:lhead]
       edge_attrs << "style=#{edge[:style]}" if edge[:style]
+      edge_attrs << "color=\"#{source_colors[edge[:from]]}\"" if source_colors[edge[:from]]
 
       # Format edge with or without attributes
       attrs_str = edge_attrs.empty? ? '' : " [#{edge_attrs.join(', ')}]"
@@ -412,6 +418,35 @@ class DagCommand
     end
 
     edges
+  end
+
+  # Assign colors to edges based on source node
+  #
+  # All edges from the same source node get the same color for visual clarity.
+  # Uses a palette of visually distinct colors that work well in Graphviz.
+  #
+  # @param edges [Array<Hash>] Array of edge hashes with :from keys
+  # @return [Hash{String => String}] Map of source node to color
+  def assign_edge_colors(edges)
+    # Palette of visually distinct colors (ColorBrewer Set1 + Set2)
+    # These colors are chosen to be distinguishable and work well in DAG visualizations
+    color_palette = %w[
+      #E41A1C #377EB8 #4DAF4A #984EA3 #FF7F00
+      #FFFF33 #A65628 #F781BF #8DD3C7 #FFFFB3
+      #BEBADA #FB8072 #80B1D3 #FDB462 #B3DE69
+      #FCCDE5 #D9D9D9 #BC80BD #CCEBC5 #FFED6F
+    ]
+
+    # Collect all unique source nodes
+    source_nodes = edges.map { |edge| edge[:from] }.uniq.sort
+
+    # Assign colors to source nodes, cycling through palette if needed
+    source_colors = {}
+    source_nodes.each_with_index do |source, index|
+      source_colors[source] = color_palette[index % color_palette.length]
+    end
+
+    source_colors
   end
 
   # Group jobs by their stage
