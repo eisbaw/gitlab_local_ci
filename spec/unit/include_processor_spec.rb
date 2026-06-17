@@ -217,5 +217,93 @@ RSpec.describe IncludeProcessor do
         }.to raise_error(/Circular include detected/)
       end
     end
+
+    context 'with include rules evaluated against variables' do
+      it 'skips an include whose rule does not match when variable is unset' do
+        config = {
+          'include' => [
+            { 'local' => 'topic_a.yml',
+              'rules' => [{ 'if' => '$FEATURE_A =~ /.+/' }] }
+          ]
+        }
+
+        result = processor.process_includes(config)
+
+        expect(result.key?('topic_a_job')).to be false
+      end
+
+      it 'merges an include whose rule matches when variable is set via --variables' do
+        proc_with_vars = described_class.new(
+          project_path: fixtures_path,
+          variables: { 'FEATURE_A' => 'enabled' }
+        )
+
+        config = {
+          'include' => [
+            { 'local' => 'topic_a.yml',
+              'rules' => [{ 'if' => '$FEATURE_A =~ /.+/' }] }
+          ]
+        }
+
+        result = proc_with_vars.process_includes(config)
+
+        expect(result['topic_a_job']).to be_a(Hash)
+      end
+
+      it 'selects exactly one include among mutually-exclusive rules' do
+        # Mirror a real-world topic-routing pattern: positive-only rules,
+        # exactly one matches per variable set.
+        mutually_exclusive = lambda do |vars|
+          described_class.new(project_path: fixtures_path, variables: vars).process_includes(
+            {
+              'include' => [
+                { 'local' => 'topic_a.yml',
+                  'rules' => [{ 'if' => '$TOPIC == "a"' }] },
+                { 'local' => 'topic_b.yml',
+                  'rules' => [{ 'if' => '$TOPIC == "b"' }] }
+              ]
+            }
+          )
+        end
+
+        result_a = mutually_exclusive.call({ 'TOPIC' => 'a' })
+        expect(result_a.key?('topic_a_job')).to be true
+        expect(result_a.key?('topic_b_job')).to be false
+
+        result_b = mutually_exclusive.call({ 'TOPIC' => 'b' })
+        expect(result_b.key?('topic_a_job')).to be false
+        expect(result_b.key?('topic_b_job')).to be true
+      end
+
+      it 'honors when: never on include rules' do
+        proc_with_vars = described_class.new(
+          project_path: fixtures_path,
+          variables: { 'FEATURE_A' => 'enabled' }
+        )
+
+        config = {
+          'include' => [
+            { 'local' => 'topic_a.yml',
+              'rules' => [{ 'if' => '$FEATURE_A =~ /.+/', 'when' => 'never' }] }
+          ]
+        }
+
+        result = proc_with_vars.process_includes(config)
+
+        expect(result.key?('topic_a_job')).to be false
+      end
+
+      it 'merges include without any rules unconditionally' do
+        config = {
+          'include' => [
+            { 'local' => 'topic_a.yml' }
+          ]
+        }
+
+        result = processor.process_includes(config)
+
+        expect(result['topic_a_job']).to be_a(Hash)
+      end
+    end
   end
 end

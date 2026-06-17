@@ -1,0 +1,4 @@
+topic_a_job:
+  stage: test
+  script:
+    - echo "topic A"

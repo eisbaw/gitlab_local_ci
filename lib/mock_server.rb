@@ -16,6 +16,8 @@
 
 require 'yaml'
 require_relative 'mock_pipeline'
+require_relative 'rules_evaluator'
+require_relative 'predefined_variables'
 
 # MockServer simulates GitLab's CI pipeline server functionality
 # It parses YAML configs, creates pipelines, and manages job scheduling
@@ -47,7 +49,7 @@ class MockServer
   # Initialize the mock server with a path to the GitLab submodule
   #
   # @param gitlab_path [String] Path to the GitLab CE git submodule (not used in standalone mode)
-  def initialize(gitlab_path = nil)
+  def initialize(gitlab_path = nil, project_dir: nil, pipeline_source: 'push')
     # Validate gitlab_path if provided and not empty
     if gitlab_path && !gitlab_path.empty? && !Dir.exist?(gitlab_path)
       raise ArgumentError, "GitLab lib directory not found at: #{gitlab_path}"
@@ -57,7 +59,14 @@ class MockServer
     @event_queue = []
     @pipelines = {}
     @pipeline_counter = 0
+    @project_dir = File.expand_path(project_dir || Dir.pwd)
+    @pipeline_source = pipeline_source
   end
+
+  # Signals to caller that workflow:rules: produced no match and the
+  # pipeline must be empty (matches upstream
+  # Ci::Pipeline.workflow_rules_failure_message).
+  class WorkflowRulesFilteredError < StandardError; end
 
   # Create a pipeline from a YAML configuration
   #
@@ -71,6 +80,26 @@ class MockServer
     # Extract stages and jobs
     stages = extract_stages(parsed_config)
     job_configs = extract_jobs(parsed_config)
+
+    # GAP 4: workflow:rules:variables cascade. Variable assembly order:
+    #   1. predefined CI_* vars (from PredefinedVariables.build)
+    #   2. top-level `variables:` defaults
+    #   3. trigger overlay (options[:variables])
+    #   4. matched workflow.rules' `variables:` (if any)
+    # The merged set is then visible to BOTH include-rules (already
+    # evaluated upstream of MockServer in DryRunCommand) and per-job
+    # rules. If `workflow:rules:` is present and NO rule matches, the
+    # pipeline is empty — matches upstream EvaluateWorkflowRules.
+    effective_vars = build_effective_variables(parsed_config, options[:variables] || {})
+    workflow_result = apply_workflow_rules(parsed_config, effective_vars)
+    effective_vars = workflow_result[:variables]
+
+    if workflow_result[:filtered]
+      warn 'Warning: workflow:rules: matched no rule, skipping pipeline'
+      raise WorkflowRulesFilteredError, 'workflow:rules: matched no rule, skipping pipeline'
+    end
+
+    job_configs = filter_jobs_by_rules(job_configs, effective_vars)
 
     # Validate there are jobs
     if job_configs.empty?
@@ -161,6 +190,162 @@ class MockServer
     end
 
     jobs
+  end
+
+  # Build the variables hash used to evaluate job-level `rules:`.
+  #
+  # GitLab makes top-level `variables:` defaults visible to job rules
+  # (unlike include rules). Pipeline-trigger variables override defaults.
+  #
+  # @param config [Hash] Parsed (post-include, post-extends) configuration.
+  # @param trigger_vars [Hash] Variables supplied at pipeline trigger time
+  #   (e.g. via `--variables`).
+  # @return [Hash<String, String>] Effective variable map.
+  def build_effective_variables(config, trigger_vars)
+    # GAP 3: predefined CI_* variables form the base layer.
+    predefined = PredefinedVariables.build(
+      project_dir: @project_dir, pipeline_source: @pipeline_source
+    )
+
+    defaults = predefined.dup
+    raw = config['variables']
+    if raw.is_a?(Hash)
+      raw.each do |k, v|
+        defaults[k.to_s] =
+          if v.is_a?(Hash)
+            # GitLab's `variables: FOO: { value: "...", description: "..." }` form.
+            (v['value'] || v[:value] || '').to_s
+          elsif v.nil?
+            ''
+          else
+            v.to_s
+          end
+      end
+    end
+
+    # Trigger variables win over both predefined and defaults — matches
+    # GitLab where dotenv / pipeline variables override predefined.
+    trigger_vars.each { |k, v| defaults[k.to_s] = v.to_s }
+    defaults
+  end
+
+  # GAP 4: Evaluate workflow.rules and cascade matched rule's `variables:`
+  # into the pipeline variable set. Returns:
+  #   { variables: Hash, filtered: Boolean }
+  # filtered=true means workflow rules were present but matched nothing
+  # — caller treats this as an empty pipeline.
+  def apply_workflow_rules(config, variables)
+    workflow = config['workflow'] || config[:workflow]
+    rules = workflow.is_a?(Hash) ? (workflow['rules'] || workflow[:rules]) : nil
+    return { variables: variables, filtered: false } if rules.nil?
+
+    context = {
+      project_dir: @project_dir,
+      default_branch: variables['CI_DEFAULT_BRANCH'] || 'main'
+    }
+
+    result = RulesEvaluator.evaluate_rules(rules, variables, context: context, mode: :job)
+
+    unless result[:matched]
+      return { variables: variables, filtered: true }
+    end
+
+    # `when: never` on the matched workflow rule also filters the pipeline.
+    if result[:when] && result[:when].to_s == 'never'
+      return { variables: variables, filtered: true }
+    end
+
+    # Merge matched rule's `variables:` over the current set.
+    matched_vars = result[:attributes]['variables']
+    if matched_vars.is_a?(Hash)
+      matched_vars.each { |k, v| variables[k.to_s] = v.to_s }
+    end
+
+    { variables: variables, filtered: false }
+  end
+
+  # Drop jobs whose `rules:` exclude them under the effective variables.
+  #
+  # A job is kept iff:
+  #   - it has no `rules:` key, OR
+  #   - the first matching rule's `when:` is not `never`.
+  # A job whose rules contain no matching entry is dropped (matches GitLab).
+  #
+  # @param job_configs [Hash] Job name => job config (post-extends).
+  # @param variables [Hash] Effective variables for rule evaluation.
+  # @return [Hash] Filtered job_configs.
+  def filter_jobs_by_rules(job_configs, variables)
+    kept = {}
+    job_configs.each do |name, job_config|
+      rules = job_config['rules'] || job_config[:rules]
+      if rules.nil?
+        kept[name] = job_config
+        next
+      end
+
+      # Per-job rule eval gets a job-specific CI_JOB_NAME / CI_JOB_STAGE
+      # overlay so rules can reference them.
+      job_vars = variables.dup
+      job_vars['CI_JOB_NAME']  = name.to_s
+      job_vars['CI_JOB_STAGE'] = (job_config['stage'] || job_config[:stage] || 'test').to_s
+
+      context = {
+        project_dir: @project_dir,
+        default_branch: variables['CI_DEFAULT_BRANCH'] || 'main'
+      }
+      result = RulesEvaluator.evaluate_rules(rules, job_vars, context: context, mode: :job)
+      next unless result[:matched]
+      next if result[:when] && result[:when].to_s == 'never'
+
+      kept[name] = apply_rule_attributes(job_config, result)
+    end
+
+    cascade_drop_orphaned_needs(kept)
+  end
+
+  # GAP 5: Merge attributes from the matched rule into the job config.
+  # Rule values override job-level values (matches upstream semantics
+  # where `rules:variables:` win over the job's own `variables:`).
+  # `when:` is also surfaced on the job spec so downstream consumers can
+  # see it (e.g. `manual`, `delayed`).
+  def apply_rule_attributes(job_config, rule_result)
+    merged = job_config.dup
+    attrs = rule_result[:attributes] || {}
+
+    if (rule_vars = attrs['variables']).is_a?(Hash)
+      job_vars = merged['variables'].is_a?(Hash) ? merged['variables'].dup : {}
+      rule_vars.each { |k, v| job_vars[k.to_s] = v }
+      merged['variables'] = job_vars
+    end
+
+    %w[allow_failure start_in needs interruptible].each do |k|
+      merged[k] = attrs[k] unless attrs[k].nil?
+    end
+
+    merged['when'] = rule_result[:when] if rule_result[:when]
+    merged
+  end
+
+  # Repeatedly drop any job whose `needs:` reference a job not in the
+  # current set, until a fixed point is reached. Matches GitLab's behavior:
+  # a job whose needed dependency was rules-filtered out is itself dropped.
+  # Names containing `/` (cross-pipeline / external-project needs) are
+  # treated as out-of-scope and never orphan a job.
+  #
+  # @param job_configs [Hash] Surviving job_configs after direct rule filter.
+  # @return [Hash] Job_configs with cascade-orphaned jobs removed.
+  def cascade_drop_orphaned_needs(job_configs)
+    loop do
+      surviving = job_configs.keys
+      orphaned = job_configs.select do |_name, cfg|
+        needs = extract_needs(cfg['needs'])
+        needs.any? { |n| !surviving.include?(n) && !n.include?('/') }
+      end
+      break if orphaned.empty?
+
+      orphaned.each_key { |n| job_configs.delete(n) }
+    end
+    job_configs
   end
 
   # Extract needs dependencies

@@ -297,4 +297,104 @@ RSpec.describe MockServer do
       expect(MockServer::EVENT_PIPELINE_COMPLETED).to eq(:pipeline_completed)
     end
   end
+
+  describe 'job-level rules filtering' do
+    let(:server) { described_class.new(nil) }
+
+    let(:config_with_gated_job) do
+      {
+        'stages' => %w[verify_feature],
+        'variables' => {
+          'ENABLE_FEATURE_VERIF' => {
+            'description' => 'Enable deeper feature verification (hardware-gated)',
+            'value' => 'true',
+          },
+        },
+        'feature_verify_job' => {
+          'stage' => 'verify_feature',
+          'script' => ['echo verify'],
+          'rules' => [{ 'if' => '$ENABLE_FEATURE_VERIF == "true"' }],
+        },
+        'always_job' => {
+          'stage' => 'verify_feature',
+          'script' => ['echo always'],
+        },
+      }
+    end
+
+    it 'drops a job when its rule evaluates to false under --variables' do
+      pipeline = server.create_pipeline(
+        config_with_gated_job,
+        variables: { 'ENABLE_FEATURE_VERIF' => 'false' }
+      )
+
+      job_names = pipeline.jobs.map(&:name)
+      expect(job_names).not_to include('feature_verify_job')
+      expect(job_names).to include('always_job')
+    end
+
+    it 'keeps a job when its rule evaluates to true under --variables' do
+      pipeline = server.create_pipeline(
+        config_with_gated_job,
+        variables: { 'ENABLE_FEATURE_VERIF' => 'true' }
+      )
+
+      job_names = pipeline.jobs.map(&:name)
+      expect(job_names).to include('feature_verify_job')
+      expect(job_names).to include('always_job')
+    end
+
+    it 'falls back to top-level variables: defaults when no --variables given' do
+      # ENABLE_FEATURE_VERIF default is "true" in the variables: block, which
+      # IS visible to job rules (unlike include rules).
+      pipeline = server.create_pipeline(config_with_gated_job)
+
+      job_names = pipeline.jobs.map(&:name)
+      expect(job_names).to include('feature_verify_job')
+    end
+
+    it 'drops a job whose rules contain no matching entry' do
+      config = {
+        'stages' => ['test'],
+        'unreachable_job' => {
+          'stage' => 'test',
+          'script' => ['echo unreachable'],
+          'rules' => [{ 'if' => '$NOT_SET == "x"' }],
+        },
+        'always_job' => {
+          'stage' => 'test',
+          'script' => ['echo always'],
+        },
+      }
+
+      pipeline = server.create_pipeline(config)
+
+      job_names = pipeline.jobs.map(&:name)
+      expect(job_names).not_to include('unreachable_job')
+      expect(job_names).to include('always_job')
+    end
+
+    it 'honors when: never on job rules' do
+      config = {
+        'stages' => ['test'],
+        'skipped_job' => {
+          'stage' => 'test',
+          'script' => ['echo skipped'],
+          'rules' => [{ 'if' => '$FOO == "bar"', 'when' => 'never' }],
+        },
+        'always_job' => {
+          'stage' => 'test',
+          'script' => ['echo always'],
+        },
+      }
+
+      pipeline = server.create_pipeline(
+        config,
+        variables: { 'FOO' => 'bar' }
+      )
+
+      job_names = pipeline.jobs.map(&:name)
+      expect(job_names).not_to include('skipped_job')
+    end
+  end
 end

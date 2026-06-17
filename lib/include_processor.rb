@@ -19,6 +19,7 @@ require 'net/http'
 require 'uri'
 require 'set'
 require_relative 'external_resource_cache'
+require_relative 'rules_evaluator'
 
 # Custom exception raised when include depth limit is exceeded
 class IncludeDepthExceededError < StandardError
@@ -47,18 +48,23 @@ class IncludeProcessor
   # Maximum include depth (matches GitLab's limit)
   MAX_DEPTH = 150
 
-  attr_reader :project_path, :gitlab_templates_path
+  attr_reader :project_path, :gitlab_templates_path, :variables
 
   # Initialize the include processor
   #
   # @param project_path [String] Path to the project root
   # @param gitlab_templates_path [String] Path to GitLab templates directory
   # @param cache_root [String] Root directory for external resource cache
-  def initialize(project_path:, gitlab_templates_path: nil, cache_root: 'ext_tmp')
+  # @param variables [Hash] CI variables used to evaluate `include: rules: if:`
+  #   expressions. Pipeline-trigger variables (i.e. those passed via
+  #   `--variables`) belong here; defaults from a top-level `variables:` block
+  #   are NOT visible to include rules (matches GitLab documented behavior).
+  def initialize(project_path:, gitlab_templates_path: nil, cache_root: 'ext_tmp', variables: {})
     @project_path = project_path
     @gitlab_templates_path = gitlab_templates_path
     @processed_includes = Set.new # Track processed includes to detect circular refs
     @external_cache = ExternalResourceCache.new(cache_root: cache_root)
+    @variables = variables || {}
   end
 
   # Process all includes in a configuration
@@ -86,6 +92,11 @@ class IncludeProcessor
 
     # Process each include
     includes.each do |include_spec|
+      # GitLab evaluates `include: rules:` against pipeline-trigger
+      # variables BEFORE fetching the include. Skip non-matching includes
+      # entirely; never resolve their files, never merge their content.
+      next unless include_rules_match?(include_spec)
+
       # Determine include type and fetch content
       include_type = determine_include_type(include_spec)
 
@@ -133,6 +144,33 @@ class IncludeProcessor
   end
 
   private
+
+  # Evaluate `rules:` on an include spec.
+  #
+  # GitLab semantics: the include is merged iff a rule matches and that
+  # rule's `when:` is not `never`. Specs without a `rules:` key are merged
+  # unconditionally. String specs cannot carry rules at all.
+  #
+  # @param include_spec [Hash, String] Single include specification.
+  # @return [Boolean] True if the include should be merged.
+  def include_rules_match?(include_spec)
+    return true unless include_spec.is_a?(Hash)
+
+    rules = include_spec['rules'] || include_spec[:rules]
+    return true if rules.nil?
+
+    # Include rules use mode: :include so RulesEvaluator validates that
+    # `when:` is one of {never, always} (matches upstream
+    # gitlab/lib/gitlab/ci/config/external/rules.rb ALLOWED_WHEN).
+    context = { project_dir: @project_path, default_branch: ENV['CI_DEFAULT_BRANCH'] || 'main' }
+    result = RulesEvaluator.evaluate_rules(rules, @variables, context: context, mode: :include)
+    return false unless result[:matched]
+
+    when_clause = result[:when]
+    return false if when_clause && when_clause.to_s == 'never'
+
+    true
+  end
 
   # Expand includes with array file specs into multiple individual includes
   #

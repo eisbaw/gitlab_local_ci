@@ -204,9 +204,12 @@ module Commands
       end
 
       # Create include processor
+      # Pass CLI/trigger variables (not top-level defaults) — matches
+      # GitLab's documented include-rules variable scope.
       processor = IncludeProcessor.new(
         project_path: project_path,
-        gitlab_templates_path: gitlab_templates_path
+        gitlab_templates_path: gitlab_templates_path,
+        variables: @variables || {}
       )
 
       # Process includes

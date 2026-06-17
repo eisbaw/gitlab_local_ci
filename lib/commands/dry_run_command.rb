@@ -20,6 +20,7 @@ require_relative '../mock_runner'
 require_relative '../mock_job'
 require_relative '../include_processor'
 require_relative '../extends_resolver'
+require_relative '../predefined_variables'
 require 'yaml'
 
 module GitlabCiCli
@@ -67,7 +68,11 @@ module GitlabCiCli
       def execute
         validate_prerequisites
 
-        @server = MockServer.new(@options[:gitlab_dir])
+        @server = MockServer.new(
+          @options[:gitlab_dir],
+          project_dir: @options[:project],
+          pipeline_source: @options[:pipeline]
+        )
         @fleet = load_runner_fleet
 
         pipeline = create_pipeline
@@ -95,7 +100,12 @@ module GitlabCiCli
           runners: options[:runners] || './runners',
           ref: options[:ref] || 'HEAD',
           variables: options[:variables] || {},
-          verbose: options[:verbose] || false
+          verbose: options[:verbose] || false,
+          # Project root used for `exists:` / `changes:` clauses and the
+          # CI_PROJECT_DIR predefined variable.
+          project: options[:project] || Dir.pwd,
+          # CI_PIPELINE_SOURCE — feeds workflow / include / job rules.
+          pipeline: options[:pipeline] || 'push'
         }
       end
 
@@ -165,6 +175,9 @@ module GitlabCiCli
         log_info("")
 
         pipeline
+      rescue MockServer::WorkflowRulesFilteredError => e
+        log_info(e.message)
+        nil
       rescue StandardError => e
         log_error("Failed to create pipeline: #{e.message}")
         nil
@@ -186,10 +199,21 @@ module GitlabCiCli
           gitlab_templates_path = File.join(@options[:gitlab_dir], 'lib', 'gitlab', 'ci', 'templates')
         end
 
-        # Create include processor
+        # Create include processor.
+        # Include rules see (in this precedence order):
+        #   - predefined CI_* vars (CI_PIPELINE_SOURCE etc.)
+        #   - CLI/trigger variables (--variables, overlay last)
+        # Top-level `variables:` defaults are NOT visible to include
+        # rules — matches GitLab's documented scope.
+        predefined = PredefinedVariables.build(
+          project_dir: @options[:project] || Dir.pwd,
+          pipeline_source: @options[:pipeline] || 'push'
+        )
+        include_vars = predefined.merge((@options[:variables] || {}).transform_keys(&:to_s))
         processor = IncludeProcessor.new(
           project_path: project_path,
-          gitlab_templates_path: gitlab_templates_path
+          gitlab_templates_path: gitlab_templates_path,
+          variables: include_vars
         )
 
         # Process includes
@@ -239,7 +263,16 @@ module GitlabCiCli
         when Hash
           result = {}
           obj.each do |key, value|
-            result[key] = expand_variables(value, variables, key_path + [key])
+            # Do not substitute into rule expressions: `if:` strings under
+            # a `rules:` array are evaluated by RulesEvaluator with proper
+            # $VAR lookup. Textual gsub would corrupt them (e.g. turning
+            # `$SUBMODULE_UPDATE == "true"` into `true == "true"`).
+            key_str = key.to_s
+            if key_str == 'if' && key_path.last.to_s == 'rules'
+              result[key] = value
+            else
+              result[key] = expand_variables(value, variables, key_path + [key])
+            end
           end
           result
         when Array

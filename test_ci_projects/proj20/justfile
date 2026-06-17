@@ -12,8 +12,10 @@ dag:
     {{CLI}} dag --entry {{CI_FILE}} --gitlab-dir {{GITLAB_DIR}}
 
 # Perform dry-run simulation
+# Many jobs gate on `rules: if: $CI_COMMIT_BRANCH`; simulate a branch push
+# so they survive rule-filtering.
 dry-run:
-    {{CLI}} dry-run --entry {{CI_FILE}} --gitlab-dir {{GITLAB_DIR}} --runners {{RUNNERS_DIR}}
+    {{CLI}} dry-run --entry {{CI_FILE}} --gitlab-dir {{GITLAB_DIR}} --runners {{RUNNERS_DIR}} --variables CI_COMMIT_BRANCH=main --variables CI_PIPELINE_SOURCE=push
 
 # Run all tests (lint, dag, dry-run) in sequence
 test: lint dag dry-run
