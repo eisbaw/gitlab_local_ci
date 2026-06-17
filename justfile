@@ -14,12 +14,18 @@ setup:
     bundle install
 
 # Run tests
+# NOT `bundle exec rspec`: that exports BUNDLE_GEMFILE which propagates via
+# Open3 into the CLI subprocess in spec/integration/lint_spec.rb, causing
+# double-activation of bundler and "already initialized constant" warnings
+# on stderr — which fail the `expect(stderr).to be_empty` assertions.
+# `.gems/` is on GEM_PATH via shell.nix shellHook, so plain `rspec` resolves
+# the gem set without bundler env-var injection.
 test:
-    bundle exec rspec
+    rspec
 
 # Run specific test file
 test-file FILE:
-    bundle exec rspec {{FILE}}
+    rspec {{FILE}}
 
 # Lint YAML file
 lint FILE=".gitlab-ci.yml":
@@ -47,7 +53,7 @@ clean:
 
 # Run integration tests
 test-integration:
-    bundle exec rspec spec/integration/
+    rspec spec/integration/
 
 # Test CI Projects
 # Run all tests for test_ci_projects (lint, dag, dry-run)

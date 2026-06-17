@@ -72,7 +72,7 @@ RSpec.describe GitlabCiCli::CLI do
       it 'raises ArgumentError for multiple commands' do
         expect do
           described_class.parse_args(['lint', 'dag'])
-        end.to raise_error(ArgumentError, /Multiple commands specified: lint, dag/)
+        end.to raise_error(ArgumentError, /Multiple commands or unexpected argument: dag/)
       end
     end
 
