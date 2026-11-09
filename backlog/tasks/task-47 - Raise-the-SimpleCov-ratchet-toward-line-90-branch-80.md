@@ -4,6 +4,7 @@ title: Raise the SimpleCov ratchet toward line 90 / branch 80
 status: To Do
 assignee: []
 created_date: '2026-11-09T20:47:00Z'
+updated_date: '2026-11-09T22:40:00Z'
 labels:
   - testing
   - coverage
@@ -23,3 +24,9 @@ TASK-2 made the coverage gate honest (CLI subprocesses measured, every lib/ file
 - [ ] #1 minimum_coverage raised to the measured floor at least once, with the before/after numbers in the commit
 - [ ] #2 Specs added assert behaviour (upstream semantics where they exist), no coverage filters added
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-22/51 (0a53036): ratchet raised to line 88 / branch 81 (measured 88.24/81.83 on main and detached). run_command.rb and export_just_command.rb were rewritten and now have dedicated integration specs.
+<!-- SECTION:NOTES:END -->
