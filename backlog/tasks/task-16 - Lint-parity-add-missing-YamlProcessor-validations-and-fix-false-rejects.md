@@ -4,7 +4,7 @@ title: 'Lint parity: add missing YamlProcessor validations and fix false rejects
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T19:52:00Z'
+updated_date: '2026-11-09T20:01:00Z'
 labels:
   - audit
   - lint
@@ -39,4 +39,8 @@ Forward-carried from TASK-4: lint gets its jobs from PipelineBuilder.resolve_con
 QA on TASK-4: unknown key (frobnicate: 1) is a lint warning (valid, exit 0) but a dry-run error; upstream rejects. A job with no script/trigger fails lint and dry-run, but dag draws it and export-just writes a placeholder, both exit 0: validation is not part of PipelineBuilder, so the builder guarantees the same job set, not the same validity. Natural home: a validation step on Result (errors as data) in lib/pipeline_builder.rb that every command reports.
 
 Forward-carried from TASK-31/8: (1) lint now reports ExtendsResolver errors verbatim (upstream texts, no prefix) and ReferenceResolver errors verbatim; validate_extends is gone. (2) Upstream validations not done here yet: Entry::Commands 'should be a string or a nested array of strings up to 10 levels deep' (script/before_script/after_script; flatten_lists flattens any depth silently), Entry::Stages nested_array_of_strings max 10, Rules::Rule 'config should be a hash' (RulesEvaluator now raises a ParseError on a non-Hash rule at rule-evaluation time, with our own text, so lint, which does not evaluate rules, still accepts it). (3) The 2-string-array 'skip !reference' heuristic is removed from validate_needs: needs are flattened and validated as names now.
+
+From architect review of TASK-31/8: non-Hash rule error is data in build ('Error evaluating rules: rules: each rule must be a hash, got String') but lint stops at resolve_config so lint passes what dry-run rejects; upstream text 'jobs:j:rules:rule config should be a hash' names the job. Pre-resolution sites (include rules, extends) can show internal class name CiYaml::Reference in errors.
+
+From QA of TASK-31/8: (1) lint accepts rules: ['string'] (valid, exit 0) while dag/dry-run/export-just reject it; (2) lint validates hidden templates (.unused_tpl: {script: 42} fails) but upstream never validates hidden jobs; only extends errors in unused templates are upstream behaviour; (4) script nested >10 levels silently flattened, upstream Entry::Commands MAX_NESTING_LEVEL=10 rejects.
 <!-- SECTION:NOTES:END -->

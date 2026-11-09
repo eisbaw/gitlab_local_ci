@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:51:00Z'
+updated_date: '2026-11-09T19:57:00Z'
 labels:
   - audit
   - config
@@ -23,3 +24,9 @@ Found during TASK-8. PipelineBuilder.flatten_lists (lib/pipeline_builder.rb, JOB
 <!-- AC:BEGIN -->
 - [ ] #1 Nested lists in hooks:pre_get_sources_script and services[].command are flattened, with a spec
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From architect review of TASK-31/8: add rules[].needs (Entry::Needs upstream; probe: anchor-nested rules:needs -> [["a"]], needs_job_names silently drops the Array -> lost DAG edge), hooks:pre_get_sources_script, services[].command. Fix the overclaiming 'every consumer sees flat lists' comment in PipelineBuilder.flatten_lists to name deliberately-excluded keys.
+<!-- SECTION:NOTES:END -->

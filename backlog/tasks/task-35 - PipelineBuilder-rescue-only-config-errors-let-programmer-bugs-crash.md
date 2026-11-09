@@ -4,6 +4,7 @@ title: 'PipelineBuilder: rescue only config errors, let programmer bugs crash'
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:23:00Z'
+updated_date: '2026-11-09T20:01:00Z'
 labels:
   - audit
   - hardening
@@ -22,3 +23,9 @@ From TASK-4 architect review. PipelineBuilder.resolve_config/build rescue Standa
 <!-- AC:BEGIN -->
 - [ ] #1 Bugs surface as crashes with backtrace; config errors stay Result#errors
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From QA of TASK-31/8: include: !reference [...] -> 'Error processing includes: undefined method key? for an instance of CiYaml::Reference' (internal error text leaks); <<: !reference -> 'undefined method reverse_each' from Psych merge-key code.
+<!-- SECTION:NOTES:END -->

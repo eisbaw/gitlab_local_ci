@@ -4,7 +4,7 @@ title: Support spec:inputs headers, multi-doc YAML, $[[ ]] interpolation
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T17:55:00Z'
+updated_date: '2026-11-09T20:01:00Z'
 labels:
   - audit
   - include
@@ -27,3 +27,9 @@ YAML.safe_load keeps only the first document, so a file with a spec header drops
 - [ ] #2 $[[ inputs.x ]] and functions interpolated in included files and the root file (CLI --input)
 - [ ] #3 Upstream interpolation error messages for missing/unknown inputs
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From QA of TASK-31/8: 7 real files in the corpus have spec header + '---' (e.g. gitlab/.gitlab/ci/test-on-omnibus/main.gitlab-ci.yml); CiYaml.load (Psych.parse) still keeps only the first document - the multi-doc loader must replace CiYaml.load's document handling, not add a second loader.
+<!-- SECTION:NOTES:END -->
