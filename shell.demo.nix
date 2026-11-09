@@ -130,68 +130,17 @@ let
     echo "DAG visualizations saved to: ./dags/"
   '';
 
-  # Create script to regenerate reference outputs
+  # Reference outputs are owned by the justfile e2e gate (TASK-1). The
+  # goldens are defined against the flake dev shell (ruby, graphviz), so
+  # these helpers run the gate there rather than in this demo shell.
   regenerateReferences = pkgs.writeShellScriptBin "regenerate-references" ''
     #!/usr/bin/env bash
-    ./generate_output_references.sh
+    exec nix develop -c just e2e-update
   '';
 
-  # Create script to compare current output against references
   compareReferences = pkgs.writeShellScriptBin "compare-references" ''
     #!/usr/bin/env bash
-
-    echo "======================================================================"
-    echo "Comparing Current Output Against Reference Outputs"
-    echo "======================================================================"
-    echo ""
-
-    PROJECTS_DIR="test_ci_projects"
-    DIFF_COUNT=0
-    MATCH_COUNT=0
-    TOTAL=20
-
-    for i in $(seq 1 $TOTAL); do
-      PROJECT="proj$i"
-      REF_DIR="$PROJECTS_DIR/$PROJECT.output_reference"
-      CONFIG="$PROJECTS_DIR/$PROJECT/.gitlab-ci.yml"
-
-      if [ ! -f "$CONFIG" ]; then
-        continue
-      fi
-
-      echo -n "Comparing $PROJECT... "
-
-      # Generate current output
-      TMP_DIR=$(mktemp -d)
-      gitlab_ci_cli lint --entry "$CONFIG" --format text > "$TMP_DIR/lint.txt" 2>&1 || true
-
-      # Compare with reference
-      if diff -q "$REF_DIR/lint.txt" "$TMP_DIR/lint.txt" > /dev/null 2>&1; then
-        echo "✓ MATCH"
-        MATCH_COUNT=$((MATCH_COUNT + 1))
-      else
-        echo "✗ DIFF"
-        DIFF_COUNT=$((DIFF_COUNT + 1))
-        echo "  Changes detected in $PROJECT output"
-      fi
-
-      rm -rf "$TMP_DIR"
-    done
-
-    echo ""
-    echo "======================================================================"
-    echo "Results: $MATCH_COUNT matched, $DIFF_COUNT changed"
-    echo "======================================================================"
-    echo ""
-
-    if [ $DIFF_COUNT -eq 0 ]; then
-      echo "✓ All outputs match references (no breaking changes detected)"
-      exit 0
-    else
-      echo "⚠️  Some outputs differ from references"
-      echo "   Run 'regenerate-references' to update if changes are intentional"
-      exit 1
-    fi
+    exec nix develop -c just e2e
   '';
 
   # Create a comprehensive demo script

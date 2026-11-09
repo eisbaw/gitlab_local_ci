@@ -32,6 +32,10 @@ GITLAB_DIR="./gitlab"
 [ -d "$PROJECTS_DIR" ] || { echo "error: $PROJECTS_DIR not found" >&2; exit 1; }
 [ -d "$GITLAB_DIR/lib" ] || { echo "error: $GITLAB_DIR submodule not checked out (git submodule update --init)" >&2; exit 1; }
 command -v dot >/dev/null || { echo "error: graphviz 'dot' not on PATH; run inside the dev shell" >&2; exit 1; }
+# A CLI that cannot start (e.g. no ruby on PATH) would otherwise be
+# recorded as exit 127 everywhere, and e2e-update would overwrite every
+# golden with that. Fail before writing anything.
+"$CLI" --version >/dev/null 2>&1 || { echo "error: $CLI does not run (is ruby on PATH? run inside the dev shell)" >&2; exit 1; }
 
 STDERR_LINES_MAX=50
 
