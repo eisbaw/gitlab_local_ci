@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 require_relative '../spec_helper'
+require 'tmpdir'
 require_relative '../../lib/commands/lint_command'
 
 RSpec.describe Commands::LintCommand do
@@ -105,6 +106,38 @@ RSpec.describe Commands::LintCommand do
       expect(hash[:stages]).to eq(%w[build test])
       expect(hash[:jobs]).to eq(%w[job1 job2])
       expect(hash[:errors]).to eq([])
+    end
+  end
+
+  describe 'parallel jobs (TASK-18)' do
+    it 'accepts a need on one instance by its expanded name (gitlab-runner build.gitlab-ci.yml)' do
+      Dir.mktmpdir('lint_parallel') do |dir|
+        entry = File.join(dir, '.gitlab-ci.yml')
+        File.write(entry, <<~YAML)
+          helper images:
+            stage: build
+            script: [echo]
+            parallel:
+              matrix:
+                - TARGETS: [alpine alpine-pwsh, windows]
+          prebuilt helper images:
+            stage: build
+            script: [echo]
+            needs: ["helper images: [alpine alpine-pwsh]"]
+        YAML
+        result = described_class.execute({ entry: entry, gitlab_dir: dir }.merge(PinnedPipelineContext.options))
+        expect(result.errors).to eq([])
+        expect(result.jobs).to eq(['helper images: [alpine alpine-pwsh]', 'helper images: [windows]', 'prebuilt helper images'])
+      end
+    end
+
+    it "reports invalid parallel: in upstream's wording" do
+      Dir.mktmpdir('lint_parallel') do |dir|
+        entry = File.join(dir, '.gitlab-ci.yml')
+        File.write(entry, "j:\n  script: [echo]\n  parallel: 201\n")
+        result = described_class.execute({ entry: entry, gitlab_dir: dir }.merge(PinnedPipelineContext.options))
+        expect(result.errors).to eq(['jobs:j:parallel config must be less than or equal to 200'])
+      end
     end
   end
 end

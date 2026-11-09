@@ -166,6 +166,90 @@ RSpec.describe PipelineBuilder do
     end
   end
 
+  describe 'needs and dependencies on a parallel job' do
+    let(:build_job) do
+      <<~YAML
+        stages: [build, test]
+        build:
+          stage: build
+          script: [echo]
+          parallel:
+            matrix:
+              - OS: [linux]
+                ARCH: [amd64, arm64]
+      YAML
+    end
+
+    it 'fans out needs (both forms, other keys kept) and dependencies to every instance' do
+      jobs = pipeline_jobs(build_job + <<~YAML)
+        a: {stage: test, script: [echo], needs: [build]}
+        b: {stage: test, script: [echo], needs: [{job: build, artifacts: false}]}
+        c: {stage: test, script: [echo], dependencies: [build]}
+      YAML
+      expect(jobs['a']['needs']).to eq(['build: [linux, amd64]', 'build: [linux, arm64]'])
+      expect(jobs['b']['needs']).to eq([{ 'job' => 'build: [linux, amd64]', 'artifacts' => false },
+                                        { 'job' => 'build: [linux, arm64]', 'artifacts' => false }])
+      expect(jobs['c']['dependencies']).to eq(['build: [linux, amd64]', 'build: [linux, arm64]'])
+    end
+
+    it 'selects instances with needs:parallel:matrix' do
+      jobs = pipeline_jobs(build_job + <<~YAML)
+        t:
+          stage: test
+          script: [echo]
+          needs:
+            - job: build
+              parallel:
+                matrix:
+                  - OS: linux
+                    ARCH: arm64
+      YAML
+      expect(jobs['t']['needs']).to eq([{ 'job' => 'build: [linux, arm64]' }])
+    end
+
+    it 'resolves $[[ matrix.X ]] in needs per instance (audit_config/38 repro)' do
+      jobs = pipeline_jobs(build_job + <<~YAML)
+        t:
+          stage: test
+          script: [echo]
+          parallel:
+            matrix:
+              - OS: [linux]
+                ARCH: [amd64, arm64]
+          needs:
+            - job: build
+              parallel:
+                matrix:
+                  - OS: ['$[[ matrix.OS ]]']
+                    ARCH: ['$[[matrix.ARCH]]']
+      YAML
+      expect(jobs['t: [linux, amd64]']['needs']).to eq([{ 'job' => 'build: [linux, amd64]' }])
+      expect(jobs['t: [linux, arm64]']['needs']).to eq([{ 'job' => 'build: [linux, arm64]' }])
+    end
+
+    it "reports an unknown $[[ matrix.X ]] once, in upstream's wording" do
+      result = build(build_job + <<~YAML)
+        t:
+          stage: test
+          script: [echo]
+          parallel: {matrix: [{OS: [linux, mac]}]}
+          needs: [{job: build, parallel: {matrix: [{OS: '$[[ matrix.NOPE ]]', ARCH: amd64}]}}]
+      YAML
+      expect(result.errors).to eq(["t job: 'NOPE' does not exist in matrix configuration"])
+    end
+
+    it 'leaves needs on a non-parallel job and cross-pipeline needs alone' do
+      jobs = pipeline_jobs(build_job + <<~YAML)
+        plain: {stage: build, script: [echo]}
+        t:
+          stage: test
+          script: [echo]
+          needs: [plain, {pipeline: $PARENT_PIPELINE_ID, job: build}]
+      YAML
+      expect(jobs['t']['needs']).to eq(['plain', { 'pipeline' => '$PARENT_PIPELINE_ID', 'job' => 'build' }])
+    end
+  end
+
   describe 'validation (Entry::Product::Parallel, Matrix, Variables)' do
     {
       'parallel: "3"' => 'jobs:j:parallel should be an integer or a hash',
@@ -184,6 +268,8 @@ RSpec.describe PipelineBuilder do
         'jobs:j:parallel:matrix:variables config should be a hash of key value pairs, value can be an array',
       'parallel: {matrix: [{A: [1,2,3,4,5,6,7,8,9,10], B: [1,2,3,4,5,6,7,8,9,10], C: [1,2,3]}]}' =>
         'jobs:j:parallel:matrix config generates too many jobs (maximum is 200)',
+      'needs: [{job: x, parallel: 2}]' => 'jobs:j:needs config cannot use "parallel: <number>".',
+      'needs: [{job: x, parallel: {matrix: {A: a}}}]' => 'jobs:j:needs:need:parallel:matrix config should be an array of hashes'
     }.each do |setting, message|
       it "rejects #{setting}" do
         expect(build("x: {script: [echo]}\nj:\n  script: [echo]\n  #{setting}\n").errors).to include(message)

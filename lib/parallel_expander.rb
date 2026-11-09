@@ -11,7 +11,8 @@
 require_relative 'ci_keywords'
 
 # `parallel:` expansion, upstream Config::Normalizer (NumberStrategy,
-# MatrixStrategy), plus the validation of Entry::Product::{Parallel,Matrix,Variables} it relies on.
+# MatrixStrategy) and Interpolation::MatrixInterpolator, plus the
+# validation of Entry::Product::{Parallel,Matrix,Variables} it relies on.
 #
 # Upstream runs it on the composed jobs (Config#normalized_jobs, after
 # default:/inherit:), before YamlProcessor's stage/needs checks and before
@@ -30,13 +31,21 @@ module ParallelExpander
   # Upstream Entry::Product::Parallel::PARALLEL_LIMIT.
   PARALLEL_LIMIT = 200
 
+  # Upstream MatrixInterpolator::MATRIX_EXPRESSION_REGEXP.
+  MATRIX_EXPRESSION = /\$\[\[\s*matrix\.([a-zA-Z0-9_-]+)\s*\]\]/
+
+  # Keys of a need on another pipeline's job (Entry::Need
+  # CrossPipelineDependency, EE CrossProjectDependency): not fanned out.
+  CROSS_PIPELINE_NEED_KEYS = %w[project pipeline ref].freeze
+
   # One job a parallel job expands to. variables: matrix variables,
   # String => String, config order; empty for parallel: N.
   Instance = Struct.new(:name, :index, :total, :variables, keyword_init: true)
 
   module_function
 
-  # Entry::Product::Parallel errors of every visible job's `parallel:`, in
+  # Entry::Product::Parallel errors of every visible job's `parallel:`
+  # and of its needs' `parallel:` (Entry::Needs/Need: matrix only), in
   # upstream lint's wording. Expansion assumes these are empty.
   #
   # @param jobs [Hash] name => job, composed
@@ -45,8 +54,24 @@ module ParallelExpander
     jobs.flat_map do |name, job|
       next [] if CiKeywords.hidden?(name) || !job.is_a?(Hash)
 
-      job['parallel'].nil? ? [] : parallel_errors("jobs:#{name}:parallel", job['parallel'])
+      own = job['parallel'].nil? ? [] : parallel_errors("jobs:#{name}:parallel", job['parallel'])
+      own + needs_parallel_errors(name, needs_parallel(job['needs']))
     end
+  end
+
+  # Entry::Needs rejects a number once for the whole list (and composes no
+  # Need then); otherwise each Need's matrix is checked.
+  def needs_parallel_errors(name, parallels)
+    return ["jobs:#{name}:needs config cannot use \"parallel: <number>\"."] if parallels.any?(Numeric)
+
+    parallels.flat_map { |parallel| parallel_errors("jobs:#{name}:needs:need:parallel", parallel) }
+  end
+
+  # `parallel:` values of the map-form needs that have one.
+  def needs_parallel(needs)
+    return [] unless needs.is_a?(Array)
+
+    needs.filter_map { |need| need['parallel'] if need.is_a?(Hash) && !need['parallel'].nil? }
   end
 
   # Entry::Product::Parallel: an Integer (ParallelBuilds) or a Hash
@@ -133,7 +158,10 @@ module ParallelExpander
   end
 
   # Upstream Normalizer#normalize_jobs: every visible parallel job
-  # replaced, in place, by its instances.
+  # replaced, in place, by its instances; then in every visible job
+  # (instances included) `$[[ matrix.X ]]` in needs interpolated, and
+  # needs/dependencies on a parallel job fanned out to its instances (or
+  # to the instances needs:parallel:matrix names).
   #
   # @param jobs [Hash] name => job, composed, errors(jobs) empty
   # @return [Array(Hash, Array<String>)] [expanded jobs, errors]; errors
@@ -152,9 +180,11 @@ module ParallelExpander
       if CiKeywords.hidden?(name) || !job.is_a?(Hash)
         expanded[name] = job
       elsif (instances = parallelized[name])
-        instances.each { |instance| expanded[instance.name] = instance_job(job, instance) }
+        instances.each do |instance|
+          expanded[instance.name] = normalize_job(name, instance_job(job, instance), instance.variables, parallelized, errors)
+        end
       else
-        expanded[name] = job
+        expanded[name] = normalize_job(name, job, {}, parallelized, errors)
       end
     end
     [expanded, errors.empty? ? [] : [errors.uniq.join(', ')]]
@@ -170,5 +200,69 @@ module ParallelExpander
     return instance_job unless own.nil? || own.is_a?(Hash)
 
     instance_job.merge('variables' => (own || {}).merge(instance.variables))
+  end
+
+  # Upstream Normalizer#normalize_job. Interpolation sees the matrix
+  # variables only (upstream passes all job variables, but a non-matrix
+  # one is a {value:} hash there and would interpolate as its inspect
+  # text); a failed interpolation leaves the needs as written.
+  def normalize_job(name, job, matrix_variables, parallelized, errors)
+    job = job.dup
+    if job['needs'].is_a?(Array)
+      interpolation_errors = []
+      interpolated = interpolate(job['needs'], matrix_variables, interpolation_errors)
+      if interpolation_errors.empty?
+        job['needs'] = interpolated
+      else
+        errors.concat(interpolation_errors.map { |error| "#{name} job: #{error}" })
+      end
+      job['needs'] = fan_out_needs(job['needs'], parallelized)
+    end
+    job['dependencies'] = fan_out_dependencies(job['dependencies'], parallelized) if job['dependencies'].is_a?(Array)
+    job
+  end
+
+  # MatrixInterpolator#interpolate_value: every String in the needs tree.
+  def interpolate(value, variables, errors)
+    case value
+    when String
+      value.scan(MATRIX_EXPRESSION).map(&:first).uniq.reduce(value) do |result, variable|
+        # Block form: a value is literal text, never a back-reference.
+        next result.gsub(/\$\[\[\s*matrix\.#{Regexp.escape(variable)}\s*\]\]/) { variables[variable] } if variables.key?(variable)
+
+        errors << "'#{variable}' does not exist in matrix configuration"
+        result
+      end
+    when Hash then value.transform_values { |item| interpolate(item, variables, errors) }
+    when Array then value.map { |item| interpolate(item, variables, errors) }
+    else value
+    end
+  end
+
+  # Normalizer#expand_parallelized_job_names.
+  def fan_out_dependencies(dependencies, parallelized)
+    dependencies.flat_map { |name| parallelized[name]&.map(&:name) || [name] }
+  end
+
+  # Normalizer#expand_parallelized_needs, over the needs as written: a
+  # String stays a String, a {job:} need keeps its other keys and loses
+  # `parallel:`. needs:parallel:matrix names instances by generating them
+  # from its own matrix (a combination the job does not have stays, and is
+  # an undefined need). Cross-pipeline needs and needs on a non-parallel
+  # job are untouched.
+  def fan_out_needs(needs, parallelized)
+    needs.flat_map do |need|
+      next [need] if need.is_a?(Hash) && CROSS_PIPELINE_NEED_KEYS.any? { |key| need.key?(key) }
+
+      name = need.is_a?(Hash) ? need['job'] : need
+      next [need] unless (instances = parallelized[name])
+
+      if need.is_a?(Hash)
+        instances = instances(name, need['parallel']) unless need['parallel'].nil?
+        instances.map { |instance| need.except('parallel').merge('job' => instance.name) }
+      else
+        instances.map(&:name)
+      end
+    end
   end
 end
