@@ -73,7 +73,7 @@
 <!-- build_default_cache -->
 <g id="node2" class="node">
 <title>build_default_cache</title>
-<g id="a_node2"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;script:&#10;&#45; echo &quot;Using global cache configuration&quot;&#10;&#45; mkdir &#45;p .cache vendor&#10;&#45; echo &quot;build artifacts&quot; &gt; .cache/build.txt&#10;&#45; echo &quot;vendor libs&quot; &gt; vendor/libs.txt&#10;">
+<g id="a_node2"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;script:&#10;&#45; echo &quot;Using global cache configuration&quot;&#10;&#45; mkdir &#45;p .cache vendor&#10;&#45; echo &quot;build artifacts&quot; &gt; .cache/build.txt&#10;&#45; echo &quot;vendor libs&quot; &gt; vendor/libs.txt&#10;cache:&#10; &#160;key: global&#45;cache&#45;key&#10; &#160;paths:&#10; &#160;&#45; &quot;.cache/&quot;&#10; &#160;&#45; vendor/&#10; &#160;policy: pull&#45;push&#10;">
 <polygon fill="lightblue" stroke="black" points="175.25,-275 23.5,-275 23.5,-239 175.25,-239 175.25,-275"/>
 <text text-anchor="middle" x="99.38" y="-252.32" font-family="Times,serif" font-size="14.00">build:default&#45;cache</text>
 </a>

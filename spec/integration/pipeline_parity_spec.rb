@@ -260,6 +260,44 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
     end
   end
 
+  context 'default: and legacy globals (TASK-9)' do
+    before do
+      write('.gitlab-ci.yml', <<~YAML)
+        before_script: [echo LEGACY-BEFORE]
+        default:
+          tags: [no-runner-has-this-tag]
+          after_script: [echo DEFAULT-AFTER]
+        job:
+          script: [echo JOB-SCRIPT]
+        free:
+          inherit: {default: [before_script, after_script]}
+          script: [echo FREE-SCRIPT]
+      YAML
+    end
+
+    it 'reach every command' do
+      expect(lint_jobs.sort).to eq(%w[free job])
+
+      dot, = cli('dag')
+      expect(dot[/job \[label="job", tooltip="[^"]*"/]).to include('no-runner-has-this-tag')
+
+      # Tags: the default-tagged job never gets a runner (audit_config/03),
+      # the job that opts out of default tags does.
+      stdout, = cli('dry-run', '--runners', runners_dir)
+      expect(stdout.scan(/Job '([^']+)' → Runner/).flatten.uniq).to eq(%w[free])
+      expect(stdout).to include('Pipeline status: stuck')
+
+      just, = cli('export-just', '--flat')
+      job_recipe = just[/^job:\n(?:    .*\n)+/]
+      expect(job_recipe).to include('echo LEGACY-BEFORE', 'echo JOB-SCRIPT', 'echo DEFAULT-AFTER')
+
+      run_out, run_err, status = cli('run', 'free')
+      expect(status).to eq(0), run_err
+      expect(run_out.index('LEGACY-BEFORE')).to be < run_out.index('FREE-SCRIPT')
+      expect(run_out.index('FREE-SCRIPT')).to be < run_out.index('DEFAULT-AFTER')
+    end
+  end
+
   context 'job keywords' do
     it 'that upstream allows are accepted by lint and dry-run alike' do
       write('.gitlab-ci.yml', <<~YAML)

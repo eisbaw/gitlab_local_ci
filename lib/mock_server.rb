@@ -65,7 +65,8 @@ class MockServer
 
   # Create a pipeline from a config that has not been through
   # PipelineBuilder (YAML string or parsed hash; no includes/extends):
-  # evaluates workflow and job rules, then create_pipeline_from.
+  # applies default:/inherit:, evaluates workflow and job rules, then
+  # create_pipeline_from.
   #
   # @param config [String, Hash] YAML config content or parsed hash
   # @param options [Hash] :ref, :variables (CLI/trigger variables)
@@ -75,6 +76,7 @@ class MockServer
     parsed_config = parse_configuration(config)
     evaluated = PipelineBuilder.evaluate_rules(
       parsed_config,
+      jobs: PipelineBuilder.visible_jobs(PipelineBuilder.compose_jobs(parsed_config)),
       predefined: PredefinedVariables.build(project_dir: @project_dir, pipeline_source: @pipeline_source),
       cli_variables: options[:variables] || {},
       project_dir: @project_dir

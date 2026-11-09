@@ -28,7 +28,7 @@
 <!-- unit_tests -->
 <g id="node5" class="node">
 <title>unit_tests</title>
-<g id="a_node5"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;before_script:&#10;&#45; echo &quot;Setting up test environment...&quot;&#10;script:&#10;&#45; echo &quot;Running unit tests...&quot;&#10;&#45; echo &quot;Test suite: Unit Tests&quot;&#10;&#45; echo &quot;Tests passed: 150/150&quot;&#10;&#45; echo &quot;Coverage: 85%&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;">
+<g id="a_node5"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;before_script:&#10;&#45; echo &quot;Setting up test environment...&quot;&#10;script:&#10;&#45; echo &quot;Running unit tests...&quot;&#10;&#45; echo &quot;Test suite: Unit Tests&quot;&#10;&#45; echo &quot;Tests passed: 150/150&quot;&#10;&#45; echo &quot;Coverage: 85%&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="448.12,-199 363.88,-199 363.88,-163 448.12,-163 448.12,-199"/>
 <text text-anchor="middle" x="406" y="-176.32" font-family="Times,serif" font-size="14.00">unit&#45;tests</text>
 </a>
@@ -43,7 +43,7 @@
 <!-- integration_tests -->
 <g id="node6" class="node">
 <title>integration_tests</title>
-<g id="a_node6"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;before_script:&#10;&#45; echo &quot;Setting up test environment...&quot;&#10;script:&#10;&#45; echo &quot;Running integration tests (with override)...&quot;&#10;&#45; echo &quot;Test suite: Integration Tests (Extended)&quot;&#10;&#45; echo &quot;Running additional smoke tests...&quot;&#10;&#45; echo &quot;Tests passed: 50/50&quot;&#10;&#45; echo &quot;All integration tests passed&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;allow_failure: true&#10;">
+<g id="a_node6"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;before_script:&#10;&#45; echo &quot;Setting up test environment...&quot;&#10;script:&#10;&#45; echo &quot;Running integration tests (with override)...&quot;&#10;&#45; echo &quot;Test suite: Integration Tests (Extended)&quot;&#10;&#45; echo &quot;Running additional smoke tests...&quot;&#10;&#45; echo &quot;Tests passed: 50/50&quot;&#10;&#45; echo &quot;All integration tests passed&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;allow_failure: true&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="473.62,-253 338.38,-253 338.38,-217 473.62,-217 473.62,-253"/>
 <text text-anchor="middle" x="406" y="-230.32" font-family="Times,serif" font-size="14.00">integration&#45;tests</text>
 </a>
@@ -58,7 +58,7 @@
 <!-- security_scan -->
 <g id="node7" class="node">
 <title>security_scan</title>
-<g id="a_node7"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;before_script:&#10;&#45; echo &quot;Setting up test environment...&quot;&#10;script:&#10;&#45; echo &quot;Running security scan...&quot;&#10;&#45; echo &quot;Scanning for vulnerabilities...&quot;&#10;&#45; echo &quot;No critical vulnerabilities found&quot;&#10;allow_failure: true&#10;">
+<g id="a_node7"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;before_script:&#10;&#45; echo &quot;Setting up test environment...&quot;&#10;script:&#10;&#45; echo &quot;Running security scan...&quot;&#10;&#45; echo &quot;Scanning for vulnerabilities...&quot;&#10;&#45; echo &quot;No critical vulnerabilities found&quot;&#10;allow_failure: true&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="461.25,-307 350.75,-307 350.75,-271 461.25,-271 461.25,-307"/>
 <text text-anchor="middle" x="406" y="-284.32" font-family="Times,serif" font-size="14.00">security&#45;scan</text>
 </a>
@@ -73,7 +73,7 @@
 <!-- code_quality -->
 <g id="node8" class="node">
 <title>code_quality</title>
-<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running code quality checks...&quot;&#10;&#45; echo &quot;Analyzing code style...&quot;&#10;&#45; echo &quot;Checking for code smells...&quot;&#10;&#45; echo &quot;Quality score: A+&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;allow_failure: true&#10;">
+<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running code quality checks...&quot;&#10;&#45; echo &quot;Analyzing code style...&quot;&#10;&#45; echo &quot;Checking for code smells...&quot;&#10;&#45; echo &quot;Quality score: A+&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;allow_failure: true&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="457.5,-361 354.5,-361 354.5,-325 457.5,-325 457.5,-361"/>
 <text text-anchor="middle" x="406" y="-338.32" font-family="Times,serif" font-size="14.00">code&#45;quality</text>
 </a>
@@ -88,7 +88,7 @@
 <!-- build_app -->
 <g id="node2" class="node">
 <title>build_app</title>
-<g id="a_node2"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;before_script:&#10;&#45; echo &quot;Preparing build environment...&quot;&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; build/&#10; &#160;expire_in: 1 hour&#10;script:&#10;&#45; echo &quot;Building application with overrides...&quot;&#10;&#45; echo &quot;Build type: ${BUILD_TYPE}&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;app&#45;v${VERSION}&#45;optimized&quot; &gt; build/app.txt&#10;&#45; echo &quot;Build completed with custom configuration&quot;&#10;variables:&#10; &#160;BUILD_TYPE: optimized&#10;after_script:&#10;&#45; echo &quot;Custom post&#45;build step&quot;&#10;&#45; ls &#45;la build/&#10;">
+<g id="a_node2"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;before_script:&#10;&#45; echo &quot;Preparing build environment...&quot;&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; build/&#10; &#160;expire_in: 1 hour&#10;script:&#10;&#45; echo &quot;Building application with overrides...&quot;&#10;&#45; echo &quot;Build type: ${BUILD_TYPE}&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;app&#45;v${VERSION}&#45;optimized&quot; &gt; build/app.txt&#10;&#45; echo &quot;Build completed with custom configuration&quot;&#10;variables:&#10; &#160;BUILD_TYPE: optimized&#10;after_script:&#10;&#45; echo &quot;Custom post&#45;build step&quot;&#10;&#45; ls &#45;la build/&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="140.75,-304 58,-304 58,-268 140.75,-268 140.75,-304"/>
 <text text-anchor="middle" x="99.38" y="-281.32" font-family="Times,serif" font-size="14.00">build&#45;app</text>
 </a>
@@ -97,7 +97,7 @@
 <!-- build_docker -->
 <g id="node3" class="node">
 <title>build_docker</title>
-<g id="a_node3"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;before_script:&#10;&#45; echo &quot;Preparing build environment...&quot;&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; build/&#10; &#160;expire_in: 1 hour&#10;script:&#10;&#45; echo &quot;Building Docker image...&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;docker&#45;image:latest&quot; &gt; build/docker.txt&#10;&#45; echo &quot;Docker build completed&quot;&#10;only:&#10;&#45; main&#10;&#45; develop&#10;">
+<g id="a_node3"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;before_script:&#10;&#45; echo &quot;Preparing build environment...&quot;&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; build/&#10; &#160;expire_in: 1 hour&#10;script:&#10;&#45; echo &quot;Building Docker image...&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;docker&#45;image:latest&quot; &gt; build/docker.txt&#10;&#45; echo &quot;Docker build completed&quot;&#10;only:&#10;&#45; main&#10;&#45; develop&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="151.62,-358 47.12,-358 47.12,-322 151.62,-322 151.62,-358"/>
 <text text-anchor="middle" x="99.38" y="-335.32" font-family="Times,serif" font-size="14.00">build&#45;docker</text>
 </a>
@@ -107,7 +107,7 @@
 <!-- deploy_staging -->
 <g id="node10" class="node">
 <title>deploy_staging</title>
-<g id="a_node10"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;before_script:&#10;&#45; echo &quot;Preparing deployment...&quot;&#10;when: manual&#10;only:&#10;&#45; develop&#10;script:&#10;&#45; echo &quot;Deploying to staging environment...&quot;&#10;&#45; echo &quot;Target: staging.example.com&quot;&#10;&#45; echo &quot;Deployment completed&quot;&#10;environment:&#10; &#160;name: staging&#10; &#160;url: https://staging.example.com&#10;">
+<g id="a_node10"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;before_script:&#10;&#45; echo &quot;Preparing deployment...&quot;&#10;when: manual&#10;only:&#10;&#45; develop&#10;script:&#10;&#45; echo &quot;Deploying to staging environment...&quot;&#10;&#45; echo &quot;Target: staging.example.com&quot;&#10;&#45; echo &quot;Deployment completed&quot;&#10;environment:&#10; &#160;name: staging&#10; &#160;url: https://staging.example.com&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="778.75,-96 657.75,-96 657.75,-60 778.75,-60 778.75,-96"/>
 <text text-anchor="middle" x="718.25" y="-73.33" font-family="Times,serif" font-size="14.00">deploy&#45;staging</text>
 </a>
@@ -122,7 +122,7 @@
 <!-- deploy_production -->
 <g id="node11" class="node">
 <title>deploy_production</title>
-<g id="a_node11"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;before_script:&#10;&#45; echo &quot;Preparing production deployment with extra checks...&quot;&#10;&#45; echo &quot;Verifying all tests passed...&quot;&#10;&#45; echo &quot;Checking deployment prerequisites...&quot;&#10;when: manual&#10;only:&#10;&#45; main&#10;script:&#10;&#45; echo &quot;Deploying to production environment (verified)...&quot;&#10;&#45; echo &quot;Target: www.example.com&quot;&#10;&#45; echo &quot;Running pre&#45;deployment health checks...&quot;&#10;&#45; echo &quot;Production deployment completed successfully&quot;&#10;environment:&#10; &#160;name: production&#10; &#160;url: https://www.example.com&#10;after_script:&#10;&#45; echo &quot;Running post&#45;deployment verification...&quot;&#10;&#45; echo &quot;Sending deployment notification...&quot;&#10;">
+<g id="a_node11"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;before_script:&#10;&#45; echo &quot;Preparing production deployment with extra checks...&quot;&#10;&#45; echo &quot;Verifying all tests passed...&quot;&#10;&#45; echo &quot;Checking deployment prerequisites...&quot;&#10;when: manual&#10;only:&#10;&#45; main&#10;script:&#10;&#45; echo &quot;Deploying to production environment (verified)...&quot;&#10;&#45; echo &quot;Target: www.example.com&quot;&#10;&#45; echo &quot;Running pre&#45;deployment health checks...&quot;&#10;&#45; echo &quot;Production deployment completed successfully&quot;&#10;environment:&#10; &#160;name: production&#10; &#160;url: https://www.example.com&#10;after_script:&#10;&#45; echo &quot;Running post&#45;deployment verification...&quot;&#10;&#45; echo &quot;Sending deployment notification...&quot;&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="790.75,-150 645.75,-150 645.75,-114 790.75,-114 790.75,-150"/>
 <text text-anchor="middle" x="718.25" y="-127.33" font-family="Times,serif" font-size="14.00">deploy&#45;production</text>
 </a>
@@ -137,7 +137,7 @@
 <!-- rollback_production -->
 <g id="node12" class="node">
 <title>rollback_production</title>
-<g id="a_node12"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;script:&#10;&#45; echo &quot;Rolling back production deployment...&quot;&#10;&#45; echo &quot;Restoring previous version...&quot;&#10;&#45; echo &quot;Rollback completed&quot;&#10;environment:&#10; &#160;name: production&#10; &#160;action: rollback&#10;when: manual&#10;only:&#10;&#45; main&#10;">
+<g id="a_node12"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;script:&#10;&#45; echo &quot;Rolling back production deployment...&quot;&#10;&#45; echo &quot;Restoring previous version...&quot;&#10;&#45; echo &quot;Rollback completed&quot;&#10;environment:&#10; &#160;name: production&#10; &#160;action: rollback&#10;when: manual&#10;only:&#10;&#45; main&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10; &#160;&#45; stuck_or_timeout_failure&#10;">
 <polygon fill="lightblue" stroke="black" points="795.62,-204 640.88,-204 640.88,-168 795.62,-168 795.62,-204"/>
 <text text-anchor="middle" x="718.25" y="-181.32" font-family="Times,serif" font-size="14.00">rollback&#45;production</text>
 </a>

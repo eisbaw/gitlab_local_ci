@@ -39,6 +39,23 @@ module CiKeywords
     needs resource_group environment interruptible
   ].uniq.freeze
 
+  # Entry::Default::ALLOWED_KEYS (gitlab/lib/gitlab/ci/config/entry/default.rb):
+  # the keys `default:` may set. Entry::Job declares each of them
+  # `inherit: true`, so a job gets every one it does not set itself.
+  DEFAULT = %w[
+    before_script after_script hooks cache image services
+    interruptible timeout retry tags artifacts id_tokens
+  ].freeze
+
+  # The Entry::Default entries declared `inherit: true`: the deprecated
+  # top-level globals that act as `default:` keys (Entry::Root reserves
+  # them; Default#overwrite_entry takes them when default: lacks them).
+  LEGACY_DEFAULT = %w[before_script after_script cache image services].freeze
+
+  # The only Processable entry declared `inherit: true`. A trigger job
+  # (Entry::Bridge) declares none of Job's, so it inherits just this.
+  BRIDGE_DEFAULT = %w[interruptible].freeze
+
   module_function
 
   # Upstream Entry::Jobs: a non-root key whose value is a Hash is a job

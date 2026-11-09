@@ -27,11 +27,11 @@ require_relative 'predefined_variables'
 #   extends                ExtendsResolver    (every key a root, as upstream Extendable)
 #   !reference             ReferenceResolver  (after extends, before split)
 #   nested lists           flatten_lists      (upstream Entry values)
-#   default:/inherit:      -                  (TASK-9: on the split jobs, before rules)
+#   default:/inherit:      compose_jobs       (on the split jobs, before rules)
 #   workflow:rules         apply_workflow_rules
 #   job rules              filter_jobs_by_rules
 #
-# resolve_config stops after the nested lists (the static config lint
+# resolve_config stops after composing the jobs (the static config lint
 # validates);
 # build continues through the rules (the jobs of one pipeline).
 module PipelineBuilder
@@ -67,12 +67,18 @@ module PipelineBuilder
   # non-empty every other field is nil and the caller reports the errors.
   #
   # config          merged, extended, references resolved, lists flattened
-  #                 (globals, templates, jobs)
+  #                 (globals, templates, jobs); defaults NOT applied
+  # job_definitions name => job, every job entry (hidden templates included,
+  #                 untouched), config order, visible jobs with default:
+  #                 and legacy globals applied (compose_jobs). Stored, not
+  #                 derived from config: once defaults apply a job is no
+  #                 longer its config entry (upstream Root#jobs_value vs
+  #                 Config#to_hash).
   # workflow_skipped workflow:rules created no pipeline (build only)
   # pipeline_jobs   name => job config of the jobs this pipeline creates,
   #                 rule attributes applied, config order (build only)
   # excluded_jobs   name => reason, visible jobs rules dropped (build only)
-  Result = Struct.new(:config, :errors, :workflow_skipped,
+  Result = Struct.new(:config, :job_definitions, :errors, :workflow_skipped,
                       :pipeline_jobs, :excluded_jobs, keyword_init: true) do
     def ok?
       errors.empty?
@@ -82,23 +88,22 @@ module PipelineBuilder
       config['stages'] || DEFAULT_STAGES
     end
 
-    # Every job entry, hidden templates included, in config order.
-    def job_definitions
-      PipelineBuilder.job_definitions(config)
-    end
-
     # Visible jobs before rules: the static job set.
     def jobs
-      PipelineBuilder.visible_jobs(config)
+      PipelineBuilder.visible_jobs(job_definitions)
     end
   end
 
   # Operating error while loading the entry file; becomes Result#errors.
   LoadError = Class.new(StandardError)
 
+  # Invalid default:/inherit:, in upstream's wording; becomes Result#errors.
+  ConfigError = Class.new(StandardError)
+
   module_function
 
-  # Static config: load, includes, extends, !reference, nested lists.
+  # Static config: load, includes, extends, !reference, nested lists,
+  # defaults.
   #
   # @param entry [String] path to .gitlab-ci.yml
   # @param context [Context]
@@ -139,7 +144,12 @@ module PipelineBuilder
       return failure(e.message)
     end
 
-    Result.new(config: flatten_lists(config), errors: [])
+    config = flatten_lists(config)
+    begin
+      Result.new(config: config, job_definitions: compose_jobs(config), errors: [])
+    rescue ConfigError => e
+      failure(e.message)
+    end
   end
 
   # The jobs of one pipeline: resolve_config, then workflow and job rules.
@@ -151,30 +161,40 @@ module PipelineBuilder
     return result unless result.ok?
 
     evaluated = begin
-      evaluate_rules(result.config, predefined: predefined, cli_variables: context.variables,
-                                    project_dir: context.project_dir)
+      evaluate_rules(result.config, jobs: result.jobs, predefined: predefined,
+                                    cli_variables: context.variables, project_dir: context.project_dir)
     rescue StandardError => e
       return failure("Error evaluating rules: #{e.message}")
     end
-    Result.new(config: result.config, errors: [], **evaluated)
+    Result.new(config: result.config, job_definitions: result.job_definitions, errors: [], **evaluated)
   end
 
-  # Workflow rules, then job rules, over a resolved config.
+  # Workflow rules, then job rules, over a resolved config and its visible
+  # composed jobs (Result#jobs).
+  #
+  # Variables, lowest precedence first: predefined CI_*, root variables
+  # (top-level `variables:` overlaid by the matched workflow rule's
+  # `variables:`, upstream Chain::Seed#root_variables), CLI variables
+  # (pipeline variables outrank every .gitlab-ci.yml variable, doc/ci/variables
+  # "CI/CD variable precedence"). Each job's rules see only the root
+  # variables its `inherit:variables` lets through (Seed::Build
+  # #calculate_yaml_variables!); predefined and CLI variables are not root
+  # variables and always reach it.
   #
   # @return [Hash] { workflow_skipped:, pipeline_jobs:, excluded_jobs: }
   # @raise [StandardError] on a rule the evaluator rejects
-  def evaluate_rules(config, predefined:, cli_variables:, project_dir:)
-    variables = pipeline_variables(config, predefined: predefined, cli_variables: cli_variables)
-    workflow = apply_workflow_rules(config, variables, project_dir: project_dir)
-    # Pipeline (CLI) variables outrank every .gitlab-ci.yml variable,
-    # workflow:rules:variables included (doc/ci/variables "CI/CD variable
-    # precedence").
-    workflow[:variables] = workflow[:variables].merge(cli_variables.to_h { |k, v| [k.to_s, v.to_s] })
+  def evaluate_rules(config, jobs:, predefined:, cli_variables:, project_dir:)
+    cli = cli_variables.to_h { |k, v| [k.to_s, v.to_s] }
+    root = root_variables(config)
+    workflow = apply_workflow_rules(config, predefined.merge(root).merge(cli), project_dir: project_dir)
     if workflow[:filtered]
       return { workflow_skipped: true, pipeline_jobs: {}, excluded_jobs: {} }
     end
 
-    pipeline_jobs, excluded_jobs = filter_jobs_by_rules(visible_jobs(config), workflow[:variables], project_dir: project_dir)
+    root = root.merge(workflow[:variables])
+    pipeline_jobs, excluded_jobs = filter_jobs_by_rules(jobs, project_dir: project_dir) do |name, job|
+      predefined.merge(inherited_root_variables(name, job, root)).merge(cli)
+    end
     { workflow_skipped: false, pipeline_jobs: pipeline_jobs, excluded_jobs: excluded_jobs }
   end
 
@@ -272,43 +292,131 @@ module PipelineBuilder
   end
 
   # Job entries that become jobs: hidden templates excluded.
-  def visible_jobs(config)
-    job_definitions(config).reject { |key, _| CiKeywords.hidden?(key) }
+  def visible_jobs(job_definitions)
+    job_definitions.reject { |key, _| CiKeywords.hidden?(key) }
   end
 
-  # Variables visible to workflow and job rules, lowest precedence first:
-  # predefined CI_*, top-level `variables:` defaults, CLI/trigger variables.
-  # (Include rules do NOT see top-level `variables:`; that is upstream's
-  # documented scope.)
-  def pipeline_variables(config, predefined:, cli_variables:)
-    variables = predefined.dup
-    raw = config['variables']
-    if raw.is_a?(Hash)
-      raw.each do |k, v|
-        variables[k.to_s] =
-          if v.is_a?(Hash)
-            # `variables: FOO: { value: "...", description: "..." }` form.
-            (v['value'] || v[:value] || '').to_s
-          elsif v.nil?
-            ''
-          else
-            v.to_s
-          end
-      end
+  # Every job entry as upstream composes it (Entry::Root#compose!), config
+  # order. A visible job takes each default it may inherit and does not set
+  # itself (Inheritable#inherit!, Job#overwrite_entry). The default replaces
+  # the job's entry whole, never deep-merged: a job's own `cache:` drops the
+  # default cache entirely. Applied after extends, so a key a job got from
+  # a template counts as the job's own. A key set to null is unspecified
+  # (Factory: nil value -> Entry::Unspecified) and inherits. Hidden
+  # templates get nothing (Entry::Hidden is no Processable).
+  #
+  # @return [Hash] name => job
+  # @raise [ConfigError] invalid default: or inherit:, or a key both in
+  #   default: and top-level
+  def compose_jobs(config)
+    defaults = job_defaults(config)
+    job_definitions(config).to_h do |name, job|
+      next [name, job] if CiKeywords.hidden?(name)
+
+      inherit_setting(name, job, 'variables') # validated here, read by evaluate_rules
+      inherited = defaults.slice(*inheritable_default_keys(name, job)).reject { |key, _| specified?(job, key) }
+      [name, job.merge(inherited)]
     end
-    cli_variables.each { |k, v| variables[k.to_s] = v.to_s }
-    variables
   end
 
-  # Evaluate workflow:rules. Returns { variables:, filtered: }; filtered
-  # means workflow rules exist and matched nothing (or matched when: never),
-  # so upstream creates no pipeline (Chain::EvaluateWorkflowRules). The
-  # matched rule's `variables:` are layered over the input variables; the
-  # caller re-applies CLI variables on top.
+  # `default:` merged with the legacy top-level globals, unspecified (null)
+  # entries dropped. Upstream Entry::Default#overwrite_entry.
+  #
+  # @raise [ConfigError]
+  def job_defaults(config)
+    default = config['default'].nil? ? {} : config['default']
+    raise ConfigError, 'default config should be a hash' unless default.is_a?(Hash)
+
+    unknown = default.keys - CiKeywords::DEFAULT
+    raise ConfigError, "default config contains unknown keys: #{unknown.join(', ')}" unless unknown.empty?
+
+    defaults = default.reject { |_, value| value.nil? }
+    CiKeywords::LEGACY_DEFAULT.each do |key|
+      next if config[key].nil?
+      raise ConfigError, "#{key} is defined in top-level and `default:` entry" if defaults.key?(key)
+
+      defaults[key] = config[key]
+    end
+    defaults
+  end
+
+  # Default keys this job may inherit: its type's inheritable entries
+  # (Entry::Job: all of default:; Entry::Bridge, i.e. no script:/run:: only
+  # Processable's), narrowed by `inherit:default` (Inherit::Default).
+  #
+  # @raise [ConfigError]
+  def inheritable_default_keys(name, job)
+    keys = job.key?('script') || job.key?('run') ? CiKeywords::DEFAULT : CiKeywords::BRIDGE_DEFAULT
+    setting = inherit_setting(name, job, 'default')
+    return setting ? keys : [] if [true, false].include?(setting)
+
+    unknown = setting - CiKeywords::DEFAULT
+    raise ConfigError, "jobs:#{name}:inherit:default config contains unknown values: #{unknown.join(', ')}" unless unknown.empty?
+
+    keys & setting
+  end
+
+  # `inherit:<key>` (default or variables): true, false, or a list of names.
+  # Absent or null means true (Entry::Inherit defaults).
+  #
+  # @raise [ConfigError] on another shape, in upstream's wording
+  def inherit_setting(name, job, key)
+    inherit = job['inherit']
+    return true if inherit.nil?
+    raise ConfigError, "jobs:#{name}:inherit config should be a hash" unless inherit.is_a?(Hash)
+
+    unknown = inherit.keys - %w[default variables]
+    raise ConfigError, "jobs:#{name}:inherit config contains unknown keys: #{unknown.join(', ')}" unless unknown.empty?
+
+    setting = inherit[key]
+    return true if setting.nil?
+    return setting if [true, false].include?(setting) || (setting.is_a?(Array) && setting.all?(String))
+
+    raise ConfigError, "jobs:#{name}:inherit:#{key} should be a bool or array of strings"
+  end
+
+  def specified?(job, key)
+    !job[key].nil?
+  end
+
+  # The root variables this job inherits (Variables::Helpers
+  # #inherit_yaml_variables): all, none, or the listed names.
+  def inherited_root_variables(name, job, root_variables)
+    setting = inherit_setting(name, job, 'variables')
+    return setting ? root_variables : {} if [true, false].include?(setting)
+
+    root_variables.slice(*setting)
+  end
+
+  # Top-level `variables:` as String => String. (Include rules do NOT see
+  # them; that is upstream's documented scope.)
+  def root_variables(config)
+    raw = config['variables']
+    return {} unless raw.is_a?(Hash)
+
+    raw.to_h do |k, v|
+      value =
+        if v.is_a?(Hash)
+          # `variables: FOO: { value: "...", description: "..." }` form.
+          (v['value'] || v[:value] || '').to_s
+        elsif v.nil?
+          ''
+        else
+          v.to_s
+        end
+      [k.to_s, value]
+    end
+  end
+
+  # Evaluate workflow:rules against `variables`. Returns { variables:,
+  # filtered: }: variables are the matched rule's `variables:` (String =>
+  # String, empty if none); filtered means workflow rules exist and matched
+  # nothing (or matched when: never), so upstream creates no pipeline
+  # (Chain::EvaluateWorkflowRules).
   def apply_workflow_rules(config, variables, project_dir:)
     workflow = config['workflow'] || config[:workflow]
     rules = workflow.is_a?(Hash) ? (workflow['rules'] || workflow[:rules]) : nil
-    return { variables: variables, filtered: false } if rules.nil?
+    return { variables: {}, filtered: false } if rules.nil?
 
     context = {
       project_dir: project_dir,
@@ -316,24 +424,24 @@ module PipelineBuilder
     }
     result = RulesEvaluator.evaluate_rules(rules, variables, context: context, mode: :job)
 
-    return { variables: variables, filtered: true } unless result[:matched]
-    return { variables: variables, filtered: true } if result[:when] && result[:when].to_s == 'never'
+    return { variables: {}, filtered: true } unless result[:matched]
+    return { variables: {}, filtered: true } if result[:when] && result[:when].to_s == 'never'
 
-    variables = variables.dup
     matched_vars = result[:attributes]['variables']
-    matched_vars.each { |k, v| variables[k.to_s] = v.to_s } if matched_vars.is_a?(Hash)
-    { variables: variables, filtered: false }
+    rule_variables = matched_vars.is_a?(Hash) ? matched_vars.to_h { |k, v| [k.to_s, v.to_s] } : {}
+    { variables: rule_variables, filtered: false }
   end
 
-  # Split jobs into those `rules:` keep under `variables` and those they
-  # drop, with the reason.
+  # Split jobs into those `rules:` keep and those they drop, with the
+  # reason. The block yields (name, job) and returns the variables that
+  # job's rules see.
   #
   # A job is kept iff it has no `rules:`, or its first matching rule's
   # `when:` is not `never`. A job with rules but no matching rule is
   # dropped (upstream). Matched rule attributes are merged into the job.
   #
   # @return [Array(Hash, Hash)] [kept name => config, excluded name => reason]
-  def filter_jobs_by_rules(jobs, variables, project_dir:)
+  def filter_jobs_by_rules(jobs, project_dir:)
     kept = {}
     excluded = {}
     jobs.each do |name, job_config|
@@ -344,13 +452,13 @@ module PipelineBuilder
       end
 
       # Per-job overlay so rules can reference CI_JOB_NAME / CI_JOB_STAGE.
-      job_vars = variables.dup
+      job_vars = yield(name, job_config).dup
       job_vars['CI_JOB_NAME']  = name.to_s
       job_vars['CI_JOB_STAGE'] = (job_config['stage'] || job_config[:stage] || 'test').to_s
 
       context = {
         project_dir: project_dir,
-        default_branch: variables['CI_DEFAULT_BRANCH'] || 'main'
+        default_branch: job_vars['CI_DEFAULT_BRANCH'] || 'main'
       }
       result = RulesEvaluator.evaluate_rules(rules, job_vars, context: context, mode: :job)
       if !result[:matched]
