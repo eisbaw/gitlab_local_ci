@@ -33,7 +33,9 @@ module GitlabCiCli
     # - Simple matching algorithm: Runner assignment is straightforward
     # - Fail-fast on errors: Invalid configurations are rejected immediately
     class DryRunCommand
-      # Maximum simulation iterations to prevent infinite loops
+      # Bound on simulated ticks (TIME_STEP_SECONDS each). Only a pipeline
+      # still making progress reaches it (~2000 sequential 5 s jobs); a
+      # stuck one stops as soon as no state can change.
       MAX_ITERATIONS = 10000
 
       # Simulation time step in seconds
@@ -76,8 +78,6 @@ module GitlabCiCli
         return 1 if pipeline.nil?
 
         run_simulation(pipeline)
-
-        0
       rescue StandardError => e
         log_error("Dry-run failed: #{e.class.name}: #{e.message}")
         log_error("Backtrace: #{e.backtrace.first(5).join("\n")}") if @options[:verbose]
@@ -242,65 +242,58 @@ module GitlabCiCli
         end
       end
 
-      # Run simulation loop
+      # Run the simulation until every job is finished, nothing can change
+      # any more (stuck), or MAX_ITERATIONS ticks.
       #
-      # @param pipeline [Pipeline] Pipeline to simulate
+      # @param pipeline [MockPipeline] Pipeline to simulate
+      # @return [Integer] exit code: 0 success, 1 stuck/failed/gave up
       def run_simulation(pipeline)
         simulation_time = 0
-        iteration = 0
+        job_timers = {}    # job id => { start:, duration: }
+        job_to_runner = {} # job id => MockRunner running it
+        reported_wait = {} # job name => last reported wait reason
+        outcome = :max_iterations
 
-        # Track job start times and durations for simulation
-        job_timers = {}
-        # Track which runner is executing which job
-        job_to_runner = {}
+        MAX_ITERATIONS.times do
+          if pipeline_finished?(pipeline)
+            outcome = :finished
+            break
+          end
 
-        while !pipeline_finished?(pipeline) && iteration < MAX_ITERATIONS
-          # Process pipeline state transitions
           @server.process_pipeline(pipeline)
 
-          pipeline.skip_blocked_jobs.each do |job|
+          skipped = pipeline.skip_blocked_jobs
+          skipped.each do |job|
             log_info("[T+#{simulation_time}s] Job '#{job.name}' skipped (when: #{job.when_to_run}, previous jobs: #{pipeline.previous_status(job)})")
           end
 
-          # Process pending jobs - attempt to assign to runners
-          pending_jobs = pipeline.pending_jobs
-          pending_jobs.each do |job|
-            runner = assign_job_to_runner(job, simulation_time)
+          pipeline.pending_jobs.each do |job|
+            runner = assign_job_to_runner(job, simulation_time, reported_wait)
             job_to_runner[job.id] = runner if runner
           end
 
-          # Process running jobs - check if they should complete
           running_jobs = get_running_jobs(pipeline)
-          running_jobs.each do |job|
-            # Initialize timer if not set
-            job_timers[job.id] ||= { start: simulation_time, duration: DEFAULT_JOB_DURATION }
-
-            # Check if job should complete
-            timer = job_timers[job.id]
-            if simulation_time >= timer[:start] + timer[:duration]
-              complete_job(job, simulation_time)
-              # Release runner capacity
-              runner = job_to_runner[job.id]
-              release_runner_for_job(job, runner)
-            end
+          # Job states only change by a skip or a running job finishing, and
+          # runner capacity only frees when one does. With neither, every
+          # later tick would be this one again.
+          if running_jobs.empty? && skipped.empty?
+            outcome = :stuck
+            break
           end
 
-          # Advance simulation time
+          running_jobs.each do |job|
+            job_timers[job.id] ||= { start: simulation_time, duration: DEFAULT_JOB_DURATION }
+            timer = job_timers[job.id]
+            next unless simulation_time >= timer[:start] + timer[:duration]
+
+            complete_job(job, simulation_time)
+            release_runner_for_job(job, job_to_runner[job.id])
+          end
+
           simulation_time += TIME_STEP_SECONDS
-          iteration += 1
         end
 
-        # Check for infinite loop condition
-        if iteration >= MAX_ITERATIONS
-          log_error("")
-          log_error("Simulation terminated: Maximum iterations (#{MAX_ITERATIONS}) reached")
-          log_error("This may indicate:")
-          log_error("  - Circular dependencies in job needs")
-          log_error("  - Jobs stuck in pending state (no eligible runners)")
-          log_error("  - Jobs that never complete")
-        end
-
-        output_final_status(pipeline, simulation_time)
+        output_final_status(pipeline, simulation_time, outcome)
       end
 
       # Check if pipeline is finished
@@ -319,36 +312,60 @@ module GitlabCiCli
         pipeline.jobs.select(&:running?)
       end
 
-      # Assign job to an available runner
+      # Assign a ready job to a free runner, or report once per job and
+      # reason why it waits: no runner can ever take it (a warning, the
+      # pipeline will be stuck) or every runner that can is busy (normal
+      # queueing, a timeline line).
       #
       # @param job [MockJob] Job to assign
       # @param time [Integer] Current simulation time
+      # @param reported_wait [Hash] job name => last reported reason; updated
       # @return [MockRunner, nil] Assigned runner or nil if no runner available
-      def assign_job_to_runner(job, time)
+      def assign_job_to_runner(job, time, reported_wait)
         runner = @fleet.find_available_runner(job)
 
         if runner
-          # Assign job to runner
           runner.assign_job(job)
           job.transition_to(MockJob::STATUS_RUNNING)
 
           log_info("[T+#{time}s] Job '#{job.name}' → Runner '#{runner.id}'")
-          runner
-        else
-          log_warning("[T+#{time}s] Job '#{job.name}' waiting (no eligible runner)")
+          return runner
+        end
 
-          if @options[:verbose]
-            # Show job tags and runner compatibility for debugging
-            job_tags = job.tag_list || []
-            log_info("  Job tags: #{job_tags.inspect}")
-            log_info("  Available runners:")
-            @fleet.runners.each do |r|
-              can_handle = r.can_handle?(job)
-              has_capacity = r.has_capacity?
-              log_info("    - #{r.id}: tags=#{r.tags.inspect}, can_handle=#{can_handle}, has_capacity=#{has_capacity}")
-            end
-          end
-          nil
+        reason = @fleet.eligible_runners(job).empty? ? :no_runner : :busy
+        return nil if reported_wait[job.name] == reason
+
+        reported_wait[job.name] = reason
+        if reason == :no_runner
+          log_warning("[T+#{time}s] Job '#{job.name}' cannot start: #{no_runner_reason(job)}")
+        else
+          log_info("[T+#{time}s] Job '#{job.name}' queued: every runner that can take it is busy")
+        end
+        log_runner_compatibility(job) if @options[:verbose]
+        nil
+      end
+
+      # Why no runner in the fleet can ever take the job.
+      #
+      # @param job [MockJob] job with no eligible runner
+      # @return [String]
+      def no_runner_reason(job)
+        tags = job.tag_list || []
+        if tags.empty?
+          'it has no tags and no runner has run_untagged: true'
+        else
+          "no runner has tags [#{tags.join(', ')}]"
+        end
+      end
+
+      # Verbose: job tags against every runner.
+      #
+      # @param job [MockJob]
+      def log_runner_compatibility(job)
+        log_info("  Job tags: #{(job.tag_list || []).inspect}")
+        log_info("  Available runners:")
+        @fleet.runners.each do |r|
+          log_info("    - #{r.id}: tags=#{r.tags.inspect}, can_handle=#{r.can_handle?(job)}, has_capacity=#{r.has_capacity?}")
         end
       end
 
@@ -374,27 +391,64 @@ module GitlabCiCli
         runner.release_job(job)
       end
 
-      # Output final pipeline status
+      # Previous jobs listed per stuck job before "and N more".
+      STUCK_WAITS_FOR_MAX = 5
+
+      # Output final pipeline status and pick the exit code.
       #
-      # @param pipeline [Pipeline] Completed pipeline
+      # @param pipeline [MockPipeline]
       # @param time [Integer] Final simulation time
-      def output_final_status(pipeline, time)
+      # @param outcome [Symbol] :finished, :stuck or :max_iterations
+      # @return [Integer] exit code
+      def output_final_status(pipeline, time, outcome)
         log_info("")
-        log_info("Simulation completed at T+#{time}s")
+        log_info("Simulation #{outcome == :finished ? 'completed' : 'stopped'} at T+#{time}s")
         log_info("")
 
-        # Unfinished jobs after the loop can only mean it gave up.
-        status = pipeline_finished?(pipeline) ? pipeline.status : 'stuck'
-
+        status = outcome == :finished ? pipeline.status : 'stuck'
         log_info("Pipeline status: #{status}")
 
-        # Job summary by status
         log_info("Job summary:")
         status_counts = Hash.new(0)
         pipeline.jobs.each { |job| status_counts[job.status] += 1 }
-
         status_counts.each do |job_status, count|
           log_info("  #{job_status}: #{count}")
+        end
+
+        case outcome
+        when :finished
+          [MockPipeline::STATE_FAILED, :canceled].include?(status) ? 1 : 0
+        when :stuck
+          report_stuck_jobs(pipeline, time)
+          1
+        else
+          log_error("Simulation gave up after #{MAX_ITERATIONS} simulated seconds with jobs still running or queued")
+          1
+        end
+      end
+
+      # One line per job that can never start, with the reason.
+      #
+      # @param pipeline [MockPipeline] stuck: no job running, none can start
+      # @param time [Integer]
+      def report_stuck_jobs(pipeline, time)
+        stuck_jobs = pipeline.jobs.select(&:pending?)
+        ready = pipeline.pending_jobs
+        log_error("Pipeline stuck at T+#{time}s: #{stuck_jobs.size} job(s) can never start")
+        stuck_jobs.each do |job|
+          reason = if ready.include?(job)
+                     # Nothing runs, so every runner is free: a ready job
+                     # left pending has no eligible runner, or capacity leaked.
+                     unless @fleet.eligible_runners(job).empty?
+                       raise "invariant: '#{job.name}' is ready, nothing runs, yet eligible runners exist (capacity leak?)"
+                     end
+                     no_runner_reason(job)
+                   else
+                     waits_for = pipeline.previous_jobs(job).reject(&:finished?).map(&:name)
+                     more = waits_for.size > STUCK_WAITS_FOR_MAX ? ", and #{waits_for.size - STUCK_WAITS_FOR_MAX} more" : ''
+                     "waits for #{waits_for.first(STUCK_WAITS_FOR_MAX).join(', ')}#{more}"
+                   end
+          log_error("  - #{job.name}: #{reason}")
         end
       end
 

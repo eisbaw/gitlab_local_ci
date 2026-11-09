@@ -10,6 +10,7 @@ Pipeline #1 created with 12 job(s)
 [T+6s] Job 'test:frontend:e2e' → Runner 'runner_001'
 [T+6s] Job 'test:backend:unit' → Runner 'runner_001'
 [T+6s] Job 'test:backend:api' → Runner 'runner_001'
+[T+6s] Job 'integration:smoke' queued: every runner that can take it is busy
 [T+11s] Job 'test:frontend:unit' completed
 [T+11s] Job 'test:frontend:e2e' completed
 [T+11s] Job 'test:backend:unit' completed

@@ -4,6 +4,10 @@ Pipeline #1 created with 11 job(s)
 [T+0s] Job 'integration:test' → Runner 'runner_001'
 [T+0s] Job 'unit:test:parallel' → Runner 'runner_001'
 [T+0s] Job 'e2e:test' → Runner 'runner_001'
+[T+0s] Job 'stress:test' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices' queued: every runner that can take it is busy
 [T+5s] Job 'test:matrix' completed
 [T+5s] Job 'integration:test' completed
 [T+5s] Job 'unit:test:parallel' completed

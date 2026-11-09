@@ -525,6 +525,59 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
     end
   end
 
+  # TASK-28: a pipeline that cannot finish exits non-zero right away with
+  # one reason per job; capacity queueing is a timeline line, not a warning.
+  context 'stuck and queued jobs' do
+    def dry_run_config(config, runners)
+      Dir.mktmpdir do |dir|
+        entry = File.join(dir, '.gitlab-ci.yml')
+        File.write(entry, config)
+        with_temp_runner_fleet(runners) { |runners_dir| return run_dry_run(entry, runners_dir: runners_dir) }
+      end
+    end
+
+    let(:docker_only) { [{ id: 'docker-runner', tags: ['docker'], max_jobs: 2, run_untagged: false, executor: 'docker' }] }
+
+    it 'stops at once, exits 1 and names the missing tags and the jobs waiting behind' do
+      stdout, stderr, status = dry_run_config(<<~YAML, docker_only)
+        stages: [build, test]
+        gpu_build: {stage: build, tags: [gpu, linux], script: b}
+        ok_build: {stage: build, tags: [docker], script: b}
+        test: {stage: test, tags: [docker], script: t}
+      YAML
+
+      expect(status).to eq(1)
+      expect(stdout).to include('Pipeline status: stuck', 'Simulation stopped at T+6s', "Job 'ok_build' completed")
+      expect(stderr.scan(/gpu_build' cannot start/).size).to eq(1)
+      expect(stderr).to include('Pipeline stuck at T+6s: 2 job(s) can never start',
+                                '  - gpu_build: no runner has tags [gpu, linux]',
+                                '  - test: waits for gpu_build')
+    end
+
+    it 'explains an untagged job without a run_untagged runner' do
+      _stdout, stderr, status = dry_run_config(<<~YAML, docker_only)
+        plain: {stage: test, script: p}
+      YAML
+
+      expect(status).to eq(1)
+      expect(stderr).to include('  - plain: it has no tags and no runner has run_untagged: true')
+    end
+
+    it 'reports a capacity wait once per job on stdout, without warnings' do
+      stdout, stderr, status = dry_run_config(<<~YAML, [{ id: 'one', tags: [], max_jobs: 1, run_untagged: true, executor: 'shell' }])
+        a: {stage: test, script: a}
+        b: {stage: test, script: b}
+        c: {stage: test, script: c}
+      YAML
+
+      expect(status).to eq(0), "STDERR: #{stderr}"
+      expect(stderr).to be_empty
+      expect(stdout.scan(/Job 'b' queued: every runner that can take it is busy/).size).to eq(1)
+      expect(stdout.scan(/Job 'c' queued/).size).to eq(1)
+      expect(stdout).to include("[T+12s] Job 'c' → Runner 'one'", 'Pipeline status: success')
+    end
+  end
+
   # TASK-43: only include:template needs the GitLab checkout; a normal
   # repo has no ./gitlab.
   context 'without a GitLab checkout' do
@@ -553,22 +606,34 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
   end
 
   context 'complex pipeline simulation' do
+    # No runner in spec/fixtures/runners has [docker, security] (security_scan)
+    # or [deploy, production] (deploy_production): with those the pipeline
+    # always ended stuck, which exited 0 until TASK-28. These examples are
+    # about a large pipeline running to completion, so they get a fleet
+    # that takes every job.
+    def run_complex
+      with_temp_runner_fleet([{ id: 'all-tags', tags: %w[docker linux build security deploy staging production], max_jobs: 3,
+                                run_untagged: true, executor: 'docker' }]) do |runners|
+        return run_dry_run(complex_pipeline_file, runners_dir: runners)
+      end
+    end
+
     describe 'complex_pipeline.yml' do
       it 'handles large pipeline with many stages and jobs' do
-        stdout, stderr, status = run_dry_run(complex_pipeline_file)
+        stdout, stderr, status = run_complex
 
         expect(status).to eq(0), "Failed on complex pipeline. STDERR: #{stderr}"
       end
 
       it 'shows execution of multiple stages' do
-        stdout, _stderr, _status = run_dry_run(complex_pipeline_file)
+        stdout, _stderr, _status = run_complex
 
         # Should show progression through stages
         expect(stdout).to match(/prepare|build|test|security|deploy/i)
       end
 
       it 'handles parallel jobs efficiently' do
-        stdout, _stderr, status = run_dry_run(complex_pipeline_file)
+        stdout, _stderr, status = run_complex
 
         expect(status).to eq(0)
 
@@ -581,7 +646,7 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
 
       it 'completes in reasonable time' do
         start_time = Time.now
-        stdout, stderr, status = run_dry_run(complex_pipeline_file)
+        stdout, stderr, status = run_complex
         elapsed = Time.now - start_time
 
         expect(status).to eq(0)

@@ -1,51 +1,17 @@
-Warning: [T+0s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+0s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+0s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+0s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+1s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+1s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+1s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+1s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+2s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+2s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+2s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+2s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+3s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+3s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+3s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+3s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+4s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+4s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+4s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+4s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+5s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+5s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+5s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+5s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+6s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+6s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+6s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+6s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+7s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+7s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+7s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+7s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+8s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+8s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+8s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+8s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+9s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+9s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+9s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+9s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+10s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+10s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+10s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+10s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+11s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+11s] Job 'build_complex' waiting (no eligible runner)
-Warning: [T+11s] Job 'build_advanced' waiting (no eligible runner)
-Warning: [T+11s] Job 'build_no_retry' waiting (no eligible runner)
-Warning: [T+12s] Job 'build_simple' waiting (no eligible runner)
-Warning: [T+12s] Job 'build_complex' waiting (no eligible runner)
-# total_lines=40006
+Warning: [T+0s] Job 'build_simple' cannot start: no runner has tags [docker, build]
+Warning: [T+0s] Job 'build_complex' cannot start: no runner has tags [docker, build]
+Warning: [T+0s] Job 'build_advanced' cannot start: no runner has tags [docker, build]
+Warning: [T+0s] Job 'build_no_retry' cannot start: no runner has tags [docker, build]
+Error: Pipeline stuck at T+0s: 11 job(s) can never start
+Error:   - build_simple: no runner has tags [docker, build]
+Error:   - build_complex: no runner has tags [docker, build]
+Error:   - build_advanced: no runner has tags [docker, build]
+Error:   - test_unit: waits for build_simple, build_complex, build_advanced, build_no_retry
+Error:   - test_integration: waits for build_simple, build_complex, build_advanced, build_no_retry
+Error:   - test_e2e: waits for build_simple, build_complex, build_advanced, build_no_retry
+Error:   - deploy_staging: waits for build_simple, build_complex, build_advanced, test_unit, test_integration, and 3 more
+Error:   - deploy_production: waits for build_simple, build_complex, build_advanced, test_unit, test_integration, and 3 more
+Error:   - deploy_canary: waits for build_simple, build_complex, build_advanced, test_unit, test_integration, and 3 more
+Error:   - build_no_retry: no runner has tags [docker, build]
+Error:   - test_security: waits for build_simple, build_complex, build_advanced, build_no_retry
+# total_lines=16

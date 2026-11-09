@@ -18,6 +18,7 @@ Pipeline #1 created with 12 job(s)
 [T+12s] Job 'job_many_after_commands' → Runner 'runner_001'
 [T+12s] Job 'job_script_fails' → Runner 'runner_001'
 [T+12s] Job 'job_before_fails' → Runner 'runner_001'
+[T+12s] Job 'job_complex_vars' queued: every runner that can take it is busy
 [T+17s] Job 'job_many_before_commands' completed
 [T+17s] Job 'job_many_after_commands' completed
 [T+17s] Job 'job_script_fails' completed

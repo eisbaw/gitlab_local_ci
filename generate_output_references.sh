@@ -73,9 +73,9 @@ snapshot() {
     local err code=0
     err="$(env "${unset_ci_args[@]}" "$CLI" "$@" --gitlab-dir "$GITLAB_DIR" 2>&1 > "$out")" || code=$?
     if [ -n "$err" ]; then
-        # The cap exists for proj13's stuck dry-run (one warning per job per
-        # simulated second, ~110k lines, TASK-28); total_lines still changes
-        # when that is fixed.
+        # Bound on golden size. It was needed for proj13's stuck dry-run
+        # (one warning per job per simulated second, ~110k lines) until
+        # TASK-28; total_lines keeps any regression to that visible.
         { head -n "$STDERR_LINES_MAX" <<< "$err"; echo "# total_lines=$(wc -l <<< "$err")"; } > "${out}.stderr"
     fi
     echo "$code" > "$code_file"

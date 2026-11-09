@@ -4,6 +4,7 @@ Pipeline #1 created with 7 job(s)
 [T+0s] Job 'test:redis' → Runner 'runner_001'
 [T+0s] Job 'test:mysql' → Runner 'runner_001'
 [T+0s] Job 'test:mongodb' → Runner 'runner_001'
+[T+0s] Job 'test:custom-service' queued: every runner that can take it is busy
 [T+5s] Job 'test:postgres' completed
 [T+5s] Job 'test:redis' completed
 [T+5s] Job 'test:mysql' completed

@@ -428,4 +428,18 @@ RSpec.describe RunnerFleet do
       expect { fleet.find_available_runner(nil) }.to raise_error(ArgumentError, /job cannot be nil/)
     end
   end
+
+  describe '#eligible_runners' do
+    it 'keeps runners whose tags take the job, busy or not' do
+      fleet = described_class.new
+      busy = MockRunner.new('id' => 'busy', 'tags' => ['docker'], 'max_jobs' => 1)
+      other = MockRunner.new('id' => 'other', 'tags' => ['arm'], 'max_jobs' => 4)
+      fleet.runners.push(busy, other)
+      job = MockJob.new('name' => 'j', 'tags' => ['docker'])
+      busy.assign_job(job)
+
+      expect(fleet.eligible_runners(job).map(&:id)).to eq(['busy'])
+      expect(fleet.find_available_runner(job)).to be_nil
+    end
+  end
 end

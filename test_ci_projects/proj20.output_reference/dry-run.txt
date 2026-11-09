@@ -4,6 +4,15 @@ Pipeline #1 created with 13 job(s)
 [T+0s] Job 'audit:backend:dependencies' → Runner 'runner_001'
 [T+0s] Job 'security:container:scan' → Runner 'runner_001'
 [T+0s] Job 'security:license:check' → Runner 'runner_001'
+[T+0s] Job 'validate:yaml' queued: every runner that can take it is busy
+[T+0s] Job 'validate:dependencies' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility' queued: every runner that can take it is busy
+[T+0s] Job 'security:sast' queued: every runner that can take it is busy
+[T+0s] Job 'security:dependency-scanning' queued: every runner that can take it is busy
+[T+0s] Job 'security:secrets' queued: every runner that can take it is busy
+[T+0s] Job 'quality:codeclimate' queued: every runner that can take it is busy
+[T+0s] Job 'cleanup:old-images' queued: every runner that can take it is busy
+[T+0s] Job 'notify:pipeline-status' queued: every runner that can take it is busy
 [T+5s] Job 'audit:frontend:dependencies' completed
 [T+5s] Job 'audit:backend:dependencies' completed
 [T+5s] Job 'security:container:scan' completed

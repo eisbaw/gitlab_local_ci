@@ -101,6 +101,19 @@ class RunnerFleet
     nil
   end
 
+  # Runners that could ever take the job: their tags match (load_runners
+  # rejects max_jobs < 1, so each has capacity once idle). Empty means the
+  # job can never start on this fleet, however long it waits; vs.
+  # find_available_runner nil, which may only mean busy right now.
+  #
+  # @param job [MockJob]
+  # @return [Array<MockRunner>]
+  def eligible_runners(job)
+    raise ArgumentError, "job cannot be nil" if job.nil?
+
+    @runners.select { |runner| runner.can_handle?(job) }
+  end
+
   private
 
   # Validate runner data has all required fields

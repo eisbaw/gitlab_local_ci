@@ -1,7 +1,7 @@
 Pipeline #1 created with 11 job(s)
 
 
-Simulation completed at T+10000s
+Simulation stopped at T+0s
 
 Pipeline status: stuck
 Job summary:

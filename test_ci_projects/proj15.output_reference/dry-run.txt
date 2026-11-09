@@ -4,6 +4,7 @@ Pipeline #1 created with 7 job(s)
 [T+0s] Job 'integration-tests' → Runner 'runner_001'
 [T+0s] Job 'coverage-formats' → Runner 'runner_001'
 [T+0s] Job 'full-test-suite' → Runner 'runner_001'
+[T+0s] Job 'go-tests' queued: every runner that can take it is busy
 [T+5s] Job 'unit-tests' completed
 [T+5s] Job 'integration-tests' completed
 [T+5s] Job 'coverage-formats' completed

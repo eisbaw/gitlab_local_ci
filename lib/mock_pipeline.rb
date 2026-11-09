@@ -160,7 +160,16 @@ class MockPipeline
   # @param job [MockJob]
   # @return [Symbol, nil]
   def previous_status(job)
-    composite_status(@previous_jobs.fetch(job.name), dag: job.dag?)
+    composite_status(previous_jobs(job), dag: job.dag?)
+  end
+
+  # The jobs `job` waits for: its needs for a DAG job, every job of every
+  # earlier stage otherwise.
+  #
+  # @param job [MockJob]
+  # @return [Array<MockJob>]
+  def previous_jobs(job)
+    @previous_jobs.fetch(job.name)
   end
 
   private
@@ -227,8 +236,7 @@ class MockPipeline
     end
   end
 
-  # The jobs `job` waits for: its needs for a DAG job, every job of every
-  # earlier stage otherwise.
+  # previous_jobs, computed once at creation.
   def select_previous_jobs(job)
     return @jobs.select { |j| job.needs.include?(j.name) } if job.dag?
 

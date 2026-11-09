@@ -10,6 +10,9 @@ Pipeline #1 created with 13 job(s)
 [T+6s] Job 'test:short-timeout' → Runner 'runner_001'
 [T+6s] Job 'test:interruptible' → Runner 'runner_001'
 [T+6s] Job 'test:non-interruptible' → Runner 'runner_001'
+[T+6s] Job 'test:complex-retry' queued: every runner that can take it is busy
+[T+6s] Job 'test:long-running' queued: every runner that can take it is busy
+[T+6s] Job 'test:precise-timeout' queued: every runner that can take it is busy
 [T+11s] Job 'test:with-timeout' completed
 [T+11s] Job 'test:short-timeout' completed
 [T+11s] Job 'test:interruptible' completed

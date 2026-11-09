@@ -1,7 +1,0 @@
-Warning: [T+0s] Job 'test:custom-service' waiting (no eligible runner)
-Warning: [T+1s] Job 'test:custom-service' waiting (no eligible runner)
-Warning: [T+2s] Job 'test:custom-service' waiting (no eligible runner)
-Warning: [T+3s] Job 'test:custom-service' waiting (no eligible runner)
-Warning: [T+4s] Job 'test:custom-service' waiting (no eligible runner)
-Warning: [T+5s] Job 'test:custom-service' waiting (no eligible runner)
-# total_lines=6
