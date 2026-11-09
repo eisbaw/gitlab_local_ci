@@ -2,26 +2,26 @@ Pipeline #1 created with 10 job(s)
 
 [T+0s] Job 'build:app' → Runner 'runner_001'
 [T+0s] Job 'build:assets' → Runner 'runner_001'
-[T+0s] Job 'test:unit' → Runner 'runner_001'
-[T+0s] Job 'test:coverage' → Runner 'runner_001'
+[T+0s] Job 'build:package' → Runner 'runner_001'
 [T+5s] Job 'build:app' completed
 [T+5s] Job 'build:assets' completed
-[T+5s] Job 'test:unit' completed
-[T+5s] Job 'test:coverage' completed
+[T+5s] Job 'build:package' completed
+[T+6s] Job 'test:unit' → Runner 'runner_001'
+[T+6s] Job 'test:coverage' → Runner 'runner_001'
 [T+6s] Job 'test:integration' → Runner 'runner_001'
-[T+6s] Job 'report:summary' → Runner 'runner_001'
-[T+6s] Job 'deploy:staging' → Runner 'runner_001'
-[T+6s] Job 'deploy:docs' → Runner 'runner_001'
+[T+6s] Job 'test:debug' → Runner 'runner_001'
+[T+11s] Job 'test:unit' completed
+[T+11s] Job 'test:coverage' completed
 [T+11s] Job 'test:integration' completed
-[T+11s] Job 'report:summary' completed
-[T+11s] Job 'deploy:staging' completed
-[T+11s] Job 'deploy:docs' completed
-[T+12s] Job 'test:debug' → Runner 'runner_001'
-[T+12s] Job 'build:package' → Runner 'runner_001'
-[T+17s] Job 'test:debug' completed
-[T+17s] Job 'build:package' completed
+[T+11s] Job 'test:debug' completed
+[T+12s] Job 'report:summary' → Runner 'runner_001'
+[T+17s] Job 'report:summary' completed
+[T+18s] Job 'deploy:staging' → Runner 'runner_001'
+[T+18s] Job 'deploy:docs' → Runner 'runner_001'
+[T+23s] Job 'deploy:staging' completed
+[T+23s] Job 'deploy:docs' completed
 
-Simulation completed at T+18s
+Simulation completed at T+24s
 
 Pipeline status: success
 Job summary:

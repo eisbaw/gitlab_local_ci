@@ -532,3 +532,16 @@ RSpec.describe MockJob do
     end
   end
 end
+
+RSpec.describe MockJob, 'scheduling attributes' do
+  it 'defaults to a stage-scheduled on_success job that may not fail' do
+    job = described_class.new('name' => 'j')
+
+    expect([job.scheduling_type, job.dag?, job.when_to_run, job.allow_failure]).to eq([:stage, false, 'on_success', false])
+  end
+
+  it 'rejects an unknown when: or scheduling_type' do
+    expect { described_class.new('name' => 'j', 'when' => 'never') }.to raise_error(ArgumentError, /unknown when: 'never'/)
+    expect { described_class.new('name' => 'j', 'scheduling_type' => :x) }.to raise_error(ArgumentError, /scheduling_type/)
+  end
+end

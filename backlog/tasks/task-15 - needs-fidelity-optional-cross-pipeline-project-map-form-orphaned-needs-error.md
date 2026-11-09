@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T20:12:00Z'
+updated_date: '2026-11-09T21:06:00Z'
 labels:
   - audit
   - needs
@@ -43,4 +43,6 @@ Forward-carried from TASK-4: the needs cascade now lives in PipelineBuilder.casc
 COMPASS 2026-11-09: on the 'good enough' line (tasks that must land before claiming GitLab parity for common configs).
 
 COMPASS: narrowed - optional/cross-project cascade done in efda999; remaining: MockPipeline#extract_job_needs reads need['name'] (map-form needs dropped), fold per-command needs parsers, orphan-need pipeline error. Also absorb rules[].needs flatten from TASK-39.
+
+From TASK-7: MockPipeline#extract_job_needs now uses PipelineBuilder.same_pipeline_needs (job: key of the map form, optional need on an absent job dropped, {project:}/{pipeline:}/{ref:} needs ignored); required_same_pipeline_needs is derived from the same parser. Spec: spec/unit/mock_pipeline_spec.rb 'reads the job: key of map-form needs'. Still open here: orphan-need pipeline error, folding dag/run/export-just/lint needs parsers.
 <!-- SECTION:NOTES:END -->

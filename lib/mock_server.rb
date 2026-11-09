@@ -96,7 +96,7 @@ class MockServer
   def create_pipeline_from(stages:, jobs:, ref: nil, variables: nil)
     raise ConfigurationError, "No jobs defined in configuration" if jobs.empty?
 
-    validate_job_configs(jobs)
+    validate_job_configs(jobs, stages)
     validate_dag(jobs)
 
     @pipeline_counter += 1
@@ -153,10 +153,15 @@ class MockServer
   # Validate job configurations
   #
   # @param job_configs [Hash] Job configurations
-  def validate_job_configs(job_configs)
+  # @param stages [Array<String>] the pipeline's stages
+  def validate_job_configs(job_configs, stages)
     errors = []
 
     job_configs.each do |job_name, job_config|
+      # Same wording as lint. .pre/.post are not implicit yet (TASK-17).
+      stage = (job_config['stage'] || job_config[:stage] || MockPipeline::DEFAULT_JOB_STAGE).to_s
+      errors << "Job '#{job_name}' references undefined stage '#{stage}'" unless stages.include?(stage)
+
       # Validate script is present (unless trigger or pages is defined)
       script = job_config['script'] || job_config[:script]
       trigger = job_config['trigger'] || job_config[:trigger]
@@ -252,7 +257,7 @@ class MockServer
       event_type = case new_status
                    when MockPipeline::STATE_RUNNING
                      EVENT_PIPELINE_STARTED
-                   when MockPipeline::STATE_SUCCESS, MockPipeline::STATE_FAILED
+                   when MockPipeline::STATE_SUCCESS, MockPipeline::STATE_FAILED, :skipped, :canceled
                      EVENT_PIPELINE_COMPLETED
                    end
 

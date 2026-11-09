@@ -1,26 +1,26 @@
 Pipeline #1 created with 9 job(s)
 
 [T+0s] Job 'build_main' → Runner 'runner_001'
-[T+0s] Job 'test_comprehensive' → Runner 'runner_001'
-[T+0s] Job 'deploy_staging' → Runner 'runner_001'
-[T+0s] Job 'deploy_production' → Runner 'runner_001'
 [T+5s] Job 'build_main' completed
-[T+5s] Job 'test_comprehensive' completed
-[T+5s] Job 'deploy_staging' completed
-[T+5s] Job 'deploy_production' completed
-[T+6s] Job 'notify_success' → Runner 'runner_001'
-[T+6s] Job 'notify_failure' → Runner 'runner_001'
-[T+6s] Job 'cleanup_always' → Runner 'runner_001'
+[T+6s] Job 'test_comprehensive' → Runner 'runner_001'
 [T+6s] Job 'experimental_test' → Runner 'runner_001'
-[T+11s] Job 'notify_success' completed
-[T+11s] Job 'notify_failure' completed
-[T+11s] Job 'cleanup_always' completed
+[T+6s] Job 'integration_test' → Runner 'runner_001'
+[T+11s] Job 'test_comprehensive' completed
 [T+11s] Job 'experimental_test' completed
-[T+12s] Job 'integration_test' → Runner 'runner_001'
-[T+17s] Job 'integration_test' completed
+[T+11s] Job 'integration_test' completed
+[T+12s] Job 'deploy_staging' → Runner 'runner_001'
+[T+12s] Job 'deploy_production' → Runner 'runner_001'
+[T+12s] Job 'notify_success' → Runner 'runner_001'
+[T+17s] Job 'deploy_staging' completed
+[T+17s] Job 'deploy_production' completed
+[T+17s] Job 'notify_success' completed
+[T+18s] Job 'notify_failure' skipped (when: on_failure, previous jobs: success)
+[T+18s] Job 'cleanup_always' → Runner 'runner_001'
+[T+23s] Job 'cleanup_always' completed
 
-Simulation completed at T+18s
+Simulation completed at T+24s
 
 Pipeline status: success
 Job summary:
-  completed: 9
+  completed: 8
+  skipped: 1

@@ -1,13 +1,13 @@
 Pipeline #1 created with 3 job(s)
 
 [T+0s] Job 'build_job' → Runner 'runner_001'
-[T+0s] Job 'test_job' → Runner 'runner_001'
-[T+0s] Job 'deploy_job' → Runner 'runner_001'
 [T+5s] Job 'build_job' completed
-[T+5s] Job 'test_job' completed
-[T+5s] Job 'deploy_job' completed
+[T+6s] Job 'test_job' → Runner 'runner_001'
+[T+11s] Job 'test_job' completed
+[T+12s] Job 'deploy_job' → Runner 'runner_001'
+[T+17s] Job 'deploy_job' completed
 
-Simulation completed at T+6s
+Simulation completed at T+18s
 
 Pipeline status: success
 Job summary:

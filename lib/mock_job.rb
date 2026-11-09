@@ -18,7 +18,16 @@
 # It tracks job metadata and handles state transitions
 class MockJob
   attr_reader :id, :name, :stage, :script, :image, :services, :artifacts,
-              :variables, :tag_list, :status, :needs
+              :variables, :tag_list, :status, :needs,
+              :allow_failure, :when_to_run, :scheduling_type
+
+  # Upstream Entry::Job#scheduling_type: :dag when `needs:` is defined (even
+  # `needs: []`), else :stage.
+  SCHEDULING_TYPES = %i[stage dag].freeze
+
+  # Upstream Entry::Processable `when:` values a pipeline job can carry
+  # (`never` jobs are not created).
+  WHEN_VALUES = %w[on_success on_failure always manual delayed].freeze
 
   # Job status states
   STATUS_PENDING = :pending
@@ -49,10 +58,22 @@ class MockJob
     @needs = data['needs'] || data[:needs] || []
     @status = STATUS_PENDING
 
-    # TODO: Parse additional job configuration
-    # TODO: Handle when/rules conditions
-    # TODO: Handle allow_failure flag
-    # TODO: Handle retry configuration
+    # Only `true` lets a failure pass: `allow_failure: {exit_codes: ...}`
+    # depends on an exit code the simulator does not produce.
+    @allow_failure = (data['allow_failure'] || data[:allow_failure]) == true
+    @when_to_run = (data['when'] || data[:when] || 'on_success').to_s
+    @scheduling_type = data['scheduling_type'] || data[:scheduling_type] || :stage
+    unless WHEN_VALUES.include?(@when_to_run)
+      raise ArgumentError, "job '#{@name}': unknown when: '#{@when_to_run}'. Must be one of: #{WHEN_VALUES.join(', ')}"
+    end
+    unless SCHEDULING_TYPES.include?(@scheduling_type)
+      raise ArgumentError, "job '#{@name}': unknown scheduling_type #{@scheduling_type.inspect}"
+    end
+  end
+
+  # @return [Boolean] waits for its needs only, not for earlier stages
+  def dag?
+    @scheduling_type == :dag
   end
 
   # Transition job to a new status

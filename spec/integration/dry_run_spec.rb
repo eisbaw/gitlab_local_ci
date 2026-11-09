@@ -497,6 +497,34 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
     end
   end
 
+  # TASK-7: stage order through the real command; one runner with room for
+  # every job, so start times are decided by ordering alone.
+  context 'stage ordering' do
+    it 'starts stage jobs after earlier stages, needs: [] at once, needs: [x] after x' do
+      config = <<~YAML
+        stages: [build, test, deploy]
+        build_a: {stage: build, script: a}
+        build_b: {stage: build, script: b}
+        test: {stage: test, script: t}
+        after_a: {stage: deploy, script: x, needs: [build_a]}
+        independent: {stage: deploy, script: i, needs: []}
+        deploy: {stage: deploy, script: d}
+      YAML
+      Dir.mktmpdir do |dir|
+        entry = File.join(dir, '.gitlab-ci.yml')
+        File.write(entry, config)
+        with_temp_runner_fleet([{ id: 'wide', tags: [], max_jobs: 10, run_untagged: true, executor: 'shell' }]) do |runners|
+          stdout, stderr, status = run_dry_run(entry, runners_dir: runners)
+
+          expect(status).to eq(0), "STDERR: #{stderr}"
+          starts = stdout.scan(/\[T\+(\d+)s\] Job '([^']+)' →/).to_h { |time, name| [name, time.to_i] }
+          expect(starts).to eq('build_a' => 0, 'build_b' => 0, 'independent' => 0,
+                               'test' => 6, 'after_a' => 6, 'deploy' => 12)
+        end
+      end
+    end
+  end
+
   # TASK-43: only include:template needs the GitLab checkout; a normal
   # repo has no ./gitlab.
   context 'without a GitLab checkout' do

@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+require 'set'
 require_relative 'mock_job'
+require_relative 'pipeline_builder'
 
 # MockPipeline represents a pipeline created from GitLab CI configuration
 # It holds stages, jobs, and state without requiring a database
@@ -32,6 +34,9 @@ class MockPipeline
   STATE_RUNNING = :running
   STATE_SUCCESS = :success
   STATE_FAILED = :failed
+
+  # Upstream Entry::Job default stage.
+  DEFAULT_JOB_STAGE = 'test'
 
   # Initialize pipeline with parsed configuration data
   #
@@ -52,19 +57,23 @@ class MockPipeline
 
     # Validate job dependencies
     validate_job_needs
+
+    # Who waits for whom is fixed at creation; only job states change. Kept
+    # so each simulated tick is O(jobs x previous jobs), not a re-scan of
+    # stages and names per job.
+    @previous_jobs = @jobs.to_h { |job| [job.name, select_previous_jobs(job)] }.freeze
   end
 
-  # Get pipeline status based on job states
-  # Status is derived, not stored - single source of truth principle
+  # Pipeline status, derived from job states (never stored): the composite
+  # of all jobs once they are finished (upstream status_of_all), else
+  # pending until the first job starts, running after.
   #
-  # @return [Symbol] Current pipeline status
+  # @return [Symbol] STATE_* or :skipped / :canceled
   def status
+    finished = composite_status(@jobs, dag: false)
+    return finished if finished
     return STATE_PENDING if @jobs.all?(&:pending?)
-    return STATE_RUNNING if @jobs.any?(&:running?)
-    return STATE_FAILED if @jobs.any?(&:failed?)
-    return STATE_SUCCESS if @jobs.all?(&:completed?)
 
-    # Mixed state: some finished, some not
     STATE_RUNNING
   end
 
@@ -91,14 +100,40 @@ class MockPipeline
     @jobs.any?(&:pending?)
   end
 
-  # Get list of pending jobs that are ready to run
-  # A job is ready if its dependencies (needs) are satisfied
+  # Pending jobs that may start now: their previous jobs are finished and
+  # their when: accepts the result. Pure query; see skip_blocked_jobs.
   #
-  # @return [Array<MockJob>] Array of pending jobs with satisfied dependencies
+  # @return [Array<MockJob>] in config order
   def pending_jobs
     @jobs.select do |job|
-      job.pending? && dependencies_satisfied?(job)
+      next false unless job.pending?
+
+      previous = previous_status(job)
+      previous && runnable_after?(job, previous)
     end
+  end
+
+  # Skip every pending job whose previous jobs are finished with a result
+  # its when: rejects (upstream ProcessBuildService: processable.skip).
+  # A skip can decide the jobs after it, so repeat to a fixed point; each
+  # pass skips at least one job or stops, so at most jobs.size + 1 passes.
+  #
+  # @return [Array<MockJob>] jobs skipped by this call, in skip order
+  def skip_blocked_jobs
+    skipped = []
+    (@jobs.size + 1).times do
+      blocked = @jobs.select do |job|
+        next false unless job.pending?
+
+        previous = previous_status(job)
+        previous && !runnable_after?(job, previous)
+      end
+      return skipped if blocked.empty?
+
+      blocked.each { |job| job.transition_to(MockJob::STATUS_SKIPPED) }
+      skipped.concat(blocked)
+    end
+    raise "skip_blocked_jobs: no fixed point after #{@jobs.size + 1} passes"
   end
 
   # Transition pipeline to new state
@@ -119,66 +154,61 @@ class MockPipeline
     @jobs.find { |job| job.name == name }
   end
 
+  # Result of the jobs this one waits for, or nil while any is unfinished
+  # (upstream AtomicProcessingService#status_of_previous_jobs).
+  #
+  # @param job [MockJob]
+  # @return [Symbol, nil]
+  def previous_status(job)
+    composite_status(@previous_jobs.fetch(job.name), dag: job.dag?)
+  end
+
   private
 
   # Build MockJob instances from GitLab job definitions
   #
-  # @param job_definitions [Hash] Job definitions from YamlProcessor (job_name => config)
+  # @param job_definitions [Hash] job name => config (PipelineBuilder::Result#pipeline_jobs)
   # @return [Array<MockJob>] Array of MockJob instances
   def build_mock_jobs(job_definitions)
-    job_counter = 0
+    job_names = job_definitions.keys.map(&:to_s)
 
-    job_definitions.map do |job_name, job_def|
-      job_counter += 1
-
-      # Extract job needs (dependencies)
-      needs = extract_job_needs(job_def)
-
-      # Extract tags
-      tags = job_def[:tags] || job_def['tags'] || []
+    job_definitions.each_with_index.map do |(job_name, job_def), index|
+      needs_config = job_def['needs'] || job_def[:needs]
+      stage = (job_def['stage'] || job_def[:stage] || DEFAULT_JOB_STAGE).to_s
+      unless @stages.include?(stage)
+        raise ArgumentError, "Job '#{job_name}' has stage '#{stage}', not in stages #{@stages.inspect}"
+      end
 
       MockJob.new(
-        id: job_counter,
+        id: index + 1,
         name: job_name.to_s,
-        stage: (job_def[:stage] || job_def['stage']).to_s,
+        stage: stage,
         script: job_def[:script] || job_def['script'] || [],
         image: job_def[:image] || job_def['image'],
         services: job_def[:services] || job_def['services'] || [],
         artifacts: job_def[:artifacts] || job_def['artifacts'],
         variables: job_def[:variables] || job_def['variables'] || {},
-        tags: tags,
-        needs: needs
+        tags: job_def[:tags] || job_def['tags'] || [],
+        needs: extract_job_needs(needs_config, job_names),
+        scheduling_type: needs_config.nil? ? :stage : :dag,
+        allow_failure: job_def['allow_failure'] || job_def[:allow_failure],
+        when: job_def['when'] || job_def[:when]
       )
     end
   end
 
-  # Extract job needs from job definition
-  # Handles both simple array format and complex needs format
+  # Names of the jobs in this pipeline that `needs:` waits for (upstream
+  # aggregated_needs_names): `job:` of the map form, an optional need on a
+  # job not in the pipeline dropped, cross-pipeline needs ignored. A
+  # required need on a missing job stays and fails validate_job_needs.
   #
-  # @param job_def [Hash] Job definition
-  # @return [Array<String>] Job names this job depends on
-  def extract_job_needs(job_def)
-    needs = job_def[:needs] || job_def['needs']
-    return [] if needs.nil? || needs.empty?
-
-    # Handle complex needs format: { job: [...] }
-    if needs.is_a?(Hash)
-      job_needs = needs[:job] || needs['job'] || []
-      return job_needs.map { |need| need[:name] || need['name'] }.compact
+  # @param needs_config [Array, nil] the job's `needs:`
+  # @param job_names [Array<String>] jobs in this pipeline
+  # @return [Array<String>]
+  def extract_job_needs(needs_config, job_names)
+    PipelineBuilder.same_pipeline_needs(needs_config).filter_map do |name, optional|
+      name.to_s unless optional && !job_names.include?(name.to_s)
     end
-
-    # Handle simple array format
-    if needs.is_a?(Array)
-      return needs.map do |need|
-        if need.is_a?(Hash)
-          need[:name] || need['name']
-        else
-          need.to_s
-        end
-      end.compact
-    end
-
-    []
   end
 
   # Validate that all job needs reference existing jobs
@@ -197,31 +227,56 @@ class MockPipeline
     end
   end
 
-  # Check if all dependencies for a job are satisfied
-  # Looks at both stage order and explicit needs
+  # The jobs `job` waits for: its needs for a DAG job, every job of every
+  # earlier stage otherwise.
+  def select_previous_jobs(job)
+    return @jobs.select { |j| job.needs.include?(j.name) } if job.dag?
+
+    stage_index = @stages.index(job.stage)
+    @jobs.select { |j| @stages.index(j.stage) < stage_index }
+  end
+
+  # Upstream Ci::ProcessBuildService#valid_statuses_for_processable. manual
+  # and delayed jobs run like on_success: the simulator has no one to
+  # press play and does not wait.
   #
-  # @param job [MockJob] Job to check
-  # @return [Boolean] True if dependencies are satisfied
-  def dependencies_satisfied?(job)
-    # Check explicit needs (DAG dependencies)
-    # If job has explicit needs, only check those (ignore stage order)
-    if job.needs.any?
-      return job.needs.all? do |needed_job_name|
-        needed_job = find_job(needed_job_name)
-        needed_job && needed_job.completed?
-      end
+  # @param job [MockJob]
+  # @param previous [Symbol] previous_status(job), not nil
+  def runnable_after?(job, previous)
+    case job.when_to_run
+    when 'on_success', 'manual', 'delayed'
+      job.dag? ? previous == :success : %i[success skipped].include?(previous)
+    when 'on_failure' then previous == :failed
+    when 'always' then %i[success failed skipped].include?(previous)
+    else raise ArgumentError, "job '#{job.name}': unhandled when: '#{job.when_to_run}'"
     end
+  end
 
-    # No explicit needs: check stage-based dependencies
-    # All jobs in prior stages must be complete
-    job_stage_index = @stages.index(job.stage)
+  # Gitlab::Ci::Status::Composite for the statuses the simulator produces;
+  # nil while any job is unfinished. No jobs is success (upstream
+  # status_for_array), which is what lets `needs: []` and the first stage
+  # start at once. A failed or canceled job with allow_failure counts as
+  # success (success_with_warnings).
+  #
+  # @param jobs [Array<MockJob>]
+  # @param dag [Boolean] a skipped need skips the DAG job
+  # @return [Symbol, nil] :success, :failed, :skipped, :canceled or nil
+  def composite_status(jobs, dag:)
+    return :success if jobs.empty?
+    return nil unless jobs.all?(&:finished?)
 
-    # First stage: no dependencies
-    return true if job_stage_index.nil? || job_stage_index.zero?
+    statuses = jobs.map do |job|
+      next :success if job.completed?
+      next :success if job.allow_failure && (job.failed? || job.canceled?)
 
-    # Check all jobs in prior stages are complete
-    prior_stages = @stages[0...job_stage_index]
-    prior_jobs = @jobs.select { |j| prior_stages.include?(j.stage) }
-    prior_jobs.all?(&:completed?)
+      job.status
+    end.to_set
+
+    return :skipped if dag && statuses.include?(:skipped)
+    return :skipped if statuses == Set[:skipped]
+    return :success if statuses.subset?(Set[:success, :skipped])
+    return :canceled if statuses.subset?(Set[:canceled, :success, :skipped])
+
+    :failed
   end
 end

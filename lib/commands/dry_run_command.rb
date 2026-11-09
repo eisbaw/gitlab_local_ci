@@ -258,8 +258,12 @@ module GitlabCiCli
           # Process pipeline state transitions
           @server.process_pipeline(pipeline)
 
+          pipeline.skip_blocked_jobs.each do |job|
+            log_info("[T+#{simulation_time}s] Job '#{job.name}' skipped (when: #{job.when_to_run}, previous jobs: #{pipeline.previous_status(job)})")
+          end
+
           # Process pending jobs - attempt to assign to runners
-          pending_jobs = get_pending_jobs(pipeline)
+          pending_jobs = pipeline.pending_jobs
           pending_jobs.each do |job|
             runner = assign_job_to_runner(job, simulation_time)
             job_to_runner[job.id] = runner if runner
@@ -307,36 +311,12 @@ module GitlabCiCli
         pipeline.jobs.all?(&:finished?)
       end
 
-      # Get pending jobs from pipeline
-      #
-      # @param pipeline [Pipeline] Pipeline to query
-      # @return [Array<MockJob>] List of pending jobs whose dependencies are satisfied
-      def get_pending_jobs(pipeline)
-        pipeline.jobs.select do |job|
-          job.pending? && dependencies_satisfied?(job, pipeline)
-        end
-      end
-
       # Get running jobs from pipeline
       #
       # @param pipeline [Pipeline] Pipeline to query
       # @return [Array<MockJob>] List of running jobs
       def get_running_jobs(pipeline)
         pipeline.jobs.select(&:running?)
-      end
-
-      # Check if job dependencies are satisfied
-      #
-      # @param job [MockJob] Job to check
-      # @param pipeline [Pipeline] Pipeline containing all jobs
-      # @return [Boolean] True if all needed jobs are completed
-      def dependencies_satisfied?(job, pipeline)
-        return true if job.needs.empty?
-
-        job.needs.all? do |needed_job_name|
-          needed_job = pipeline.jobs.find { |j| j.name == needed_job_name }
-          needed_job && needed_job.completed?
-        end
       end
 
       # Assign job to an available runner
@@ -403,20 +383,8 @@ module GitlabCiCli
         log_info("Simulation completed at T+#{time}s")
         log_info("")
 
-        # Calculate status
-        all_completed = pipeline.jobs.all?(&:completed?)
-        any_failed = pipeline.jobs.any?(&:failed?)
-        any_pending = pipeline.jobs.any?(&:pending?)
-
-        status = if all_completed
-                   'success'
-                 elsif any_failed
-                   'failed'
-                 elsif any_pending
-                   'stuck'
-                 else
-                   'partial'
-                 end
+        # Unfinished jobs after the loop can only mean it gave up.
+        status = pipeline_finished?(pipeline) ? pipeline.status : 'stuck'
 
         log_info("Pipeline status: #{status}")
 

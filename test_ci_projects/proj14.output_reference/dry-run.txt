@@ -3,29 +3,29 @@ Pipeline #1 created with 13 job(s)
 [T+0s] Job 'build:basic-retry' → Runner 'runner_001'
 [T+0s] Job 'build:conditional-retry' → Runner 'runner_001'
 [T+0s] Job 'build:selective-retry' → Runner 'runner_001'
-[T+0s] Job 'test:with-timeout' → Runner 'runner_001'
 [T+5s] Job 'build:basic-retry' completed
 [T+5s] Job 'build:conditional-retry' completed
 [T+5s] Job 'build:selective-retry' completed
-[T+5s] Job 'test:with-timeout' completed
+[T+6s] Job 'test:with-timeout' → Runner 'runner_001'
 [T+6s] Job 'test:short-timeout' → Runner 'runner_001'
 [T+6s] Job 'test:interruptible' → Runner 'runner_001'
 [T+6s] Job 'test:non-interruptible' → Runner 'runner_001'
-[T+6s] Job 'test:complex-retry' → Runner 'runner_001'
+[T+11s] Job 'test:with-timeout' completed
 [T+11s] Job 'test:short-timeout' completed
 [T+11s] Job 'test:interruptible' completed
 [T+11s] Job 'test:non-interruptible' completed
-[T+11s] Job 'test:complex-retry' completed
-[T+12s] Job 'deploy:production' → Runner 'runner_001'
-[T+12s] Job 'deploy:staging' → Runner 'runner_001'
-[T+12s] Job 'deploy:complex' → Runner 'runner_001'
+[T+12s] Job 'test:complex-retry' → Runner 'runner_001'
 [T+12s] Job 'test:long-running' → Runner 'runner_001'
-[T+17s] Job 'deploy:production' completed
-[T+17s] Job 'deploy:staging' completed
-[T+17s] Job 'deploy:complex' completed
+[T+12s] Job 'test:precise-timeout' → Runner 'runner_001'
+[T+17s] Job 'test:complex-retry' completed
 [T+17s] Job 'test:long-running' completed
-[T+18s] Job 'test:precise-timeout' → Runner 'runner_001'
-[T+23s] Job 'test:precise-timeout' completed
+[T+17s] Job 'test:precise-timeout' completed
+[T+18s] Job 'deploy:production' → Runner 'runner_001'
+[T+18s] Job 'deploy:staging' → Runner 'runner_001'
+[T+18s] Job 'deploy:complex' → Runner 'runner_001'
+[T+23s] Job 'deploy:production' completed
+[T+23s] Job 'deploy:staging' completed
+[T+23s] Job 'deploy:complex' completed
 
 Simulation completed at T+24s
 

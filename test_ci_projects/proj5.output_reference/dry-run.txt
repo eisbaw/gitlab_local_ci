@@ -1,23 +1,23 @@
 Pipeline #1 created with 8 job(s)
 
 [T+0s] Job 'test_variables' → Runner 'runner_001'
-[T+0s] Job 'build_app' → Runner 'runner_001'
 [T+0s] Job 'variable_manipulation' → Runner 'runner_001'
 [T+0s] Job 'env_specific_vars' → Runner 'runner_001'
+[T+0s] Job 'test_precedence' → Runner 'runner_001'
 [T+5s] Job 'test_variables' completed
-[T+5s] Job 'build_app' completed
 [T+5s] Job 'variable_manipulation' completed
 [T+5s] Job 'env_specific_vars' completed
-[T+6s] Job 'unit_tests' → Runner 'runner_001'
-[T+6s] Job 'integration_tests' → Runner 'runner_001'
-[T+6s] Job 'test_precedence' → Runner 'runner_001'
-[T+11s] Job 'unit_tests' completed
-[T+11s] Job 'integration_tests' completed
-[T+11s] Job 'test_precedence' completed
-[T+12s] Job 'deploy_staging' → Runner 'runner_001'
-[T+17s] Job 'deploy_staging' completed
+[T+5s] Job 'test_precedence' completed
+[T+6s] Job 'build_app' → Runner 'runner_001'
+[T+11s] Job 'build_app' completed
+[T+12s] Job 'unit_tests' → Runner 'runner_001'
+[T+12s] Job 'integration_tests' → Runner 'runner_001'
+[T+17s] Job 'unit_tests' completed
+[T+17s] Job 'integration_tests' completed
+[T+18s] Job 'deploy_staging' → Runner 'runner_001'
+[T+23s] Job 'deploy_staging' completed
 
-Simulation completed at T+18s
+Simulation completed at T+24s
 
 Pipeline status: success
 Job summary:

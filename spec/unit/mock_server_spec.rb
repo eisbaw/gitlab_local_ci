@@ -266,6 +266,14 @@ RSpec.describe MockServer do
     end
   end
 
+  describe '#create_pipeline_from stage check' do
+    it 'rejects a job whose stage is not in stages, in lint\'s wording' do
+      expect do
+        described_class.new.create_pipeline_from(stages: %w[build], jobs: { 'j' => { 'script' => 'x' } })
+      end.to raise_error(MockServer::ConfigurationError, /Job 'j' references undefined stage 'test'/)
+    end
+  end
+
   describe 'event constants' do
     it 'should define all required event types' do
       expect(MockServer::EVENT_JOB_ASSIGNED).to eq(:job_assigned)

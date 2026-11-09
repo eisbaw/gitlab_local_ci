@@ -1,25 +1,25 @@
 Pipeline #1 created with 9 job(s)
 
 [T+0s] Job 'build' → Runner 'runner_001'
-[T+0s] Job 'deploy_production_hotfix' → Runner 'runner_001'
-[T+0s] Job 'stop_staging' → Runner 'runner_001'
-[T+0s] Job 'stop_production' → Runner 'runner_001'
 [T+5s] Job 'build' completed
-[T+5s] Job 'deploy_production_hotfix' completed
-[T+5s] Job 'stop_staging' completed
-[T+5s] Job 'stop_production' completed
 [T+6s] Job 'deploy_staging_app' → Runner 'runner_001'
 [T+6s] Job 'deploy_staging_database' → Runner 'runner_001'
 [T+11s] Job 'deploy_staging_app' completed
 [T+11s] Job 'deploy_staging_database' completed
 [T+12s] Job 'deploy_production_app' → Runner 'runner_001'
+[T+12s] Job 'deploy_production_hotfix' → Runner 'runner_001'
 [T+17s] Job 'deploy_production_app' completed
+[T+17s] Job 'deploy_production_hotfix' completed
 [T+18s] Job 'deploy_production_database' → Runner 'runner_001'
 [T+18s] Job 'deploy_monitoring' → Runner 'runner_001'
 [T+23s] Job 'deploy_production_database' completed
 [T+23s] Job 'deploy_monitoring' completed
+[T+24s] Job 'stop_staging' → Runner 'runner_001'
+[T+24s] Job 'stop_production' → Runner 'runner_001'
+[T+29s] Job 'stop_staging' completed
+[T+29s] Job 'stop_production' completed
 
-Simulation completed at T+24s
+Simulation completed at T+30s
 
 Pipeline status: success
 Job summary:

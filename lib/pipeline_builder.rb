@@ -522,16 +522,23 @@ module PipelineBuilder
   # {pipeline:}, {ref:}), which upstream does not resolve against this
   # pipeline's jobs (entry/need.rb, seed/build.rb#needs_errors).
   def required_same_pipeline_needs(needs_config)
+    same_pipeline_needs(needs_config).reject { |_name, optional| optional }.map(&:first)
+  end
+
+  # Needs on jobs of this pipeline, as [job name, optional] pairs, config
+  # order: String or {job:, optional:}; {project:}/{pipeline:}/{ref:} needs
+  # are cross-pipeline (upstream CrossDependency, not a build need).
+  def same_pipeline_needs(needs_config)
     return [] unless needs_config.is_a?(Array)
 
     needs_config.filter_map do |need|
       case need
-      when String then need
+      when String then [need, false]
       when Hash
-        next if need['optional'] == true
         next if %w[project pipeline ref].any? { |k| need.key?(k) }
+        next unless need['job']
 
-        need['job']
+        [need['job'], need['optional'] == true]
       end
     end
   end
