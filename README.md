@@ -209,8 +209,15 @@ refused with the list of instances; it never runs them all.
 `export-just` recipe names are just identifiers: each run of characters
 other than letters, digits, `_` and `-` becomes one `_`, a trailing one is
 dropped (`rspec 1/3` -> `rspec_1_3`, `build: [aws, x86]` -> `build_aws_x86`).
-If two jobs map to the same name, later ones (config order) get `-2`, `-3`,
-... The comment above each recipe keeps the job's real name.
+If two or more jobs map to the same name, every one of them gets `_` and the
+first 6 hex digits of the SHA-256 of its own job name (`a b` -> `a_b_c8687a`,
+`a/b` -> `a_b_c14cdd`); none keeps the bare `a_b`. A recipe name therefore
+never depends on the order of jobs in the config, and a suffixed name always
+runs the same job. Names that do not collide are unchanged. The comment above
+each recipe keeps the job's real name. Config text (job names, stages, tags,
+paths) only ever lands in the justfile as an identifier, as escaped comment
+text, or inside the quoted recipe body, so it cannot add recipes or
+assignments.
 
 **Example output:**
 ```

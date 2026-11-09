@@ -157,6 +157,19 @@ After upgrading:
 
 ## Breaking Changes
 
+### Unreleased
+
+- `export-just --shell` was removed: it was accepted but never read.
+  Recipes are shebang recipes run by `bash`; drop the flag from scripts
+  that pass it (it is now `Unknown flag: --shell`).
+- `export-just` recipe names for colliding job names changed. Before, the
+  first job (config order) kept the bare name and later ones got `-2`,
+  `-3`, ...; reordering jobs silently changed which job a name ran. Now
+  every job of a collision set gets `_<6 hex digits of SHA-256 of the job
+  name>` (`a b` -> `a_b_c8687a`) and none keeps the bare name. Regenerate
+  exported justfiles and update callers that used `-2`-style names; run
+  `just --list` to see the new ones. Non-colliding names are unchanged.
+
 ### Version 0.1.0 (Current)
 
 No breaking changes - this is the initial release.

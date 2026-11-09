@@ -12,6 +12,7 @@ require 'spec_helper'
 require 'open3'
 require 'tmpdir'
 require 'yaml'
+require 'json'
 
 # export-just writes recipes that behave like `run` (TASK-51, TASK-23).
 # The generated recipes are executed with `just` (from the dev shell);
@@ -231,12 +232,53 @@ RSpec.describe 'export-just', type: :integration do
     end
   end
 
-  it 'gives colliding recipe names a -2, -3 suffix in config order' do
-    justfile = export("'a b': {script: [echo 1]}\n'a/b': {script: [echo 2]}\n'a:b': {script: [echo 3]}\n")
-    expect(justfile).to include("# a b\n", "\na_b:\n", "# a/b\n", "\na_b-2:\n", "# a:b\n", "\na_b-3:\n")
-    stdout, stderr, status = just('a_b-3')
+  # The suffix is part of the recipe-name format (README): pinned here as
+  # literals, the first 6 hex digits of SHA-256 of each job name.
+  it 'gives every member of a recipe-name collision a suffix from its own job name' do
+    justfile = export("'a b': {script: [echo 1]}\n'a/b': {script: [echo 2]}\n'a:b': {script: [echo 3]}\n" \
+                      "'c d': {script: [echo 4]}\n")
+    expect(justfile).to include("# a b\n", "\na_b_c8687a:\n", "# a/b\n", "\na_b_c14cdd:\n",
+                                "# a:b\n", "\na_b_6783a3:\n", "\nc_d:\n")
+    expect(justfile).not_to match(/^a_b:/)
+    stdout, stderr, status = just('a_b_6783a3')
     expect(status).to eq(0), stderr
     expect(stdout).to eq("3\n")
+  end
+
+  # Behaviour, not text: every recipe is run and must echo its own job, in
+  # every order of the same jobs (graph mode, so dependencies are named by
+  # recipe too).
+  it 'maps each recipe to the same job whatever the order of the jobs in the config' do
+    jobs = { 'a b' => 'build', 'a/b' => 'build', 'a:b' => 'test', 'rspec 1/2' => 'test', 'rspec_1_2' => 'test',
+             'solo' => 'test' }
+    mappings = jobs.keys.permutation.to_a.values_at(0, 1, 119, 360, 719).map do |order|
+      yaml = "stages: [build, test]\n" + order.map { |name| "#{name.to_json}: {stage: #{jobs[name]}, script: [echo #{name.to_json}]}\n" }.join
+      export(yaml, '--flat')
+      stdout, stderr, status = just('--summary')
+      raise "just --summary: #{stderr}" unless status.zero?
+
+      stdout.split.to_h do |recipe|
+        out, err, code = just(recipe)
+        raise "just #{recipe}: #{err}" unless code.zero?
+
+        [recipe, out.chomp]
+      end
+    end
+    expect(mappings.uniq.size).to eq(1), mappings.inspect
+    expect(mappings.first.values.sort).to eq(jobs.keys.sort)
+    expect(mappings.first.keys).to include('solo')
+    expect(mappings.first.keys.grep(/\Aa_b_[0-9a-f]{6}\z/).size).to eq(3)
+    expect(mappings.first.keys.grep(/\Arspec_1_2_[0-9a-f]{6}\z/).size).to eq(2)
+  end
+
+  it 'fails, naming the jobs, when a suffixed name equals another job name' do
+    File.write(File.join(@project_dir, '.gitlab-ci.yml'),
+               "'a b': {script: [echo 1]}\n'a/b': {script: [echo 2]}\na_b_c8687a: {script: [echo 3]}\n")
+    _stdout, stderr, status = Open3.capture3(bin_path, 'export-just', *PinnedPipelineContext::CLI_ARGS,
+                                             '--entry', File.join(@project_dir, '.gitlab-ci.yml'),
+                                             '--output', justfile_path)
+    expect(status.exitstatus).to eq(1)
+    expect(stderr).to include('recipe name a_b_c8687a would be shared by jobs "a b", "a_b_c8687a"; rename one')
   end
 
   it 'no longer accepts --shell' do

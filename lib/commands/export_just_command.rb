@@ -18,6 +18,7 @@ require_relative '../pipeline_builder'
 require_relative '../job_environment'
 require_relative '../mock_pipeline'
 require_relative '../shell_quote'
+require 'digest'
 require 'time'
 
 module GitlabCiCli
@@ -64,6 +65,13 @@ module GitlabCiCli
       # A just identifier. Every recipe name written must match: anything
       # else could carry `:`, `:=` or a newline into the justfile.
       RECIPE_NAME_PATTERN = /\A[A-Za-z_][A-Za-z0-9_-]*\z/
+
+      # Hex digits of the SHA-256 of a job name that tell colliding recipe
+      # names apart (recipe_names): 24 bits, so two names of one collision
+      # set share a suffix with probability ~2^-24 (then an error, not a
+      # silent merge). Part of the recipe-name format: changing it renames
+      # recipes.
+      COLLISION_SUFFIX_LENGTH = 6
 
       # Characters that could end a `#` comment line or hide its text:
       # control characters (\n, \r, \t, ESC, ...), Unicode line/paragraph
@@ -147,33 +155,47 @@ module GitlabCiCli
         [generate_header, *recipes].join("\n\n") + "\n"
       end
 
-      # job name => recipe name, deterministic, config order. just
-      # identifiers are [A-Za-z_][A-Za-z0-9_-]*: each run of other
-      # characters becomes one '_', a trailing one is dropped, and a name
-      # not starting with a letter or '_' gets a leading '_'. Parallel
-      # instances read naturally: 'rspec 1/3' -> rspec_1_3,
-      # 'build: [aws, x]' -> build_aws_x. When names collide ('a b' and
-      # 'a/b'), the first keeps the name and each later one gets the first
-      # free '-2', '-3', ... suffix; the recipe's comment keeps the job's
-      # real name.
+      # job name => recipe name. just identifiers are [A-Za-z_][A-Za-z0-9_-]*:
+      # each run of other characters becomes one '_', a trailing one is
+      # dropped, and a name not starting with a letter or '_' gets a leading
+      # '_'. Parallel instances read naturally: 'rspec 1/3' -> rspec_1_3,
+      # 'build: [aws, x]' -> build_aws_x.
+      #
+      # When names collide ('a b' and 'a/b'), EVERY job of the collision set
+      # gets '_' + the first COLLISION_SUFFIX_LENGTH hex digits of SHA-256 of
+      # its own job name (a_b_c8687a, a_b_c14cdd); none keeps the bare name.
+      # A recipe name is so a function of its job name and of whether that
+      # name collides, never of config order. With first-come numbering,
+      # moving 'a/b' above 'a b' swapped which job `a_b` and `a_b-2` ran.
+      # Now a suffixed name only ever means its one job; a bare name means
+      # the only job with that base in this config, and when a second one
+      # appears it disappears (just: recipe not found) rather than silently
+      # running another job. The recipe's comment keeps the job's real name.
+      #
+      # @return [Hash{String => String}]
+      # @raise [RuntimeError] two jobs still share a name (a suffix collision,
+      #   or a job literally named like another's suffixed name)
       def recipe_names(job_names)
-        taken = {}
-        job_names.to_h do |name|
-          base = name.gsub(/[^A-Za-z0-9_-]+/, '_')
-          base = base.delete_suffix('_') if name.match?(/[^A-Za-z0-9_-]\z/) && base.size > 1
-          base = "_#{base}" unless base.match?(/\A[A-Za-z_]/)
-          recipe = base
-          # Bounded: at most job_names.size names are taken.
-          (2..job_names.size + 1).each do |n|
-            break unless taken.key?(recipe)
+        bases = job_names.to_h { |name| [name, recipe_base(name)] }
+        colliding = bases.values.tally.select { |_base, count| count > 1 }
+        names = bases.to_h do |name, base|
+          next [name, base] unless colliding.key?(base)
 
-            recipe = "#{base}-#{n}"
-          end
-          raise "recipe name #{recipe} still taken" if taken.key?(recipe)
-
-          taken[recipe] = true
-          [name, recipe]
+          [name, "#{base}_#{Digest::SHA256.hexdigest(name)[0, COLLISION_SUFFIX_LENGTH]}"]
         end
+        names.group_by { |_name, recipe| recipe }.each do |recipe, pairs|
+          next if pairs.size == 1
+
+          raise "recipe name #{recipe} would be shared by jobs #{pairs.map { |name, _| name.inspect }.join(', ')}; rename one"
+        end
+        names
+      end
+
+      # The identifier a job name maps to before collisions (recipe_names).
+      def recipe_base(name)
+        base = name.gsub(/[^A-Za-z0-9_-]+/, '_')
+        base = base.delete_suffix('_') if name.match?(/[^A-Za-z0-9_-]\z/) && base.size > 1
+        base.match?(/\A[A-Za-z_]/) ? base : "_#{base}"
       end
 
       # name => names of the jobs its recipe depends on (class comment).
