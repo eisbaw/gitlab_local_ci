@@ -15,72 +15,70 @@
 # limitations under the License.
 
 require_relative '../pipeline_builder'
-require 'open3'
+require_relative '../job_environment'
+require_relative '../mock_pipeline'
 
 module GitlabCiCli
   module Commands
-    # RunCommand executes a specific job locally
-    # Optionally includes dependencies in topologically sorted order
+    # RunCommand executes a job on this host the way a GitLab Runner shell
+    # executor would (JobEnvironment): the job's variables exported,
+    # before_script + script in one bash with errexit/pipefail, after_script
+    # in a second bash that also runs after a failure and sees
+    # CI_JOB_STATUS, both in the project directory.
     #
-    # MPED Principles Applied:
-    # - Fail-fast: Validates job exists and dependencies are acyclic
-    # - Explicit: Clear execution order and output
-    # - Simple: Straightforward script execution
+    # With --run-deps incl it first runs the jobs the target waits for,
+    # scheduled by MockPipeline exactly as dry-run schedules them (`needs:`
+    # for a DAG job, `needs: []` meaning none, earlier stages otherwise),
+    # with real outcomes deciding `when: on_failure` / `always` jobs.
+    #
+    # Exit code: that of the first job that failed and was not allowed to;
+    # 0 when there is none.
     class RunCommand
       attr_reader :options, :job_name
 
-      # Initialize the run command
-      #
+      # After SIGTERM, how long an after_script process group gets before
+      # SIGKILL.
+      KILL_GRACE_S = 5
+
+      # Exit code reported for a shell killed by a signal (shell convention).
+      SIGNAL_EXIT_BASE = 128
+
       # @param job_name [String] Name of the job to run
       # @param options [Hash] Command options
       # @option options [String] :entry Path to .gitlab-ci.yml file
       # @option options [String] :gitlab_dir Path to GitLab submodule
       # @option options [String] :run_deps 'incl' or 'excl' (include/exclude dependencies)
-      # @option options [Hash] :variables CI variables to set
+      # @option options [Hash] :variables CLI --variables
       # @option options [Boolean] :verbose Enable verbose output
       def initialize(job_name, options = {})
         @job_name = job_name
         @options = validate_options(options)
-        @stages = nil
-        @all_jobs = nil
       end
 
-      # Execute the run command
-      #
-      # @return [Integer] Exit code (0 for success, 1 for failure)
+      # @return [Integer] exit code
       def execute
-        result = PipelineBuilder.build(@options[:entry], PipelineBuilder::Context.from_options(@options))
+        context = PipelineBuilder::Context.from_options(@options)
+        result = PipelineBuilder.build(@options[:entry], context)
         unless result.ok?
           result.errors.each { |message| log_error(message) }
           return 1
         end
         return 1 unless runnable?(result)
 
-        @stages = result.stages
-        @all_jobs = expand_variables(result.pipeline_jobs, @options[:variables])
-
-        # Determine which jobs to run
-        jobs_to_run = if @options[:run_deps] == 'incl'
-                        resolve_dependencies(@job_name)
-                      else
-                        [@job_name]
-                      end
-
+        pipeline = plan(result)
         log_info("Execution plan:")
-        jobs_to_run.each_with_index do |job, idx|
-          log_info("  #{idx + 1}. #{job}")
-        end
+        pipeline.jobs.each_with_index { |job, index| log_info("  #{index + 1}. #{job.name}") }
         log_info("")
 
-        # Execute jobs in order
-        jobs_to_run.each do |job|
-          success = execute_job(job)
-          return 1 unless success
+        run_pipeline(pipeline) do |name|
+          environment = JobEnvironment.build(result, name, cli_variables: context.variables,
+                                                           project_dir: context.project_dir)
+          execute_job(environment, result.pipeline_jobs.fetch(name))
         end
-
-        log_info("")
-        log_info("All jobs completed successfully")
-        0
+        report(pipeline)
+      rescue JobEnvironment::Error => e
+        log_error(e.message)
+        1
       rescue StandardError => e
         log_error("Execution failed: #{e.message}")
         log_error("Backtrace: #{e.backtrace.first(5).join("\n")}") if @options[:verbose]
@@ -115,7 +113,12 @@ module GitlabCiCli
           log_error(PipelineBuilder::WORKFLOW_SKIPPED_MESSAGE)
           return false
         end
-        return true if result.pipeline_jobs.key?(@job_name)
+        if (job = result.pipeline_jobs[@job_name])
+          return true unless job['script'].nil?
+
+          log_error("Job '#{@job_name}' has no script (a trigger job): nothing to run locally")
+          return false
+        end
 
         if (reason = result.excluded_jobs[@job_name])
           log_error("Job '#{@job_name}' is excluded by rules in this pipeline context: #{reason}")
@@ -128,204 +131,180 @@ module GitlabCiCli
         false
       end
 
-      # Recursively expand variables in configuration
+      # The jobs to run, as a pipeline of their own, in stage order (config
+      # order within a stage).
       #
-      # @param obj [Object] Configuration object
-      # @param variables [Hash] Variable substitutions
-      # @return [Object] Configuration with variables expanded
-      def expand_variables(obj, variables)
-        case obj
-        when Hash
-          obj.transform_values { |v| expand_variables(v, variables) }
-        when Array
-          obj.map { |item| expand_variables(item, variables) }
-        when String
-          expanded = obj.dup
-          variables.each do |key, value|
-            value_str = value.to_s
-            expanded = expanded.gsub(/\$\{#{Regexp.escape(key)}\}/) { value_str }
-            expanded = expanded.gsub(/\$#{Regexp.escape(key)}\b/) { value_str }
-          end
-          expanded
-        else
-          obj
-        end
+      # excl: the target alone, run regardless of its `needs:` and `when:`:
+      # it was asked for, and there is nothing before it to wait for.
+      # incl: the target and every job it transitively waits for. That set
+      # is closed under MockPipeline#previous_jobs, so each job waits for
+      # the same jobs it waits for in the whole pipeline.
+      #
+      # @return [MockPipeline]
+      def plan(result)
+        stages = result.stages
+        jobs = if @options[:run_deps] == 'incl'
+                 whole = MockPipeline.new(id: 1, stages: stages, jobs: result.pipeline_jobs, ref: nil, variables: {})
+                 names = waited_for(whole, @job_name)
+                 result.pipeline_jobs.select { |name, _| names.include?(name) }
+               else
+                 { @job_name => result.pipeline_jobs.fetch(@job_name).except('needs', 'when') }
+               end
+        by_stage = jobs.sort_by.with_index { |(_, job), index| [stages.index(job['stage'] || PipelineBuilder::DEFAULT_JOB_STAGE), index] }
+        MockPipeline.new(id: 1, stages: stages, jobs: by_stage.to_h, ref: nil, variables: {})
       end
 
-      # Resolve job dependencies using topological sort
+      # `name` and every job it transitively waits for. Bounded: each job is
+      # visited once.
       #
-      # @param job_name [String] Name of the job
-      # @return [Array<String>] Ordered list of jobs (dependencies first)
-      def resolve_dependencies(job_name)
-        stages = @stages
-        visited = {}
-        result = []
+      # @return [Array<String>]
+      def waited_for(pipeline, name)
+        seen = [name]
+        queue = [name]
+        until queue.empty?
+          pipeline.previous_jobs(pipeline.find_job(queue.shift)).each do |job|
+            next if seen.include?(job.name)
 
-        # Recursive DFS to build dependency order
-        visit = lambda do |name|
-          return if visited[name]
-
-          job = @all_jobs[name]
-          return unless job # Skip if job doesn't exist
-
-          visited[name] = :visiting
-
-          # Add explicit 'needs' dependencies
-          needs = extract_needs(job)
-          needs.each do |dep|
-            if visited[dep] == :visiting
-              raise "Circular dependency detected: #{name} -> #{dep}"
-            end
-            visit.call(dep)
+            seen << job.name
+            queue << job.name
           end
-
-          # Add implicit stage dependencies if no explicit needs
-          if needs.empty?
-            job_stage = job['stage'] || job[:stage] || 'test'
-            job_stage_index = stages.index(job_stage)
-
-            if job_stage_index && job_stage_index > 0
-              # All jobs in previous stages are dependencies
-              previous_stages = stages[0...job_stage_index]
-              @all_jobs.each do |other_name, other_job|
-                other_stage = other_job['stage'] || other_job[:stage] || 'test'
-                if previous_stages.include?(other_stage)
-                  if visited[other_name] == :visiting
-                    raise "Circular dependency detected: #{name} -> #{other_name}"
-                  end
-                  visit.call(other_name)
-                end
-              end
-            end
-          end
-
-          visited[name] = :visited
-          result << name
         end
-
-        visit.call(job_name)
-        result
+        seen
       end
 
-      # Extract needs from job configuration
+      # Run pending jobs as MockPipeline lets them start, one at a time;
+      # skip those whose `when:` rejects their previous jobs' outcome.
+      # Bounded: every pass starts one job or ends the loop.
       #
-      # @param job [Hash] Job configuration
-      # @return [Array<String>] List of job names this job depends on
-      def extract_needs(job)
-        needs = job['needs'] || job[:needs]
-        return [] if needs.nil? || needs.empty?
+      # @yieldparam name [String] job to execute
+      # @yieldreturn [Integer] its exit code
+      def run_pipeline(pipeline)
+        (pipeline.jobs.size + 1).times do
+          pipeline.skip_blocked_jobs.each do |job|
+            log_info("Job '#{job.name}' skipped: when: #{job.when_to_run} and the jobs before it ended #{pipeline.previous_status(job)}")
+          end
+          job = pipeline.pending_jobs.first
+          return if job.nil?
 
-        if needs.is_a?(Array)
-          needs.map do |need|
-            case need
-            when String
-              need
-            when Hash
-              need['job'] || need[:job]
-            else
-              nil
-            end
-          end.compact
-        else
-          []
+          job.transition_to(MockJob::STATUS_RUNNING)
+          job.finish(yield(job.name))
         end
+        raise "run_pipeline: jobs still pending after #{pipeline.jobs.size + 1} passes"
       end
 
-      # Execute a single job
-      #
-      # @param job_name [String] Name of the job to execute
-      # @return [Boolean] True if job succeeded
-      def execute_job(job_name)
-        job = @all_jobs[job_name]
+      # @return [Integer] first not-allowed failure's exit code, else 0
+      def report(pipeline)
+        unfinished = pipeline.jobs.reject(&:finished?)
+        raise "jobs left unfinished: #{unfinished.map(&:name).join(', ')}" unless unfinished.empty?
 
+        log_info("")
+        log_info("Summary:")
+        pipeline.jobs.each { |job| log_info("  #{job.name}: #{outcome(job)}") }
+        failed = pipeline.jobs.find { |job| job.failed? && !job.allow_failure }
+        failed ? failed.exit_code : 0
+      end
+
+      def outcome(job)
+        return 'skipped' if job.skipped?
+        return 'success' if job.completed?
+        return "failed (exit code #{job.exit_code}, allowed to fail)" if job.allow_failure
+
+        "failed (exit code #{job.exit_code})"
+      end
+
+      # One job: main shell, then after_script shell. A job without script
+      # (trigger job) can only be a dependency here (runnable? refuses it
+      # as the target): it is reported, not run, and counts as success.
+      #
+      # @param environment [JobEnvironment::Job]
+      # @param job [Hash] the job's config, for display only
+      # @return [Integer] the main script's exit code
+      def execute_job(environment, job)
         log_info("=" * 80)
-        log_info("Running job: #{job_name}")
+        log_info("Running job: #{environment.name}")
         log_info("=" * 80)
-
-        # Build script to execute
-        script_lines = []
-
-        # Add before_script
-        before_script = job['before_script'] || job[:before_script]
-        if before_script
-          script_lines.concat(Array(before_script))
+        environment.warnings.each { |warning| log_warning(warning) }
+        if job['script'].nil?
+          log_info("No script (a trigger job): not run locally, counted as success")
+          return 0
         end
+        log_info("Image #{job['image'].inspect} is not used: the job runs on this host") if job['image'] && @options[:verbose]
+        log_info(environment.main_script) if @options[:verbose]
 
-        # Add main script
-        script = job['script'] || job[:script]
-        unless script
-          log_error("Job '#{job_name}' has no script to execute")
-          return false
-        end
-        script_lines.concat(Array(script))
+        exit_code = run_shell(environment.variables, environment.main_script, environment.project_dir)
+        run_after_script(environment, exit_code) if environment.after_script
 
-        # Add after_script
-        after_script = job['after_script'] || job[:after_script]
-        if after_script
-          script_lines.concat(Array(after_script))
-        end
-
-        # Execute script
-        full_script = script_lines.join("\n")
-
-        log_info("") if @options[:verbose]
-        log_info("Script:") if @options[:verbose]
-        log_info(full_script) if @options[:verbose]
-        log_info("") if @options[:verbose]
-
-        success = execute_script(full_script)
-
-        if success
-          log_info("")
-          log_info("Job '#{job_name}' completed successfully")
-          log_info("")
+        log_info("")
+        if exit_code.zero?
+          log_info("Job '#{environment.name}' succeeded")
         else
-          log_error("")
-          log_error("Job '#{job_name}' failed")
-          log_error("")
+          log_error("Job '#{environment.name}' failed with exit code #{exit_code}")
         end
-
-        success
+        exit_code
       end
 
-      # Execute a shell script
+      # Upstream: after_script errors and its timeout are reported and do
+      # not change the job's result (AFTER_SCRIPT_IGNORE_ERRORS defaults to
+      # true, common/consts.go DefaultAfterScriptIgnoreErrors).
+      def run_after_script(environment, main_exit_code)
+        status = main_exit_code.zero? ? 'success' : 'failed'
+        log_info("Running after script...")
+        exit_code = run_shell(environment.after_script_variables(status), environment.after_script,
+                              environment.project_dir, timeout_s: environment.after_script_timeout_s)
+        if exit_code == :timeout
+          log_warning("after_script timed out after #{environment.after_script_timeout_s}s and was killed; the job result is unchanged")
+        elsif !exit_code.zero?
+          log_warning("after_script failed with exit code #{exit_code}; the job result is unchanged")
+        end
+      end
+
+      # bash -c SHELL_PRELUDE + script, stdin empty (runner: `: | eval`),
+      # stdout/stderr inherited, variables on top of this process's
+      # environment (a shell executor's bash inherits the runner's too).
       #
-      # @param script [String] Shell script to execute
-      # @return [Boolean] True if script succeeded (exit code 0)
-      def execute_script(script)
-        # Use Open3.popen3 to capture output in real-time
-        # Use 'bash' from PATH instead of hardcoded /bin/bash for nix compatibility
-        Open3.popen3('bash', '-e') do |stdin, stdout, stderr, wait_thr|
-          stdin.write(script)
-          stdin.close
+      # With a timeout the shell gets its own process group, so everything
+      # it started is killed with it.
+      #
+      # @return [Integer, :timeout]
+      def run_shell(variables, script, project_dir, timeout_s: nil)
+        $stdout.flush
+        $stderr.flush
+        spawn_options = { chdir: project_dir, in: File::NULL }
+        spawn_options[:pgroup] = true if timeout_s
+        pid = Process.spawn(variables, 'bash', '-c', JobEnvironment::SHELL_PRELUDE + script, **spawn_options)
+        waiter = Process.detach(pid)
+        return exit_code_of(waiter.value) if timeout_s.nil?
 
-          # Read stdout and stderr simultaneously
-          threads = []
-          threads << Thread.new do
-            stdout.each_line do |line|
-              puts line
-            end
-          end
+        begin
+          return exit_code_of(waiter.value) if waiter.join(timeout_s)
 
-          threads << Thread.new do
-            stderr.each_line do |line|
-              $stderr.puts line
-            end
-          end
-
-          threads.each(&:join)
-
-          exit_status = wait_thr.value
-          exit_status.success?
+          kill_group(pid, waiter)
+          :timeout
+        ensure
+          kill_group(pid, waiter) if waiter.alive?
         end
       end
 
-      # Log info message
+      def kill_group(pid, waiter)
+        Process.kill('TERM', -pid)
+        Process.kill('KILL', -pid) unless waiter.join(KILL_GRACE_S)
+        waiter.join
+      rescue Errno::ESRCH
+        nil # already gone
+      end
+
+      def exit_code_of(status)
+        status.exitstatus || (SIGNAL_EXIT_BASE + status.termsig)
+      end
+
       def log_info(message)
         puts message
       end
 
-      # Log error message
+      def log_warning(message)
+        $stderr.puts "Warning: #{message}"
+      end
+
       def log_error(message)
         $stderr.puts "Error: #{message}"
       end

@@ -175,8 +175,18 @@ open MR). Exceptions, so MR rules work:
 `trigger`, `merge_request_event`, ...). The older names `merge_request` and
 `manual` still work as aliases for `merge_request_event` and `web`.
 
-These variables reach rules only; jobs run by `run` do not get them yet
-(TASK-22).
+`run <job>` and `export-just` give a job these variables too, plus the
+top-level, `workflow:rules:variables`, job, `rules:variables` and
+`--variables` ones, in GitLab's precedence and expanded as GitLab and the
+runner do (`lib/job_environment.rb`). Like a shell-executor runner, `run`
+executes before_script + script in one `bash` with errexit and pipefail in the
+project directory, then after_script in a second `bash` (also after a failure,
+with `CI_JOB_STATUS`, 5 min limit or `RUNNER_AFTER_SCRIPT_TIMEOUT`), and exits
+with the job's exit code (0 for an allowed failure). It runs on this host: no
+image, services, cache or artifacts. `--run-deps incl` first runs the jobs the
+target waits for, scheduled as dry-run schedules them. `export-just` writes
+one shebang recipe per job doing the same; its variables are a snapshot taken
+at export time.
 
 **Example output:**
 ```

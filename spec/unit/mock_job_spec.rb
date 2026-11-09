@@ -545,3 +545,39 @@ RSpec.describe MockJob, 'scheduling attributes' do
     expect { described_class.new('name' => 'j', 'scheduling_type' => :x) }.to raise_error(ArgumentError, /scheduling_type/)
   end
 end
+
+# run records real exit codes (TASK-22).
+RSpec.describe MockJob, 'exit codes' do
+  def finished(allow_failure, exit_code)
+    job = described_class.new('name' => 'j', 'allow_failure' => allow_failure)
+    job.transition_to(MockJob::STATUS_RUNNING)
+    job.finish(exit_code)
+    job
+  end
+
+  it 'completes on 0 and fails otherwise, keeping the code' do
+    expect([finished(nil, 0).status, finished(nil, 3).status, finished(nil, 3).exit_code])
+      .to eq([MockJob::STATUS_COMPLETED, MockJob::STATUS_FAILED, 3])
+  end
+
+  it 'allows a failure with allow_failure: true whatever the code' do
+    expect(finished(true, 3).allow_failure).to be(true)
+  end
+
+  it 'allows only listed codes with allow_failure: {exit_codes:} (Integer or list)' do
+    expect(finished({ 'exit_codes' => [3, 4] }, 4).allow_failure).to be(true)
+    expect(finished({ 'exit_codes' => 3 }, 3).allow_failure).to be(true)
+    expect(finished({ 'exit_codes' => [3] }, 5).allow_failure).to be(false)
+  end
+
+  it 'does not allow failure by exit_codes before a code exists (the simulator)' do
+    expect(described_class.new('name' => 'j', 'allow_failure' => { 'exit_codes' => [1] }).allow_failure).to be(false)
+  end
+
+  it 'refuses finish on a job that is not running, or a non-Integer code' do
+    expect { described_class.new('name' => 'j').finish(0) }.to raise_error(ArgumentError, /not running/)
+    job = described_class.new('name' => 'j')
+    job.transition_to(MockJob::STATUS_RUNNING)
+    expect { job.finish('0') }.to raise_error(ArgumentError, /Integer/)
+  end
+end

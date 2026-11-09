@@ -19,7 +19,7 @@
 class MockJob
   attr_reader :id, :name, :stage, :script, :image, :services, :artifacts,
               :variables, :tag_list, :status, :needs,
-              :allow_failure, :when_to_run, :scheduling_type
+              :when_to_run, :scheduling_type, :exit_code
 
   # Upstream Entry::Job#scheduling_type: :dag when `needs:` is defined (even
   # `needs: []`), else :stage.
@@ -58,9 +58,11 @@ class MockJob
     @needs = data['needs'] || data[:needs] || []
     @status = STATUS_PENDING
 
-    # Only `true` lets a failure pass: `allow_failure: {exit_codes: ...}`
-    # depends on an exit code the simulator does not produce.
-    @allow_failure = (data['allow_failure'] || data[:allow_failure]) == true
+    # `true`, or `{exit_codes: N | [N, ...]}` (upstream Entry::AllowFailure).
+    # The simulator produces no exit codes, so there only `true` lets a
+    # failure pass; `run` records real ones with finish.
+    @allow_failure_config = data['allow_failure'] || data[:allow_failure]
+    @exit_code = nil
     @when_to_run = (data['when'] || data[:when] || 'on_success').to_s
     @scheduling_type = data['scheduling_type'] || data[:scheduling_type] || :stage
     unless WHEN_VALUES.include?(@when_to_run)
@@ -69,6 +71,29 @@ class MockJob
     unless SCHEDULING_TYPES.include?(@scheduling_type)
       raise ArgumentError, "job '#{@name}': unknown scheduling_type #{@scheduling_type.inspect}"
     end
+  end
+
+  # Whether a failure of this job counts as success with warnings
+  # (upstream Ci::Processable#allow_failure?, #allowed_to_fail_with_code?).
+  #
+  # @return [Boolean]
+  def allow_failure
+    return true if @allow_failure_config == true
+    return false unless @allow_failure_config.is_a?(Hash) && @exit_code
+
+    Array(@allow_failure_config['exit_codes'] || @allow_failure_config[:exit_codes]).include?(@exit_code)
+  end
+
+  # End a running job with the exit code its script returned: 0 completes
+  # it, anything else fails it.
+  #
+  # @param exit_code [Integer]
+  def finish(exit_code)
+    raise ArgumentError, "exit code must be an Integer, got #{exit_code.inspect}" unless exit_code.is_a?(Integer)
+    raise ArgumentError, "job '#{@name}' is #{@status}, not running" unless running?
+
+    @exit_code = exit_code
+    transition_to(exit_code.zero? ? STATUS_COMPLETED : STATUS_FAILED)
   end
 
   # @return [Boolean] waits for its needs only, not for earlier stages

@@ -100,8 +100,14 @@ module PipelineBuilder
   # pipeline_jobs   name => job config of the jobs this pipeline creates,
   #                 rule attributes applied, config order (build only)
   # excluded_jobs   name => reason, visible jobs rules dropped (build only)
+  # predefined_variables  the pipeline's PredefinedVariables (build only):
+  #                 read from git once, here, so a job's environment
+  #                 (JobEnvironment) sees the set rules saw
+  # workflow_variables    `variables:` of the matched workflow rule, String
+  #                 => String, empty when none (build only)
   Result = Struct.new(:config, :job_definitions, :errors, :workflow_skipped,
-                      :pipeline_jobs, :excluded_jobs, keyword_init: true) do
+                      :pipeline_jobs, :excluded_jobs, :predefined_variables, :workflow_variables,
+                      keyword_init: true) do
     def ok?
       errors.empty?
     end
@@ -246,7 +252,8 @@ module PipelineBuilder
     rescue StandardError => e
       return failure("Error evaluating rules: #{e.message}")
     end
-    Result.new(config: result.config, job_definitions: result.job_definitions, errors: [], **evaluated)
+    Result.new(config: result.config, job_definitions: result.job_definitions, errors: [],
+               predefined_variables: predefined, **evaluated)
   end
 
   # Workflow rules, then job rules, over a resolved config and its visible
@@ -262,14 +269,15 @@ module PipelineBuilder
   # #calculate_yaml_variables!); predefined and CLI variables are not root
   # variables and always reach it.
   #
-  # @return [Hash] { workflow_skipped:, pipeline_jobs:, excluded_jobs: }
+  # @return [Hash] { workflow_skipped:, pipeline_jobs:, excluded_jobs:,
+  #   workflow_variables: }
   # @raise [StandardError] on a rule the evaluator rejects
   def evaluate_rules(config, jobs:, predefined:, cli_variables:, project_dir:)
     cli = cli_variables.to_h { |k, v| [k.to_s, v.to_s] }
     root = root_variables(config)
     workflow = apply_workflow_rules(config, predefined.merge(root).merge(cli), project_dir: project_dir)
     if workflow[:filtered]
-      return { workflow_skipped: true, pipeline_jobs: {}, excluded_jobs: {} }
+      return { workflow_skipped: true, pipeline_jobs: {}, excluded_jobs: {}, workflow_variables: {} }
     end
 
     root = root.merge(workflow[:variables])
@@ -278,7 +286,8 @@ module PipelineBuilder
                 .merge(inherited_root_variables(name, job, root)).merge(cli)
     end
     pipeline_jobs, excluded_jobs = drop_only_edge_stage_jobs(pipeline_jobs, excluded_jobs)
-    { workflow_skipped: false, pipeline_jobs: pipeline_jobs, excluded_jobs: excluded_jobs }
+    { workflow_skipped: false, pipeline_jobs: pipeline_jobs, excluded_jobs: excluded_jobs,
+      workflow_variables: workflow[:variables] }
   end
 
   # Upstream Chain::Populate#no_pipeline_to_create?: .pre/.post jobs alone

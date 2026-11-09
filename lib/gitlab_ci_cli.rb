@@ -57,7 +57,6 @@ module GitlabCiCli
       output: nil,
       flat: false,
       graph: false,
-      shell: 'bash',
     }.freeze
 
     def self.start(args)
@@ -146,9 +145,6 @@ module GitlabCiCli
           options[:flat] = true
         when '--graph'
           options[:graph] = true
-        when '--shell'
-          options[:shell] = require_value(arg, args[i + 1])
-          i += 1
         else
           if arg.start_with?('--')
             raise ArgumentError, "Unknown flag: #{arg}"
@@ -319,12 +315,12 @@ module GitlabCiCli
             --verbose         Increase output verbosity
             --format FORMAT   Output format: text|json|junit (default: text)
             --gitlab-dir DIR  GitLab checkout, read only by include:template (default: ./gitlab)
-            --run-deps MODE   For 'run' command: incl (with deps) | excl (only job) (default: excl)
+            --run-deps MODE   For 'run': incl (also the jobs it waits for, scheduled as in
+                              dry-run) | excl (only the job) (default: excl)
             --output FILE     Output file for export-just (default: stdout)
             -o FILE           Alias for --output
             --flat            Export flat justfile (no dependencies)
             --graph           Export with dependency graph (default)
-            --shell SHELL     Shell for recipes (default: bash)
             --help, -h        Show this help message
             --version, -v     Show version information
 

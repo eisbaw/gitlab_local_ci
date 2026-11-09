@@ -15,62 +15,76 @@
 # limitations under the License.
 
 require_relative '../pipeline_builder'
+require_relative '../job_environment'
+require_relative '../mock_pipeline'
 require 'time'
 
 module GitlabCiCli
   module Commands
-    # ExportJustCommand exports GitLab CI jobs as justfile recipes
+    # ExportJustCommand writes the pipeline's jobs as justfile recipes, each
+    # behaving like `run <job>` (both read JobEnvironment):
     #
-    # Generates two types of justfiles:
-    # - Flat: Independent recipes without dependencies
-    # - Graph: Recipes with full dependency graph
+    # - a shebang recipe (one bash for the whole body), so `cd`, exported
+    #   variables and multi-line `- |` entries keep their meaning;
+    # - the job's variables exported, values as of the export (CI_COMMIT_SHA
+    #   and friends are a snapshot: regenerate after committing);
+    # - cwd = the project directory, an absolute path (regenerate if the
+    #   checkout moves);
+    # - before_script + script in their own `bash -c` with the runner's
+    #   errexit/pipefail prelude, stdin empty;
+    # - after_script in a second `bash -c` that also runs after a failure,
+    #   with CI_JOB_STATUS=success|failed, under `timeout <after_script_timeout_s>` when coreutils
+    #   `timeout` exists; its failure is reported and does not change the
+    #   recipe's exit code, which is the script's.
     #
-    # MPED Principles Applied:
-    # - Single Source of Truth: Reuses parsing logic from RunCommand
-    # - Explicit: Clear output format with documentation
-    # - Fail-fast: Validates jobs and dependencies
+    # Graph mode: a recipe depends on the jobs MockPipeline says it waits for
+    # (its `needs:`, `needs: []` meaning none, else every earlier-stage job),
+    # except `when: on_failure` jobs. just runs dependencies and stops at the
+    # first failure, so a recipe is the success path: on_failure jobs never
+    # run there, `always` and `manual` jobs do (as in dry-run and run).
     class ExportJustCommand
       attr_reader :options
 
-      # Initialize the export-just command
-      #
+      # Quoted heredoc delimiter the job scripts are embedded with. A script
+      # line equal to it would end the heredoc early, so that is an error.
+      SCRIPT_DELIMITER = 'GITLAB_CI_CLI_SCRIPT_EOF'
+
       # @param options [Hash] Command options
       # @option options [String] :entry Path to .gitlab-ci.yml file
       # @option options [String] :gitlab_dir Path to GitLab submodule
       # @option options [String] :output Output filename
       # @option options [Boolean] :flat Generate flat list (no dependencies)
       # @option options [Boolean] :graph Generate with dependencies
-      # @option options [String] :shell Shell to use (default: bash)
-      # @option options [Hash] :variables CI variables
+      # @option options [Hash] :variables CLI --variables
       # @option options [Boolean] :verbose Enable verbose output
       def initialize(options = {})
         @options = validate_options(options)
-        @all_jobs = nil
-        @stages = nil
       end
 
-      # Execute the export command
-      #
       # @return [Integer] Exit code (0 for success, 1 for failure)
       def execute
-        return 1 unless load_config
+        context = PipelineBuilder::Context.from_options(@options)
+        result = PipelineBuilder.build(@options[:entry], context)
+        unless result.ok?
+          result.errors.each { |message| log_error(message) }
+          return 1
+        end
+        if result.workflow_skipped
+          log_error(PipelineBuilder::WORKFLOW_SKIPPED_MESSAGE)
+          return 1
+        end
 
-        # Generate appropriate justfile
-        output = if @options[:flat]
-                   generate_flat_justfile
-                 else
-                   generate_graph_justfile
-                 end
-
-        # Write to file or stdout
+        output = justfile(result, context)
         if @options[:output]
           File.write(@options[:output], output)
           log_info("Exported justfile to: #{@options[:output]}")
         else
           puts output
         end
-
         0
+      rescue JobEnvironment::Error => e
+        log_error(e.message)
+        1
       rescue StandardError => e
         log_error("Export failed: #{e.message}")
         log_error("Backtrace: #{e.backtrace.first(5).join("\n")}") if @options[:verbose]
@@ -79,10 +93,6 @@ module GitlabCiCli
 
       private
 
-      # Validate command options
-      #
-      # @param options [Hash] Raw options hash
-      # @return [Hash] Validated options with defaults
       def validate_options(options)
         {
           entry: options[:entry] || './.gitlab-ci.yml',
@@ -90,7 +100,6 @@ module GitlabCiCli
           output: options[:output],
           flat: options[:flat] || false,
           graph: options[:graph] || false,
-          shell: options[:shell] || 'bash',
           variables: options[:variables] || {},
           project: options[:project],
           pipeline: options[:pipeline],
@@ -99,267 +108,111 @@ module GitlabCiCli
         }
       end
 
-      # Load and process configuration
-      #
-      # @return [Boolean] false if the config could not be resolved (errors printed)
-      def load_config
-        result = PipelineBuilder.build(@options[:entry], PipelineBuilder::Context.from_options(@options))
-        unless result.ok?
-          result.errors.each { |message| log_error(message) }
-          return false
-        end
-        if result.workflow_skipped
-          log_error(PipelineBuilder::WORKFLOW_SKIPPED_MESSAGE)
-          return false
-        end
+      # @return [String] justfile content
+      def justfile(result, context)
+        jobs = result.pipeline_jobs
+        recipe_names = recipe_names(jobs.keys)
+        dependencies = @options[:flat] ? {} : dependencies(result)
+        names = @options[:flat] ? jobs.keys.sort : jobs.keys
 
-        @stages = result.stages
-        @all_jobs = expand_variables(result.pipeline_jobs, @options[:variables])
-        true
+        recipes = names.map do |name|
+          environment = JobEnvironment.build(result, name, cli_variables: context.variables,
+                                                           project_dir: context.project_dir)
+          environment.warnings.each { |warning| log_warning("#{name}: #{warning}") }
+          format_recipe(environment, jobs.fetch(name), recipe_names,
+                        dependencies.fetch(name, []))
+        end
+        [generate_header, *recipes].join("\n\n") + "\n"
       end
 
-      # Generate flat justfile (no dependencies)
+      # job name => recipe name: just identifiers are [A-Za-z_][A-Za-z0-9_-]*.
       #
-      # @return [String] Justfile content
-      def generate_flat_justfile
-        lines = []
-
-        # Header
-        lines << generate_header(flat: true)
-        lines << ""
-
-        # Variables section (if any)
-        if @options[:variables].any?
-          lines << "# Variables"
-          @options[:variables].each do |key, value|
-            lines << "export #{key} := \"#{escape_value(value)}\""
-          end
-          lines << ""
+      # @raise [RuntimeError] when two jobs map to one recipe name
+      def recipe_names(job_names)
+        names = job_names.to_h do |name|
+          recipe = name.gsub(/[^a-zA-Z0-9_-]/, '_')
+          recipe = "_#{recipe}" unless recipe.match?(/\A[A-Za-z_]/)
+          [name, recipe]
         end
+        clash = names.group_by { |_, recipe| recipe }.find { |_, pairs| pairs.size > 1 }
+        raise "jobs #{clash[1].map(&:first).map(&:inspect).join(' and ')} would both be recipe '#{clash[0]}'" if clash
 
-        # Generate recipe for each job (alphabetically sorted)
-        @all_jobs.keys.sort.each do |job_name|
-          job = @all_jobs[job_name]
-          lines << format_recipe(job_name, job, dependencies: [])
-          lines << ""
+        names
+      end
+
+      # name => names of the jobs its recipe depends on (class comment).
+      def dependencies(result)
+        pipeline = MockPipeline.new(id: 1, stages: result.stages, jobs: result.pipeline_jobs, ref: nil, variables: {})
+        pipeline.jobs.to_h do |job|
+          previous = pipeline.previous_jobs(job).reject { |other| other.when_to_run == 'on_failure' }
+          [job.name, previous.map(&:name)]
         end
+      end
 
+      # @param environment [JobEnvironment::Job]
+      # @param job [Hash] job config (stage, tags, script presence)
+      def format_recipe(environment, job, recipe_names, dependencies)
+        lines = ["# #{environment.name}", "#   Stage: #{job['stage'] || PipelineBuilder::DEFAULT_JOB_STAGE}"]
+        tags = Array(job['tags'])
+        lines << "#   Tags: #{tags.join(', ')}" unless tags.empty?
+        lines << "#   Depends: #{dependencies.join(', ')}" unless dependencies.empty?
+        signature = [recipe_names.fetch(environment.name), *dependencies.map { |name| recipe_names.fetch(name) }]
+        lines << "#{signature.first}:#{signature.drop(1).map { |name| " #{name}" }.join}"
+        body = job['script'].nil? ? trigger_body(environment) : recipe_body(environment)
+        # Split again: a value or script entry may span lines, and each
+        # justfile line needs the indentation.
+        body_lines = body.flat_map { |line| line.split("\n", -1) }
+        lines.concat(body_lines.map { |line| line.empty? ? '' : "    #{line.gsub('{{', '{{{{')}" })
         lines.join("\n")
       end
 
-      # Generate graph justfile (with dependencies)
-      #
-      # @return [String] Justfile content
-      def generate_graph_justfile
-        lines = []
-
-        # Header
-        lines << generate_header(flat: false)
-        lines << ""
-
-        # Variables section
-        if @options[:variables].any?
-          lines << "# Variables"
-          @options[:variables].each do |key, value|
-            lines << "export #{key} := \"#{escape_value(value)}\""
-          end
-          lines << ""
-        end
-
-        # Generate recipes in topological order
-        processed = Set.new
-        @all_jobs.keys.sort.each do |job_name|
-          next if processed.include?(job_name)
-
-          generate_recipe_with_deps(job_name, lines, processed)
-        end
-
-        lines.join("\n")
+      def trigger_body(environment)
+        ['#!/usr/bin/env bash', "echo #{shell_quote("#{environment.name}: no script (a trigger job), nothing to run locally")}"]
       end
 
-      # Generate recipe with dependencies
+      # The recipe's bash program (class comment). Every line goes into the
+      # justfile indented; just strips that indentation, so lines of a
+      # multi-line entry keep their own.
       #
-      # @param job_name [String] Job name
-      # @param lines [Array<String>] Output lines
-      # @param processed [Set] Already processed jobs
-      def generate_recipe_with_deps(job_name, lines, processed)
-        return if processed.include?(job_name)
-
-        job = @all_jobs[job_name]
-        return unless job
-
-        # Get dependencies
-        deps = resolve_job_dependencies(job_name)
-
-        # Process dependencies first
-        deps.each do |dep|
-          generate_recipe_with_deps(dep, lines, processed)
+      # @return [Array<String>]
+      def recipe_body(environment)
+        body = ['#!/usr/bin/env bash']
+        body.concat(environment.variables.map { |key, value| "export #{key}=#{shell_quote(value)}" })
+        body << "cd #{shell_quote(environment.project_dir)} || exit"
+        body.concat(embedded_script('gitlab_ci_main_script', environment.main_script))
+        body << 'bash -c "$gitlab_ci_main_script" </dev/null'
+        body << 'gitlab_ci_exit_code=$?'
+        if environment.after_script
+          body << 'if [ "$gitlab_ci_exit_code" -eq 0 ]; then export CI_JOB_STATUS=success; else export CI_JOB_STATUS=failed; fi'
+          body.concat(embedded_script('gitlab_ci_after_script', environment.after_script))
+          body << 'gitlab_ci_timeout=(); if command -v timeout >/dev/null; then ' \
+                  "gitlab_ci_timeout=(timeout #{environment.after_script_timeout_s}); fi"
+          body << '"${gitlab_ci_timeout[@]}" bash -c "$gitlab_ci_after_script" </dev/null ||' \
+                  ' echo "after_script failed or timed out (exit code $?); the job result is unchanged" >&2'
         end
-
-        # Generate this recipe
-        lines << format_recipe(job_name, job, dependencies: deps)
-        lines << ""
-
-        processed.add(job_name)
+        body << 'exit "$gitlab_ci_exit_code"'
       end
 
-      # Resolve dependencies for a job
-      #
-      # @param job_name [String] Job name
-      # @return [Array<String>] List of dependency job names
-      def resolve_job_dependencies(job_name)
-        job = @all_jobs[job_name]
-        return [] unless job
-
-        # Get explicit needs
-        needs = extract_needs(job)
-        return needs if needs.any?
-
-        # No explicit needs - use stage-based dependencies
-        job_stage = job['stage'] || job[:stage] || 'test'
-        job_stage_index = @stages.index(job_stage)
-        return [] unless job_stage_index && job_stage_index > 0
-
-        # All jobs from previous stage
-        previous_stage = @stages[job_stage_index - 1]
-        @all_jobs.keys.select do |other_name|
-          other_job = @all_jobs[other_name]
-          other_stage = other_job['stage'] || other_job[:stage] || 'test'
-          other_stage == previous_stage
+      # `variable` := SHELL_PRELUDE + script, verbatim (quoted heredoc: no
+      # expansion, backslashes kept).
+      def embedded_script(variable, script)
+        text = JobEnvironment::SHELL_PRELUDE + script
+        if text.lines.any? { |line| line.chomp == SCRIPT_DELIMITER }
+          raise "a script line is exactly #{SCRIPT_DELIMITER}, which ends the embedded script"
         end
+
+        ["IFS= read -r -d '' #{variable} <<'#{SCRIPT_DELIMITER}'", text, SCRIPT_DELIMITER]
       end
 
-      # Extract needs from job configuration
-      #
-      # @param job [Hash] Job configuration
-      # @return [Array<String>] List of job names
-      def extract_needs(job)
-        needs = job['needs'] || job[:needs]
-        return [] if needs.nil? || needs.empty?
-
-        if needs.is_a?(Array)
-          needs.map do |need|
-            case need
-            when String
-              need
-            when Hash
-              need['job'] || need[:job]
-            else
-              nil
-            end
-          end.compact
-        else
-          []
-        end
+      # Single-quoted for bash: nothing inside is expanded.
+      def shell_quote(value)
+        "'#{value.gsub("'") { %q('\\'') }}'"
       end
 
-      # Format a job as a just recipe
-      #
-      # @param job_name [String] Job name
-      # @param job [Hash] Job configuration
-      # @param dependencies [Array<String>] Dependency job names
-      # @return [String] Just recipe
-      def format_recipe(job_name, job, dependencies: [])
-        lines = []
-
-        # Comment header with metadata
-        stage = job['stage'] || job[:stage] || 'unknown'
-        tags = job['tags'] || job[:tags] || []
-
-        lines << "# #{job_name}"
-        lines << "#   Stage: #{stage}"
-        lines << "#   Tags: #{tags.empty? ? '(none)' : tags.join(', ')}" if tags.any?
-        if dependencies.any?
-          lines << "#   Depends: #{dependencies.join(', ')}"
-        end
-
-        # Recipe signature
-        recipe_line = job_name.gsub(/[^a-zA-Z0-9_-]/, '_')
-        if dependencies.any?
-          recipe_line += ": #{dependencies.map { |d| d.gsub(/[^a-zA-Z0-9_-]/, '_') }.join(' ')}"
-        else
-          recipe_line += ":"
-        end
-        lines << recipe_line
-
-        # Recipe body (combine before_script, script, after_script)
-        script_lines = collect_script_lines(job)
-
-        if script_lines.empty?
-          lines << "    @echo 'No script defined for #{job_name}'"
-        elsif script_lines.length == 1
-          # Single line - simple format
-          lines << "    #{escape_script_line(script_lines.first)}"
-        else
-          # Multiple lines - use indented format
-          script_lines.each do |line|
-            lines << "    #{escape_script_line(line)}"
-          end
-        end
-
-        lines.join("\n")
-      end
-
-      # Collect all script lines for a job
-      #
-      # @param job [Hash] Job configuration
-      # @return [Array<String>] Script lines
-      def collect_script_lines(job)
-        lines = []
-
-        # before_script
-        before_script = job['before_script'] || job[:before_script]
-        if before_script
-          lines.concat(Array(before_script))
-        end
-
-        # script
-        script = job['script'] || job[:script]
-        if script
-          lines.concat(Array(script))
-        end
-
-        # after_script
-        after_script = job['after_script'] || job[:after_script]
-        if after_script
-          lines.concat(Array(after_script))
-        end
-
-        lines
-      end
-
-      # Escape a script line for just syntax
-      #
-      # @param line [String] Script line
-      # @return [String] Escaped line
-      def escape_script_line(line)
-        # Escape special characters for shell
-        # Just uses sh/bash by default, so we need to handle:
-        # - Backslashes
-        # - Double quotes (just uses double quotes for strings)
-        line = line.gsub('\\', '\\\\')
-        line
-      end
-
-      # Escape a variable value
-      #
-      # @param value [String] Variable value
-      # @return [String] Escaped value
-      def escape_value(value)
-        value.to_s.gsub('\\', '\\\\').gsub('"', '\\"')
-      end
-
-      # Generate file header
-      #
-      # @param flat [Boolean] Whether this is a flat justfile
-      # @return [String] Header content
-      def generate_header(flat:)
-        mode = flat ? 'flat (no dependencies)' : 'with dependency graph'
-        regenerate_cmd = if flat
-                           "gitlab_ci_cli export-just --flat --output #{@options[:output] || 'justfile.gitlab.flat'}"
-                         else
-                           "gitlab_ci_cli export-just --graph --output #{@options[:output] || 'justfile.gitlab.graph'}"
-                         end
+      def generate_header
+        mode = @options[:flat] ? 'flat (no dependencies)' : 'with dependency graph'
+        flag = @options[:flat] ? '--flat' : '--graph'
+        default_output = @options[:flat] ? 'justfile.gitlab.flat' : 'justfile.gitlab.graph'
 
         <<~HEADER.chomp
           # Auto-generated justfile from GitLab CI configuration (#{mode})
@@ -367,7 +220,12 @@ module GitlabCiCli
           # Generated: #{Time.now.iso8601}
           #
           # DO NOT EDIT - Regenerate with:
-          #   #{regenerate_cmd}
+          #   gitlab_ci_cli export-just #{flag} --output #{@options[:output] || default_output}
+          #
+          # Each recipe runs its job like `gitlab_ci_cli run`: the job's variables
+          # (as of this export) exported, cwd = the project directory,
+          # before_script + script in one bash with errexit and pipefail,
+          # after_script in a second bash with CI_JOB_STATUS, also after a failure.
           #
           # Usage:
           #   just --list                 # Show all available jobs
@@ -376,32 +234,14 @@ module GitlabCiCli
         HEADER
       end
 
-      # Expand variables in configuration
-      def expand_variables(obj, variables)
-        case obj
-        when Hash
-          obj.transform_values { |v| expand_variables(v, variables) }
-        when Array
-          obj.map { |item| expand_variables(item, variables) }
-        when String
-          expanded = obj.dup
-          variables.each do |key, value|
-            value_str = value.to_s
-            expanded = expanded.gsub(/\$\{#{Regexp.escape(key)}\}/) { value_str }
-            expanded = expanded.gsub(/\$#{Regexp.escape(key)}\b/) { value_str }
-          end
-          expanded
-        else
-          obj
-        end
-      end
-
-      # Log info message
       def log_info(message)
         puts message
       end
 
-      # Log error message
+      def log_warning(message)
+        $stderr.puts "Warning: #{message}"
+      end
+
       def log_error(message)
         $stderr.puts "Error: #{message}"
       end
