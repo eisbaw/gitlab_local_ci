@@ -28,7 +28,15 @@
     "deploy:production",
     "security:scan",
     ".complex_matrix",
-    "test:matrix"
+    "test:matrix: [linux, 3.9]",
+    "test:matrix: [linux, 3.10]",
+    "test:matrix: [linux, 3.11]",
+    "test:matrix: [macos, 3.9]",
+    "test:matrix: [macos, 3.10]",
+    "test:matrix: [macos, 3.11]",
+    "test:matrix: [windows, 3.9]",
+    "test:matrix: [windows, 3.10]",
+    "test:matrix: [windows, 3.11]"
   ],
   "errors": [
 

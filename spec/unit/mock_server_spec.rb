@@ -122,6 +122,13 @@ RSpec.describe MockServer do
         expect(job_names).to include('build_job', 'test_job', 'deploy_job')
       end
 
+      it 'expands parallel jobs and reports invalid parallel:, as PipelineBuilder does (TASK-18)' do
+        pipeline = server.create_pipeline({ 'j' => { 'script' => ['echo'], 'parallel' => 2 } })
+        expect(pipeline.jobs.map(&:name)).to eq(['j 1/2', 'j 2/2'])
+        expect { server.create_pipeline({ 'j' => { 'script' => ['echo'], 'parallel' => 0 } }) }
+          .to raise_error(MockServer::ConfigurationError, /jobs:j:parallel config must be greater than or equal to 1/)
+      end
+
       xit 'should handle config with no stages defined' do
         minimal_config = { 'test_job' => { 'script' => ['echo "test"'] } }
 

@@ -1,34 +1,344 @@
-Pipeline #1 created with 11 job(s)
+Pipeline #1 created with 116 job(s)
 
-[T+0s] Job 'test:matrix' → Runner 'runner_001'
-[T+0s] Job 'integration:test' → Runner 'runner_001'
-[T+0s] Job 'unit:test:parallel' → Runner 'runner_001'
-[T+0s] Job 'e2e:test' → Runner 'runner_001'
-[T+0s] Job 'stress:test' queued: every runner that can take it is busy
-[T+0s] Job 'lint:files' queued: every runner that can take it is busy
-[T+0s] Job 'performance:test' queued: every runner that can take it is busy
-[T+0s] Job 'test:microservices' queued: every runner that can take it is busy
-[T+5s] Job 'test:matrix' completed
-[T+5s] Job 'integration:test' completed
-[T+5s] Job 'unit:test:parallel' completed
-[T+5s] Job 'e2e:test' completed
-[T+6s] Job 'stress:test' → Runner 'runner_001'
-[T+6s] Job 'lint:files' → Runner 'runner_001'
-[T+6s] Job 'performance:test' → Runner 'runner_001'
-[T+6s] Job 'test:microservices' → Runner 'runner_001'
-[T+11s] Job 'stress:test' completed
-[T+11s] Job 'lint:files' completed
-[T+11s] Job 'performance:test' completed
-[T+11s] Job 'test:microservices' completed
-[T+12s] Job 'build:multiarch' → Runner 'runner_001'
-[T+12s] Job 'process:data' → Runner 'runner_001'
-[T+17s] Job 'build:multiarch' completed
-[T+17s] Job 'process:data' completed
-[T+18s] Job 'deploy:cloud' → Runner 'runner_001'
-[T+23s] Job 'deploy:cloud' completed
+[T+0s] Job 'test:matrix: [2.7, ubuntu]' → Runner 'runner_001'
+[T+0s] Job 'test:matrix: [2.7, alpine]' → Runner 'runner_001'
+[T+0s] Job 'test:matrix: [3.0, ubuntu]' → Runner 'runner_001'
+[T+0s] Job 'test:matrix: [3.0, alpine]' → Runner 'runner_001'
+[T+0s] Job 'test:matrix: [3.1, ubuntu]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix: [3.1, alpine]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix: [3.2, ubuntu]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix: [3.2, alpine]' queued: every runner that can take it is busy
+[T+0s] Job 'integration:test: [3.0, postgresql]' queued: every runner that can take it is busy
+[T+0s] Job 'integration:test: [3.0, mysql]' queued: every runner that can take it is busy
+[T+0s] Job 'integration:test: [3.1, postgresql]' queued: every runner that can take it is busy
+[T+0s] Job 'integration:test: [3.1, mysql]' queued: every runner that can take it is busy
+[T+0s] Job 'integration:test: [3.2, postgresql]' queued: every runner that can take it is busy
+[T+0s] Job 'integration:test: [3.2, mysql]' queued: every runner that can take it is busy
+[T+0s] Job 'integration:test: [2.7, sqlite]' queued: every runner that can take it is busy
+[T+0s] Job 'unit:test:parallel 1/5' queued: every runner that can take it is busy
+[T+0s] Job 'unit:test:parallel 2/5' queued: every runner that can take it is busy
+[T+0s] Job 'unit:test:parallel 3/5' queued: every runner that can take it is busy
+[T+0s] Job 'unit:test:parallel 4/5' queued: every runner that can take it is busy
+[T+0s] Job 'unit:test:parallel 5/5' queued: every runner that can take it is busy
+[T+0s] Job 'e2e:test: [chrome, latest]' queued: every runner that can take it is busy
+[T+0s] Job 'e2e:test: [chrome, previous]' queued: every runner that can take it is busy
+[T+0s] Job 'e2e:test: [firefox, latest]' queued: every runner that can take it is busy
+[T+0s] Job 'e2e:test: [firefox, previous]' queued: every runner that can take it is busy
+[T+0s] Job 'e2e:test: [safari, latest]' queued: every runner that can take it is busy
+[T+0s] Job 'e2e:test: [safari, previous]' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 1/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 2/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 3/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 4/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 5/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 6/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 7/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 8/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 9/10' queued: every runner that can take it is busy
+[T+0s] Job 'stress:test 10/10' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [rubocop, app/]' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [rubocop, lib/]' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [rubocop, spec/]' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [reek, app/]' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [reek, lib/]' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [reek, spec/]' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [brakeman, app/]' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [brakeman, lib/]' queued: every runner that can take it is busy
+[T+0s] Job 'lint:files: [brakeman, spec/]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 1, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 1, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 1, large]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 10, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 10, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 10, large]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 100, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 100, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.0, 100, large]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 1, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 1, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 1, large]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 10, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 10, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 10, large]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 100, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 100, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.1, 100, large]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 1, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 1, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 1, large]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 10, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 10, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 10, large]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 100, small]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 100, medium]' queued: every runner that can take it is busy
+[T+0s] Job 'performance:test: [3.2, 100, large]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [api, unit]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [api, integration]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [api, contract]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [auth, unit]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [auth, integration]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [auth, contract]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [notifications, unit]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [notifications, integration]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [notifications, contract]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [billing, unit]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [billing, integration]' queued: every runner that can take it is busy
+[T+0s] Job 'test:microservices: [billing, contract]' queued: every runner that can take it is busy
+[T+5s] Job 'test:matrix: [2.7, ubuntu]' completed
+[T+5s] Job 'test:matrix: [2.7, alpine]' completed
+[T+5s] Job 'test:matrix: [3.0, ubuntu]' completed
+[T+5s] Job 'test:matrix: [3.0, alpine]' completed
+[T+6s] Job 'test:matrix: [3.1, ubuntu]' → Runner 'runner_001'
+[T+6s] Job 'test:matrix: [3.1, alpine]' → Runner 'runner_001'
+[T+6s] Job 'test:matrix: [3.2, ubuntu]' → Runner 'runner_001'
+[T+6s] Job 'test:matrix: [3.2, alpine]' → Runner 'runner_001'
+[T+11s] Job 'test:matrix: [3.1, ubuntu]' completed
+[T+11s] Job 'test:matrix: [3.1, alpine]' completed
+[T+11s] Job 'test:matrix: [3.2, ubuntu]' completed
+[T+11s] Job 'test:matrix: [3.2, alpine]' completed
+[T+12s] Job 'integration:test: [3.0, postgresql]' → Runner 'runner_001'
+[T+12s] Job 'integration:test: [3.0, mysql]' → Runner 'runner_001'
+[T+12s] Job 'integration:test: [3.1, postgresql]' → Runner 'runner_001'
+[T+12s] Job 'integration:test: [3.1, mysql]' → Runner 'runner_001'
+[T+17s] Job 'integration:test: [3.0, postgresql]' completed
+[T+17s] Job 'integration:test: [3.0, mysql]' completed
+[T+17s] Job 'integration:test: [3.1, postgresql]' completed
+[T+17s] Job 'integration:test: [3.1, mysql]' completed
+[T+18s] Job 'integration:test: [3.2, postgresql]' → Runner 'runner_001'
+[T+18s] Job 'integration:test: [3.2, mysql]' → Runner 'runner_001'
+[T+18s] Job 'integration:test: [2.7, sqlite]' → Runner 'runner_001'
+[T+18s] Job 'unit:test:parallel 1/5' → Runner 'runner_001'
+[T+23s] Job 'integration:test: [3.2, postgresql]' completed
+[T+23s] Job 'integration:test: [3.2, mysql]' completed
+[T+23s] Job 'integration:test: [2.7, sqlite]' completed
+[T+23s] Job 'unit:test:parallel 1/5' completed
+[T+24s] Job 'unit:test:parallel 2/5' → Runner 'runner_001'
+[T+24s] Job 'unit:test:parallel 3/5' → Runner 'runner_001'
+[T+24s] Job 'unit:test:parallel 4/5' → Runner 'runner_001'
+[T+24s] Job 'unit:test:parallel 5/5' → Runner 'runner_001'
+[T+29s] Job 'unit:test:parallel 2/5' completed
+[T+29s] Job 'unit:test:parallel 3/5' completed
+[T+29s] Job 'unit:test:parallel 4/5' completed
+[T+29s] Job 'unit:test:parallel 5/5' completed
+[T+30s] Job 'e2e:test: [chrome, latest]' → Runner 'runner_001'
+[T+30s] Job 'e2e:test: [chrome, previous]' → Runner 'runner_001'
+[T+30s] Job 'e2e:test: [firefox, latest]' → Runner 'runner_001'
+[T+30s] Job 'e2e:test: [firefox, previous]' → Runner 'runner_001'
+[T+35s] Job 'e2e:test: [chrome, latest]' completed
+[T+35s] Job 'e2e:test: [chrome, previous]' completed
+[T+35s] Job 'e2e:test: [firefox, latest]' completed
+[T+35s] Job 'e2e:test: [firefox, previous]' completed
+[T+36s] Job 'e2e:test: [safari, latest]' → Runner 'runner_001'
+[T+36s] Job 'e2e:test: [safari, previous]' → Runner 'runner_001'
+[T+36s] Job 'stress:test 1/10' → Runner 'runner_001'
+[T+36s] Job 'stress:test 2/10' → Runner 'runner_001'
+[T+41s] Job 'e2e:test: [safari, latest]' completed
+[T+41s] Job 'e2e:test: [safari, previous]' completed
+[T+41s] Job 'stress:test 1/10' completed
+[T+41s] Job 'stress:test 2/10' completed
+[T+42s] Job 'stress:test 3/10' → Runner 'runner_001'
+[T+42s] Job 'stress:test 4/10' → Runner 'runner_001'
+[T+42s] Job 'stress:test 5/10' → Runner 'runner_001'
+[T+42s] Job 'stress:test 6/10' → Runner 'runner_001'
+[T+47s] Job 'stress:test 3/10' completed
+[T+47s] Job 'stress:test 4/10' completed
+[T+47s] Job 'stress:test 5/10' completed
+[T+47s] Job 'stress:test 6/10' completed
+[T+48s] Job 'stress:test 7/10' → Runner 'runner_001'
+[T+48s] Job 'stress:test 8/10' → Runner 'runner_001'
+[T+48s] Job 'stress:test 9/10' → Runner 'runner_001'
+[T+48s] Job 'stress:test 10/10' → Runner 'runner_001'
+[T+53s] Job 'stress:test 7/10' completed
+[T+53s] Job 'stress:test 8/10' completed
+[T+53s] Job 'stress:test 9/10' completed
+[T+53s] Job 'stress:test 10/10' completed
+[T+54s] Job 'lint:files: [rubocop, app/]' → Runner 'runner_001'
+[T+54s] Job 'lint:files: [rubocop, lib/]' → Runner 'runner_001'
+[T+54s] Job 'lint:files: [rubocop, spec/]' → Runner 'runner_001'
+[T+54s] Job 'lint:files: [reek, app/]' → Runner 'runner_001'
+[T+59s] Job 'lint:files: [rubocop, app/]' completed
+[T+59s] Job 'lint:files: [rubocop, lib/]' completed
+[T+59s] Job 'lint:files: [rubocop, spec/]' completed
+[T+59s] Job 'lint:files: [reek, app/]' completed
+[T+60s] Job 'lint:files: [reek, lib/]' → Runner 'runner_001'
+[T+60s] Job 'lint:files: [reek, spec/]' → Runner 'runner_001'
+[T+60s] Job 'lint:files: [brakeman, app/]' → Runner 'runner_001'
+[T+60s] Job 'lint:files: [brakeman, lib/]' → Runner 'runner_001'
+[T+65s] Job 'lint:files: [reek, lib/]' completed
+[T+65s] Job 'lint:files: [reek, spec/]' completed
+[T+65s] Job 'lint:files: [brakeman, app/]' completed
+[T+65s] Job 'lint:files: [brakeman, lib/]' completed
+[T+66s] Job 'lint:files: [brakeman, spec/]' → Runner 'runner_001'
+[T+66s] Job 'performance:test: [3.0, 1, small]' → Runner 'runner_001'
+[T+66s] Job 'performance:test: [3.0, 1, medium]' → Runner 'runner_001'
+[T+66s] Job 'performance:test: [3.0, 1, large]' → Runner 'runner_001'
+[T+71s] Job 'lint:files: [brakeman, spec/]' completed
+[T+71s] Job 'performance:test: [3.0, 1, small]' completed
+[T+71s] Job 'performance:test: [3.0, 1, medium]' completed
+[T+71s] Job 'performance:test: [3.0, 1, large]' completed
+[T+72s] Job 'performance:test: [3.0, 10, small]' → Runner 'runner_001'
+[T+72s] Job 'performance:test: [3.0, 10, medium]' → Runner 'runner_001'
+[T+72s] Job 'performance:test: [3.0, 10, large]' → Runner 'runner_001'
+[T+72s] Job 'performance:test: [3.0, 100, small]' → Runner 'runner_001'
+[T+77s] Job 'performance:test: [3.0, 10, small]' completed
+[T+77s] Job 'performance:test: [3.0, 10, medium]' completed
+[T+77s] Job 'performance:test: [3.0, 10, large]' completed
+[T+77s] Job 'performance:test: [3.0, 100, small]' completed
+[T+78s] Job 'performance:test: [3.0, 100, medium]' → Runner 'runner_001'
+[T+78s] Job 'performance:test: [3.0, 100, large]' → Runner 'runner_001'
+[T+78s] Job 'performance:test: [3.1, 1, small]' → Runner 'runner_001'
+[T+78s] Job 'performance:test: [3.1, 1, medium]' → Runner 'runner_001'
+[T+83s] Job 'performance:test: [3.0, 100, medium]' completed
+[T+83s] Job 'performance:test: [3.0, 100, large]' completed
+[T+83s] Job 'performance:test: [3.1, 1, small]' completed
+[T+83s] Job 'performance:test: [3.1, 1, medium]' completed
+[T+84s] Job 'performance:test: [3.1, 1, large]' → Runner 'runner_001'
+[T+84s] Job 'performance:test: [3.1, 10, small]' → Runner 'runner_001'
+[T+84s] Job 'performance:test: [3.1, 10, medium]' → Runner 'runner_001'
+[T+84s] Job 'performance:test: [3.1, 10, large]' → Runner 'runner_001'
+[T+89s] Job 'performance:test: [3.1, 1, large]' completed
+[T+89s] Job 'performance:test: [3.1, 10, small]' completed
+[T+89s] Job 'performance:test: [3.1, 10, medium]' completed
+[T+89s] Job 'performance:test: [3.1, 10, large]' completed
+[T+90s] Job 'performance:test: [3.1, 100, small]' → Runner 'runner_001'
+[T+90s] Job 'performance:test: [3.1, 100, medium]' → Runner 'runner_001'
+[T+90s] Job 'performance:test: [3.1, 100, large]' → Runner 'runner_001'
+[T+90s] Job 'performance:test: [3.2, 1, small]' → Runner 'runner_001'
+[T+95s] Job 'performance:test: [3.1, 100, small]' completed
+[T+95s] Job 'performance:test: [3.1, 100, medium]' completed
+[T+95s] Job 'performance:test: [3.1, 100, large]' completed
+[T+95s] Job 'performance:test: [3.2, 1, small]' completed
+[T+96s] Job 'performance:test: [3.2, 1, medium]' → Runner 'runner_001'
+[T+96s] Job 'performance:test: [3.2, 1, large]' → Runner 'runner_001'
+[T+96s] Job 'performance:test: [3.2, 10, small]' → Runner 'runner_001'
+[T+96s] Job 'performance:test: [3.2, 10, medium]' → Runner 'runner_001'
+[T+101s] Job 'performance:test: [3.2, 1, medium]' completed
+[T+101s] Job 'performance:test: [3.2, 1, large]' completed
+[T+101s] Job 'performance:test: [3.2, 10, small]' completed
+[T+101s] Job 'performance:test: [3.2, 10, medium]' completed
+[T+102s] Job 'performance:test: [3.2, 10, large]' → Runner 'runner_001'
+[T+102s] Job 'performance:test: [3.2, 100, small]' → Runner 'runner_001'
+[T+102s] Job 'performance:test: [3.2, 100, medium]' → Runner 'runner_001'
+[T+102s] Job 'performance:test: [3.2, 100, large]' → Runner 'runner_001'
+[T+107s] Job 'performance:test: [3.2, 10, large]' completed
+[T+107s] Job 'performance:test: [3.2, 100, small]' completed
+[T+107s] Job 'performance:test: [3.2, 100, medium]' completed
+[T+107s] Job 'performance:test: [3.2, 100, large]' completed
+[T+108s] Job 'test:microservices: [api, unit]' → Runner 'runner_001'
+[T+108s] Job 'test:microservices: [api, integration]' → Runner 'runner_001'
+[T+108s] Job 'test:microservices: [api, contract]' → Runner 'runner_001'
+[T+108s] Job 'test:microservices: [auth, unit]' → Runner 'runner_001'
+[T+113s] Job 'test:microservices: [api, unit]' completed
+[T+113s] Job 'test:microservices: [api, integration]' completed
+[T+113s] Job 'test:microservices: [api, contract]' completed
+[T+113s] Job 'test:microservices: [auth, unit]' completed
+[T+114s] Job 'test:microservices: [auth, integration]' → Runner 'runner_001'
+[T+114s] Job 'test:microservices: [auth, contract]' → Runner 'runner_001'
+[T+114s] Job 'test:microservices: [notifications, unit]' → Runner 'runner_001'
+[T+114s] Job 'test:microservices: [notifications, integration]' → Runner 'runner_001'
+[T+119s] Job 'test:microservices: [auth, integration]' completed
+[T+119s] Job 'test:microservices: [auth, contract]' completed
+[T+119s] Job 'test:microservices: [notifications, unit]' completed
+[T+119s] Job 'test:microservices: [notifications, integration]' completed
+[T+120s] Job 'test:microservices: [notifications, contract]' → Runner 'runner_001'
+[T+120s] Job 'test:microservices: [billing, unit]' → Runner 'runner_001'
+[T+120s] Job 'test:microservices: [billing, integration]' → Runner 'runner_001'
+[T+120s] Job 'test:microservices: [billing, contract]' → Runner 'runner_001'
+[T+125s] Job 'test:microservices: [notifications, contract]' completed
+[T+125s] Job 'test:microservices: [billing, unit]' completed
+[T+125s] Job 'test:microservices: [billing, integration]' completed
+[T+125s] Job 'test:microservices: [billing, contract]' completed
+[T+126s] Job 'build:multiarch: [linux/amd64, release]' → Runner 'runner_001'
+[T+126s] Job 'build:multiarch: [linux/amd64, debug]' → Runner 'runner_001'
+[T+126s] Job 'build:multiarch: [linux/arm64, release]' → Runner 'runner_001'
+[T+126s] Job 'build:multiarch: [linux/arm64, debug]' → Runner 'runner_001'
+[T+126s] Job 'build:multiarch: [linux/arm/v7, release]' queued: every runner that can take it is busy
+[T+126s] Job 'build:multiarch: [linux/arm/v7, debug]' queued: every runner that can take it is busy
+[T+126s] Job 'process:data 1/8' queued: every runner that can take it is busy
+[T+126s] Job 'process:data 2/8' queued: every runner that can take it is busy
+[T+126s] Job 'process:data 3/8' queued: every runner that can take it is busy
+[T+126s] Job 'process:data 4/8' queued: every runner that can take it is busy
+[T+126s] Job 'process:data 5/8' queued: every runner that can take it is busy
+[T+126s] Job 'process:data 6/8' queued: every runner that can take it is busy
+[T+126s] Job 'process:data 7/8' queued: every runner that can take it is busy
+[T+126s] Job 'process:data 8/8' queued: every runner that can take it is busy
+[T+131s] Job 'build:multiarch: [linux/amd64, release]' completed
+[T+131s] Job 'build:multiarch: [linux/amd64, debug]' completed
+[T+131s] Job 'build:multiarch: [linux/arm64, release]' completed
+[T+131s] Job 'build:multiarch: [linux/arm64, debug]' completed
+[T+132s] Job 'build:multiarch: [linux/arm/v7, release]' → Runner 'runner_001'
+[T+132s] Job 'build:multiarch: [linux/arm/v7, debug]' → Runner 'runner_001'
+[T+132s] Job 'process:data 1/8' → Runner 'runner_001'
+[T+132s] Job 'process:data 2/8' → Runner 'runner_001'
+[T+137s] Job 'build:multiarch: [linux/arm/v7, release]' completed
+[T+137s] Job 'build:multiarch: [linux/arm/v7, debug]' completed
+[T+137s] Job 'process:data 1/8' completed
+[T+137s] Job 'process:data 2/8' completed
+[T+138s] Job 'process:data 3/8' → Runner 'runner_001'
+[T+138s] Job 'process:data 4/8' → Runner 'runner_001'
+[T+138s] Job 'process:data 5/8' → Runner 'runner_001'
+[T+138s] Job 'process:data 6/8' → Runner 'runner_001'
+[T+143s] Job 'process:data 3/8' completed
+[T+143s] Job 'process:data 4/8' completed
+[T+143s] Job 'process:data 5/8' completed
+[T+143s] Job 'process:data 6/8' completed
+[T+144s] Job 'process:data 7/8' → Runner 'runner_001'
+[T+144s] Job 'process:data 8/8' → Runner 'runner_001'
+[T+149s] Job 'process:data 7/8' completed
+[T+149s] Job 'process:data 8/8' completed
+[T+150s] Job 'deploy:cloud: [aws, us-east-1, staging]' → Runner 'runner_001'
+[T+150s] Job 'deploy:cloud: [aws, us-east-1, production]' → Runner 'runner_001'
+[T+150s] Job 'deploy:cloud: [aws, us-west-2, staging]' → Runner 'runner_001'
+[T+150s] Job 'deploy:cloud: [aws, us-west-2, production]' → Runner 'runner_001'
+[T+150s] Job 'deploy:cloud: [aws, eu-central-1, staging]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [aws, eu-central-1, production]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [gcp, us-east-1, staging]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [gcp, us-east-1, production]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [gcp, us-west-2, staging]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [gcp, us-west-2, production]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [gcp, eu-central-1, staging]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [gcp, eu-central-1, production]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [azure, us-east-1, staging]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [azure, us-east-1, production]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [azure, us-west-2, staging]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [azure, us-west-2, production]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [azure, eu-central-1, staging]' queued: every runner that can take it is busy
+[T+150s] Job 'deploy:cloud: [azure, eu-central-1, production]' queued: every runner that can take it is busy
+[T+155s] Job 'deploy:cloud: [aws, us-east-1, staging]' completed
+[T+155s] Job 'deploy:cloud: [aws, us-east-1, production]' completed
+[T+155s] Job 'deploy:cloud: [aws, us-west-2, staging]' completed
+[T+155s] Job 'deploy:cloud: [aws, us-west-2, production]' completed
+[T+156s] Job 'deploy:cloud: [aws, eu-central-1, staging]' → Runner 'runner_001'
+[T+156s] Job 'deploy:cloud: [aws, eu-central-1, production]' → Runner 'runner_001'
+[T+156s] Job 'deploy:cloud: [gcp, us-east-1, staging]' → Runner 'runner_001'
+[T+156s] Job 'deploy:cloud: [gcp, us-east-1, production]' → Runner 'runner_001'
+[T+161s] Job 'deploy:cloud: [aws, eu-central-1, staging]' completed
+[T+161s] Job 'deploy:cloud: [aws, eu-central-1, production]' completed
+[T+161s] Job 'deploy:cloud: [gcp, us-east-1, staging]' completed
+[T+161s] Job 'deploy:cloud: [gcp, us-east-1, production]' completed
+[T+162s] Job 'deploy:cloud: [gcp, us-west-2, staging]' → Runner 'runner_001'
+[T+162s] Job 'deploy:cloud: [gcp, us-west-2, production]' → Runner 'runner_001'
+[T+162s] Job 'deploy:cloud: [gcp, eu-central-1, staging]' → Runner 'runner_001'
+[T+162s] Job 'deploy:cloud: [gcp, eu-central-1, production]' → Runner 'runner_001'
+[T+167s] Job 'deploy:cloud: [gcp, us-west-2, staging]' completed
+[T+167s] Job 'deploy:cloud: [gcp, us-west-2, production]' completed
+[T+167s] Job 'deploy:cloud: [gcp, eu-central-1, staging]' completed
+[T+167s] Job 'deploy:cloud: [gcp, eu-central-1, production]' completed
+[T+168s] Job 'deploy:cloud: [azure, us-east-1, staging]' → Runner 'runner_001'
+[T+168s] Job 'deploy:cloud: [azure, us-east-1, production]' → Runner 'runner_001'
+[T+168s] Job 'deploy:cloud: [azure, us-west-2, staging]' → Runner 'runner_001'
+[T+168s] Job 'deploy:cloud: [azure, us-west-2, production]' → Runner 'runner_001'
+[T+173s] Job 'deploy:cloud: [azure, us-east-1, staging]' completed
+[T+173s] Job 'deploy:cloud: [azure, us-east-1, production]' completed
+[T+173s] Job 'deploy:cloud: [azure, us-west-2, staging]' completed
+[T+173s] Job 'deploy:cloud: [azure, us-west-2, production]' completed
+[T+174s] Job 'deploy:cloud: [azure, eu-central-1, staging]' → Runner 'runner_001'
+[T+174s] Job 'deploy:cloud: [azure, eu-central-1, production]' → Runner 'runner_001'
+[T+179s] Job 'deploy:cloud: [azure, eu-central-1, staging]' completed
+[T+179s] Job 'deploy:cloud: [azure, eu-central-1, production]' completed
 
-Simulation completed at T+24s
+Simulation completed at T+180s
 
 Pipeline status: success
 Job summary:
-  completed: 11
+  completed: 116

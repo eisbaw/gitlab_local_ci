@@ -15,6 +15,7 @@ require_relative 'extends_resolver'
 require_relative 'reference_resolver'
 require_relative 'rules_evaluator'
 require_relative 'predefined_variables'
+require_relative 'parallel_expander'
 
 # Config -> pipeline construction shared by every subcommand, so lint, dag,
 # dry-run, run and export-just see the same jobs.
@@ -28,6 +29,8 @@ require_relative 'predefined_variables'
 #   !reference             ReferenceResolver  (after extends, before split)
 #   nested lists           flatten_lists      (upstream Entry values)
 #   default:/inherit:      compose_jobs       (on the split jobs, before rules)
+#   parallel:              expand_parallel    (Config#normalized_jobs: instances,
+#                                              needs/dependencies fanned out)
 #   .pre/.post, stage check stages, stage_errors (YamlProcessor, on the composed jobs)
 #   workflow:rules         apply_workflow_rules
 #   job rules              filter_jobs_by_rules
@@ -95,7 +98,9 @@ module PipelineBuilder
   #                 and legacy globals applied (compose_jobs). Stored, not
   #                 derived from config: once defaults apply a job is no
   #                 longer its config entry (upstream Root#jobs_value vs
-  #                 Config#to_hash).
+  #                 Config#to_hash). A visible `parallel:` job is replaced,
+  #                 in place, by its instances (ParallelExpander), so
+  #                 every command sees 'job 1/2' and 'job: [aws]'.
   # workflow_skipped workflow:rules created no pipeline (build only)
   # pipeline_jobs   name => job config of the jobs this pipeline creates,
   #                 rule attributes applied, config order (build only)
@@ -191,10 +196,26 @@ module PipelineBuilder
       return failure(e.message)
     end
 
+    job_definitions, parallel_errors = expand_parallel(job_definitions)
+    return Result.new(errors: parallel_errors) unless parallel_errors.empty?
+
     stage_errors = stage_errors(job_definitions, stages(config))
     return Result.new(errors: stage_errors) unless stage_errors.empty?
 
     Result.new(config: config, job_definitions: job_definitions, errors: [])
+  end
+
+  # Upstream Config#normalized_jobs over the composed jobs: entry
+  # validation of `parallel:` first (Entry::Product::Parallel), then the
+  # Normalizer (ParallelExpander). Before the stage check, which upstream
+  # runs on the normalized jobs, and before rules.
+  #
+  # @return [Array(Hash, Array<String>)] [jobs, errors]
+  def expand_parallel(job_definitions)
+    errors = ParallelExpander.errors(job_definitions)
+    return [job_definitions, errors] unless errors.empty?
+
+    ParallelExpander.expand(job_definitions)
   end
 
   # The pipeline's stages, upstream Config::Stages#inject_edge_stages!:
@@ -260,14 +281,16 @@ module PipelineBuilder
   # composed jobs (Result#jobs).
   #
   # Variables, lowest precedence first: predefined CI_* (pipeline, then the
-  # job's own CI_JOB_*), root variables
+  # job's own CI_JOB_*/CI_NODE_*), root variables
   # (top-level `variables:` overlaid by the matched workflow rule's
-  # `variables:`, upstream Chain::Seed#root_variables), CLI variables
-  # (pipeline variables outrank every .gitlab-ci.yml variable, doc/ci/variables
-  # "CI/CD variable precedence"). Each job's rules see only the root
-  # variables its `inherit:variables` lets through (Seed::Build
-  # #calculate_yaml_variables!); predefined and CLI variables are not root
-  # variables and always reach it.
+  # `variables:`, upstream Chain::Seed#root_variables), the job's own
+  # `variables:` (matrix variables of a parallel instance included), CLI
+  # variables (pipeline variables outrank every .gitlab-ci.yml variable,
+  # doc/ci/variables "CI/CD variable precedence"). Each job's rules see
+  # only the root variables its `inherit:variables` lets through, then its
+  # own (Seed::Build#calculate_yaml_variables!: yaml_variables, which
+  # Context::Build puts in the rules context); predefined and CLI
+  # variables are not root variables and always reach it.
   #
   # @return [Hash] { workflow_skipped:, pipeline_jobs:, excluded_jobs:,
   #   workflow_variables: }
@@ -283,7 +306,8 @@ module PipelineBuilder
     root = root.merge(workflow[:variables])
     pipeline_jobs, excluded_jobs = filter_jobs_by_rules(jobs, project_dir: project_dir) do |name, job|
       predefined.merge(job_predefined_variables(name, job))
-                .merge(inherited_root_variables(name, job, root)).merge(cli)
+                .merge(inherited_root_variables(name, job, root))
+                .merge(variable_values(job['variables'])).merge(cli)
     end
     pipeline_jobs, excluded_jobs = drop_only_edge_stage_jobs(pipeline_jobs, excluded_jobs)
     { workflow_skipped: false, pipeline_jobs: pipeline_jobs, excluded_jobs: excluded_jobs,
@@ -544,7 +568,12 @@ module PipelineBuilder
   # Top-level `variables:` as String => String. (Include rules do NOT see
   # them; that is upstream's documented scope.)
   def root_variables(config)
-    raw = config['variables']
+    variable_values(config['variables'])
+  end
+
+  # A `variables:` entry (root or job) as String => String; a non-Hash is
+  # no variables here (JobEnvironment reports it for a job that runs).
+  def variable_values(raw)
     return {} unless raw.is_a?(Hash)
 
     raw.to_h do |k, v|
@@ -566,7 +595,18 @@ module PipelineBuilder
   # CLI variables of the same name win.
   def job_predefined_variables(name, job)
     stage = job['stage'].nil? ? DEFAULT_JOB_STAGE : job['stage'].to_s
-    PredefinedVariables.job_variables(name: name.to_s, stage: stage, when_value: job['when'])
+    index, total = parallel_instance(job) || [nil, 1]
+    PredefinedVariables.job_variables(name: name.to_s, stage: stage, when_value: job['when'],
+                                      node_index: index, node_total: total)
+  end
+
+  # [index, total] of a parallel instance (ParallelExpander#instance_job),
+  # nil for any other job.
+  def parallel_instance(job)
+    parallel = job['parallel']
+    return nil unless parallel.is_a?(Hash) && parallel.key?('instance')
+
+    [parallel.fetch('instance'), parallel.fetch('total')]
   end
 
   # Evaluate workflow:rules against `variables`. Returns { variables:,

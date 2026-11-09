@@ -47,7 +47,9 @@ require 'open3'
 #             _PROJECT_PATH and _SOURCE_PROJECT_PATH (same-project MR)
 # Job variables (Builder#predefined_variables_from_job_attr), job_variables:
 #   CI_JOB_NAME, CI_JOB_NAME_SLUG, CI_JOB_GROUP_NAME, CI_JOB_STAGE,
-#   CI_JOB_MANUAL (when: manual/delayed only)
+#   CI_JOB_MANUAL (when: manual/delayed only), CI_NODE_INDEX (an instance
+#   of a parallel job only), CI_NODE_TOTAL (every job: 1 unless parallel;
+#   Gitlab::Utils::Job.node_total)
 #
 # Deliberately omitted (unknowable locally; pass --variables to simulate):
 #   CI_PROJECT_ID/TITLE/DESCRIPTION/TOPICS/URL/VISIBILITY/..., CI_SERVER_*,
@@ -57,8 +59,7 @@ require 'open3'
 #   CI_COMMIT_TAG_MESSAGE, CI_COMMIT_DEFAULT_BRANCH_BASE_SHA,
 #   CI_CONFIG_PATH, CI_OPEN_MERGE_REQUESTS (set it to simulate a branch
 #   with an open MR), CI_MERGE_REQUEST_ID/REF_PATH/TITLE/LABELS/... ,
-#   CI_DEPLOY_FREEZE, CI_KUBERNETES_ACTIVE, CI_ENVIRONMENT_* (TASK-11),
-#   CI_NODE_INDEX/CI_NODE_TOTAL (parallel expansion, TASK-18), and every
+#   CI_DEPLOY_FREEZE, CI_KUBERNETES_ACTIVE, CI_ENVIRONMENT_* (TASK-11), and every
 #   "Job-only" variable (the runner sets those).
 module PredefinedVariables
   # Upstream Enums::Ci::Pipeline.sources, minus `unknown`.
@@ -246,7 +247,12 @@ module PredefinedVariables
   # @param name [String] job name
   # @param stage [String] the job's stage (default already applied)
   # @param when_value [String, nil] the job's own `when:`
-  def job_variables(name:, stage:, when_value:)
+  # @param node_index [Integer, nil] 1-based instance of a parallel job,
+  #   nil for any other job (CI_NODE_INDEX is then unset)
+  # @param node_total [Integer] instances of the job, 1 if not parallel
+  def job_variables(name:, stage:, when_value:, node_index: nil, node_total: 1)
+    raise ArgumentError, "node_total must be >= 1, got #{node_total.inspect}" unless node_total.is_a?(Integer) && node_total >= 1
+
     vars = {
       'CI_JOB_NAME' => name,
       'CI_JOB_NAME_SLUG' => slugify(name),
@@ -254,6 +260,8 @@ module PredefinedVariables
       'CI_JOB_STAGE' => stage
     }
     vars['CI_JOB_MANUAL'] = 'true' if ACTIONABLE_WHEN.include?(when_value.to_s)
+    vars['CI_NODE_INDEX'] = node_index.to_s unless node_index.nil?
+    vars['CI_NODE_TOTAL'] = node_total.to_s
     vars
   end
 

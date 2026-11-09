@@ -61,7 +61,7 @@ class MockServer
 
   # Create a pipeline from a config that has not been through
   # PipelineBuilder (YAML string or parsed hash; no includes/extends):
-  # applies default:/inherit:, evaluates workflow and job rules, then
+  # applies default:/inherit:, expands parallel:, evaluates workflow and job rules, then
   # create_pipeline_from.
   #
   # @param config [String, Hash] YAML config content or parsed hash
@@ -70,9 +70,9 @@ class MockServer
   # @raise [WorkflowRulesFilteredError] workflow:rules created no pipeline
   def create_pipeline(config, options = {})
     parsed_config = parse_configuration(config)
-    job_definitions = PipelineBuilder.compose_jobs(parsed_config)
-    stage_errors = PipelineBuilder.stage_errors(job_definitions, extract_stages(parsed_config))
-    raise ConfigurationError, "Configuration errors:\n  - #{stage_errors.join("\n  - ")}" unless stage_errors.empty?
+    job_definitions, errors = PipelineBuilder.expand_parallel(PipelineBuilder.compose_jobs(parsed_config))
+    errors = PipelineBuilder.stage_errors(job_definitions, extract_stages(parsed_config)) if errors.empty?
+    raise ConfigurationError, "Configuration errors:\n  - #{errors.join("\n  - ")}" unless errors.empty?
 
     evaluated = PipelineBuilder.evaluate_rules(
       parsed_config,

@@ -219,8 +219,19 @@ RSpec.describe PredefinedVariables do
     it 'sets name, slug, group name and stage' do
       expect(described_class.job_variables(name: 'Build: [aws, x86]', stage: 'build', when_value: nil)).to eq(
         'CI_JOB_NAME' => 'Build: [aws, x86]', 'CI_JOB_NAME_SLUG' => 'build---aws--x86',
-        'CI_JOB_GROUP_NAME' => 'Build', 'CI_JOB_STAGE' => 'build'
+        'CI_JOB_GROUP_NAME' => 'Build', 'CI_JOB_STAGE' => 'build', 'CI_NODE_TOTAL' => '1'
       )
+    end
+
+    it 'sets CI_NODE_TOTAL for every job and CI_NODE_INDEX only for a parallel instance' do
+      expect(described_class.job_variables(name: 'j 2/3', stage: 's', when_value: nil, node_index: 2, node_total: 3))
+        .to include('CI_NODE_INDEX' => '2', 'CI_NODE_TOTAL' => '3')
+      expect(described_class.job_variables(name: 'j', stage: 's', when_value: nil)).not_to have_key('CI_NODE_INDEX')
+    end
+
+    it 'rejects a node_total below 1 (programmer error)' do
+      expect { described_class.job_variables(name: 'j', stage: 's', when_value: nil, node_total: 0) }
+        .to raise_error(ArgumentError, /node_total/)
     end
 
     it 'strips the parallel suffix from the group name' do

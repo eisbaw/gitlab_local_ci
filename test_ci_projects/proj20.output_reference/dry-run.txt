@@ -1,12 +1,26 @@
-Pipeline #1 created with 13 job(s)
+Pipeline #1 created with 27 job(s)
 
 [T+0s] Job 'audit:frontend:dependencies' → Runner 'runner_001'
 [T+0s] Job 'audit:backend:dependencies' → Runner 'runner_001'
-[T+0s] Job 'security:container:scan' → Runner 'runner_001'
-[T+0s] Job 'security:license:check' → Runner 'runner_001'
+[T+0s] Job 'security:container:scan: [frontend]' → Runner 'runner_001'
+[T+0s] Job 'security:container:scan: [backend]' → Runner 'runner_001'
+[T+0s] Job 'security:container:scan: [api]' queued: every runner that can take it is busy
+[T+0s] Job 'security:container:scan: [workers]' queued: every runner that can take it is busy
+[T+0s] Job 'security:license:check' queued: every runner that can take it is busy
 [T+0s] Job 'validate:yaml' queued: every runner that can take it is busy
 [T+0s] Job 'validate:dependencies' queued: every runner that can take it is busy
-[T+0s] Job 'test:matrix:compatibility' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [frontend, development, linux]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [frontend, development, alpine]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [frontend, staging, linux]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [frontend, staging, alpine]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [backend, development, linux]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [backend, development, alpine]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [backend, staging, linux]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [backend, staging, alpine]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [api, development, linux]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [api, development, alpine]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [api, staging, linux]' queued: every runner that can take it is busy
+[T+0s] Job 'test:matrix:compatibility: [api, staging, alpine]' queued: every runner that can take it is busy
 [T+0s] Job 'security:sast' queued: every runner that can take it is busy
 [T+0s] Job 'security:dependency-scanning' queued: every runner that can take it is busy
 [T+0s] Job 'security:secrets' queued: every runner that can take it is busy
@@ -15,29 +29,57 @@ Pipeline #1 created with 13 job(s)
 [T+0s] Job 'notify:pipeline-status' queued: every runner that can take it is busy
 [T+5s] Job 'audit:frontend:dependencies' completed
 [T+5s] Job 'audit:backend:dependencies' completed
-[T+5s] Job 'security:container:scan' completed
-[T+5s] Job 'security:license:check' completed
+[T+5s] Job 'security:container:scan: [frontend]' completed
+[T+5s] Job 'security:container:scan: [backend]' completed
+[T+6s] Job 'security:container:scan: [api]' → Runner 'runner_001'
+[T+6s] Job 'security:container:scan: [workers]' → Runner 'runner_001'
+[T+6s] Job 'security:license:check' → Runner 'runner_001'
 [T+6s] Job 'validate:yaml' → Runner 'runner_001'
-[T+6s] Job 'validate:dependencies' → Runner 'runner_001'
-[T+6s] Job 'test:matrix:compatibility' → Runner 'runner_001'
-[T+6s] Job 'security:sast' → Runner 'runner_001'
+[T+11s] Job 'security:container:scan: [api]' completed
+[T+11s] Job 'security:container:scan: [workers]' completed
+[T+11s] Job 'security:license:check' completed
 [T+11s] Job 'validate:yaml' completed
-[T+11s] Job 'validate:dependencies' completed
-[T+11s] Job 'test:matrix:compatibility' completed
-[T+11s] Job 'security:sast' completed
-[T+12s] Job 'security:dependency-scanning' → Runner 'runner_001'
-[T+12s] Job 'security:secrets' → Runner 'runner_001'
-[T+12s] Job 'quality:codeclimate' → Runner 'runner_001'
-[T+12s] Job 'cleanup:old-images' → Runner 'runner_001'
-[T+17s] Job 'security:dependency-scanning' completed
-[T+17s] Job 'security:secrets' completed
-[T+17s] Job 'quality:codeclimate' completed
-[T+17s] Job 'cleanup:old-images' completed
-[T+18s] Job 'notify:pipeline-status' → Runner 'runner_001'
-[T+23s] Job 'notify:pipeline-status' completed
+[T+12s] Job 'validate:dependencies' → Runner 'runner_001'
+[T+12s] Job 'test:matrix:compatibility: [frontend, development, linux]' → Runner 'runner_001'
+[T+12s] Job 'test:matrix:compatibility: [frontend, development, alpine]' → Runner 'runner_001'
+[T+12s] Job 'test:matrix:compatibility: [frontend, staging, linux]' → Runner 'runner_001'
+[T+17s] Job 'validate:dependencies' completed
+[T+17s] Job 'test:matrix:compatibility: [frontend, development, linux]' completed
+[T+17s] Job 'test:matrix:compatibility: [frontend, development, alpine]' completed
+[T+17s] Job 'test:matrix:compatibility: [frontend, staging, linux]' completed
+[T+18s] Job 'test:matrix:compatibility: [frontend, staging, alpine]' → Runner 'runner_001'
+[T+18s] Job 'test:matrix:compatibility: [backend, development, linux]' → Runner 'runner_001'
+[T+18s] Job 'test:matrix:compatibility: [backend, development, alpine]' → Runner 'runner_001'
+[T+18s] Job 'test:matrix:compatibility: [backend, staging, linux]' → Runner 'runner_001'
+[T+23s] Job 'test:matrix:compatibility: [frontend, staging, alpine]' completed
+[T+23s] Job 'test:matrix:compatibility: [backend, development, linux]' completed
+[T+23s] Job 'test:matrix:compatibility: [backend, development, alpine]' completed
+[T+23s] Job 'test:matrix:compatibility: [backend, staging, linux]' completed
+[T+24s] Job 'test:matrix:compatibility: [backend, staging, alpine]' → Runner 'runner_001'
+[T+24s] Job 'test:matrix:compatibility: [api, development, linux]' → Runner 'runner_001'
+[T+24s] Job 'test:matrix:compatibility: [api, development, alpine]' → Runner 'runner_001'
+[T+24s] Job 'test:matrix:compatibility: [api, staging, linux]' → Runner 'runner_001'
+[T+29s] Job 'test:matrix:compatibility: [backend, staging, alpine]' completed
+[T+29s] Job 'test:matrix:compatibility: [api, development, linux]' completed
+[T+29s] Job 'test:matrix:compatibility: [api, development, alpine]' completed
+[T+29s] Job 'test:matrix:compatibility: [api, staging, linux]' completed
+[T+30s] Job 'test:matrix:compatibility: [api, staging, alpine]' → Runner 'runner_001'
+[T+30s] Job 'security:sast' → Runner 'runner_001'
+[T+30s] Job 'security:dependency-scanning' → Runner 'runner_001'
+[T+30s] Job 'security:secrets' → Runner 'runner_001'
+[T+35s] Job 'test:matrix:compatibility: [api, staging, alpine]' completed
+[T+35s] Job 'security:sast' completed
+[T+35s] Job 'security:dependency-scanning' completed
+[T+35s] Job 'security:secrets' completed
+[T+36s] Job 'quality:codeclimate' → Runner 'runner_001'
+[T+36s] Job 'cleanup:old-images' → Runner 'runner_001'
+[T+36s] Job 'notify:pipeline-status' → Runner 'runner_001'
+[T+41s] Job 'quality:codeclimate' completed
+[T+41s] Job 'cleanup:old-images' completed
+[T+41s] Job 'notify:pipeline-status' completed
 
-Simulation completed at T+24s
+Simulation completed at T+42s
 
 Pipeline status: success
 Job summary:
-  completed: 13
+  completed: 27

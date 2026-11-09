@@ -221,5 +221,25 @@ RSpec.describe JobEnvironment do
       yaml = "job: {variables: {RUNNER_AFTER_SCRIPT_TIMEOUT: 90s}, script: [echo]}\n"
       expect(job(yaml, 'job').after_script_timeout_s).to eq(90)
     end
+
+    it 'gives a matrix instance its matrix variables as job variables, under rules:variables and CLI (TASK-18)' do
+      yaml = <<~YAML
+        variables: {P: root, R: root}
+        deploy:
+          variables: {P: job, R: job, C: job}
+          parallel:
+            matrix:
+              - P: [aws, gcp]
+                R: [r1]
+                C: [c1]
+          rules:
+            - variables: {R: rule}
+          script: [echo]
+      YAML
+      variables = job(yaml, 'deploy: [gcp, r1, c1]', cli: { 'C' => 'cli' }).variables
+      expect(variables).to include('P' => 'gcp', 'R' => 'rule', 'C' => 'cli', 'CI_NODE_INDEX' => '2',
+                                   'CI_NODE_TOTAL' => '2', 'CI_JOB_NAME' => 'deploy: [gcp, r1, c1]',
+                                   'CI_JOB_GROUP_NAME' => 'deploy')
+    end
   end
 end

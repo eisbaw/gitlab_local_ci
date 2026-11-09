@@ -1,4 +1,4 @@
-Pipeline #1 created with 9 job(s)
+Pipeline #1 created with 17 job(s)
 
 [T+0s] Job 'build:app' → Runner 'runner-1'
 [T+0s] Job 'build:library' → Runner 'runner-1'
@@ -6,21 +6,42 @@ Pipeline #1 created with 9 job(s)
 [T+5s] Job 'build:library' completed
 [T+6s] Job 'test:unit' → Runner 'runner-1'
 [T+6s] Job 'security:scan' → Runner 'runner_001'
-[T+6s] Job 'test:matrix' → Runner 'runner-1'
+[T+6s] Job 'test:matrix: [linux, 3.9]' → Runner 'runner-1'
+[T+6s] Job 'test:matrix: [linux, 3.10]' → Runner 'runner_001'
+[T+6s] Job 'test:matrix: [linux, 3.11]' → Runner 'runner_001'
+[T+6s] Job 'test:matrix: [macos, 3.9]' → Runner 'runner_001'
+[T+6s] Job 'test:matrix: [macos, 3.10]' queued: every runner that can take it is busy
+[T+6s] Job 'test:matrix: [macos, 3.11]' queued: every runner that can take it is busy
+[T+6s] Job 'test:matrix: [windows, 3.9]' queued: every runner that can take it is busy
+[T+6s] Job 'test:matrix: [windows, 3.10]' queued: every runner that can take it is busy
+[T+6s] Job 'test:matrix: [windows, 3.11]' queued: every runner that can take it is busy
 [T+11s] Job 'test:unit' completed
 [T+11s] Job 'security:scan' completed
-[T+11s] Job 'test:matrix' completed
-[T+12s] Job 'test:integration' → Runner 'runner-1'
-[T+12s] Job 'test:e2e' → Runner 'runner-1'
-[T+17s] Job 'test:integration' completed
-[T+17s] Job 'test:e2e' completed
-[T+18s] Job 'deploy:staging' → Runner 'runner-1'
-[T+18s] Job 'deploy:production' → Runner 'runner-1'
-[T+23s] Job 'deploy:staging' completed
-[T+23s] Job 'deploy:production' completed
+[T+11s] Job 'test:matrix: [linux, 3.9]' completed
+[T+11s] Job 'test:matrix: [linux, 3.10]' completed
+[T+11s] Job 'test:matrix: [linux, 3.11]' completed
+[T+11s] Job 'test:matrix: [macos, 3.9]' completed
+[T+12s] Job 'test:matrix: [macos, 3.10]' → Runner 'runner-1'
+[T+12s] Job 'test:matrix: [macos, 3.11]' → Runner 'runner-1'
+[T+12s] Job 'test:matrix: [windows, 3.9]' → Runner 'runner_001'
+[T+12s] Job 'test:matrix: [windows, 3.10]' → Runner 'runner_001'
+[T+12s] Job 'test:matrix: [windows, 3.11]' → Runner 'runner_001'
+[T+17s] Job 'test:matrix: [macos, 3.10]' completed
+[T+17s] Job 'test:matrix: [macos, 3.11]' completed
+[T+17s] Job 'test:matrix: [windows, 3.9]' completed
+[T+17s] Job 'test:matrix: [windows, 3.10]' completed
+[T+17s] Job 'test:matrix: [windows, 3.11]' completed
+[T+18s] Job 'test:integration' → Runner 'runner-1'
+[T+18s] Job 'test:e2e' → Runner 'runner-1'
+[T+23s] Job 'test:integration' completed
+[T+23s] Job 'test:e2e' completed
+[T+24s] Job 'deploy:staging' → Runner 'runner-1'
+[T+24s] Job 'deploy:production' → Runner 'runner-1'
+[T+29s] Job 'deploy:staging' completed
+[T+29s] Job 'deploy:production' completed
 
-Simulation completed at T+24s
+Simulation completed at T+30s
 
 Pipeline status: success
 Job summary:
-  completed: 9
+  completed: 17
