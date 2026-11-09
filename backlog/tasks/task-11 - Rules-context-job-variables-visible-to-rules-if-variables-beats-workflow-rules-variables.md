@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T17:54:00Z'
+updated_date: '2026-11-09T20:13:00Z'
 labels:
   - audit
   - rules
@@ -30,3 +30,9 @@ MockServer#filter_jobs_by_rules uses only global+predefined vars; upstream Seed:
 - [ ] #2 Precedence matches doc/ci/variables/_index.md: CLI > rules:variables > job > workflow rules vars > global
 - [ ] #3 Specs per precedence level
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Forward-carried from TASK-9 (8dc4b74): evaluate_rules now builds each job's rules view as predefined < inherited root variables < CLI, via a block passed to filter_jobs_by_rules; root = root_variables(config) merged with the matched workflow rule's variables (apply_workflow_rules now returns only those), filtered by inherit:variables (PipelineBuilder.inherited_root_variables, upstream Variables::Helpers#inherit_yaml_variables). CLI-over-workflow precedence holds. Remaining for TASK-11: overlay the job's own variables: between root and CLI (upstream yaml_variables = inherited root + job vars), i.e. in that block.
+<!-- SECTION:NOTES:END -->
