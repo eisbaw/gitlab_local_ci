@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T18:12:00Z'
+updated_date: '2026-11-09T20:47:00Z'
 labels:
   - tooling
   - nix
@@ -25,3 +26,9 @@ In the flake dev shell, any require that makes RubyGems scan all specs (bare req
 - [ ] #1 No 'extensions are not built' line from any CLI subcommand or rspec in the dev shell
 - [ ] #2 gem 'rexml' mitigation removed or justified
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From TASK-2: spec/simplecov_cli_subprocess.rb (loaded into every CLI subprocess the specs spawn, via RUBYOPT) uses the same gem 'simplecov' activation mitigation; without it lint_spec's empty-stderr assertions fail on the 'Ignoring ... extensions are not built' lines. Remove it together with gem 'rexml' when the dev shell is fixed.
+<!-- SECTION:NOTES:END -->

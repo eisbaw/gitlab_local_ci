@@ -15,26 +15,47 @@
 # limitations under the License.
 
 # SimpleCov must be loaded before application code
-require 'simplecov'
+require 'fileutils'
+require_relative 'simplecov_config'
+
+# Coverage counts the CLI subprocesses too. The integration specs drive
+# dry-run, run, export-just and the lint formatters through bin/gitlab_ci_cli
+# (Open3), and in-process coverage never sees that code. Each subprocess
+# loads simplecov_cli_subprocess.rb via RUBYOPT and stores its own result.
+#
+# Results from an earlier run would be merged as if this run produced them,
+# so start from nothing: generated files only, under coverage/.
+FileUtils.rm_rf(SimpleCovConfig::SUBPROCESS_DIR)
+FileUtils.rm_f(File.join(SimpleCovConfig::ROOT, 'coverage', '.resultset.json'))
+ENV['RUBYOPT'] = [ENV['RUBYOPT'], "-r#{File.expand_path('simplecov_cli_subprocess.rb', __dir__)}"].compact.join(' ')
+
+SimpleCov.at_exit do
+  subprocess_resultsets = Dir[File.join(SimpleCovConfig::SUBPROCESS_DIR, '*', '.resultset.json')]
+  # Stored into coverage/.resultset.json, which SimpleCov.result then merges
+  # with this process's own result.
+  SimpleCov::ResultMerger.merge_and_store(*subprocess_resultsets, ignore_timeout: true) unless subprocess_resultsets.empty?
+  SimpleCov.result.format!
+end
 
 SimpleCov.start do
-  # Track coverage in lib directory
-  add_filter '/spec/'
-  add_filter '/gitlab/'
+  SimpleCovConfig.apply_common
 
-  # Set minimum coverage threshold to 90%
-  minimum_coverage 90
+  # Files no spec loads count as 0% instead of being left out of the total.
+  track_files 'lib/**/*.rb'
 
-  # Organize coverage by groups
   add_group 'Commands', 'lib/commands'
   add_group 'Formatters', 'lib/formatters'
   add_group 'Core', 'lib'
 
-  # Enable branch coverage (requires SimpleCov 0.18+)
-  enable_coverage :branch
-
-  # Report both line and branch coverage
-  minimum_coverage line: 90, branch: 80
+  # A ratchet, not a target: the floor of what the suite measured when the
+  # gate was made honest (TASK-2: line 84.34%, branch 73.85%, with the CLI
+  # subprocesses and every lib/ file counted). Before that the gate said
+  # 90/80 against ~79/64 of only the in-process-loaded files, so it was red
+  # on every run and nobody read it. Now it is green and fails when
+  # coverage drops. Only ever raise these, to the new floor, when specs add
+  # coverage; never lower them to make a change pass. The aspiration is
+  # still 90/80, tracked as a backlog task with the lowest-covered files.
+  minimum_coverage line: 84, branch: 73
 end
 
 require 'rspec'

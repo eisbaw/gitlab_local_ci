@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T20:12:00Z'
+updated_date: '2026-11-09T20:47:00Z'
 labels:
   - audit
   - variables
@@ -34,4 +34,6 @@ VariableExpander is never used outside its spec, so --undefined MODE does nothin
 
 <!-- SECTION:NOTES:BEGIN -->
 COMPASS: absorbs TASK-34 (three expand_variables copies) - same root: one expansion path. Prefer removing --undefined over wiring it.
+
+From TASK-2: more dead code under lib/formatters: lib/formatters.rb and lib/formatters/formatter_factory.rb are required by nothing (gitlab_ci_cli.rb create_formatter picks formatters itself), and TextFormatter/JsonFormatter/JunitFormatter only ever get command: :lint, so their :dag and :dry_run branches are dead. With the honest coverage gate (all lib/ tracked) these are ~130 uncovered lines; removing them raises the line ratchet to ~88% (see the ratchet follow-up task).
 <!-- SECTION:NOTES:END -->

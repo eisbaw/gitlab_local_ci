@@ -18,6 +18,7 @@ require 'spec_helper'
 require 'runner_fleet'
 require 'mock_runner'
 require 'mock_job'
+require 'tmpdir'
 
 RSpec.describe RunnerFleet do
   describe '#initialize' do
@@ -319,6 +320,112 @@ RSpec.describe RunnerFleet do
           fleet.find_available_runner(job)
         end.not_to raise_error
       end
+    end
+  end
+
+  # runners/*.json is a user-written input format (dry-run --runners), so
+  # its validation is pinned by behaviour on real files, not stubs.
+  describe 'runner file format' do
+    let(:fleet) { described_class.new }
+    let(:valid_runner) { { 'id' => 'r1', 'tags' => ['docker'], 'executor' => 'shell', 'max_jobs' => 2 } }
+
+    around do |example|
+      Dir.mktmpdir('runners') do |dir|
+        @dir = dir
+        example.run
+      end
+    end
+
+    def write_runner(name, content)
+      path = File.join(@dir, name)
+      File.write(path, content.is_a?(String) ? content : JSON.generate(content))
+      path
+    end
+
+    it 'loads every *.json file, accepting the tag_list/concurrent aliases, and ignores other files' do
+      write_runner('a.json', valid_runner)
+      write_runner('b.json', { 'id' => 7, 'tag_list' => [], 'executor' => 'docker', 'concurrent' => 4 })
+      write_runner('notes.txt', 'not a runner')
+
+      expect(fleet.load_runners(@dir)).to eq(2)
+      expect(fleet.runners.map(&:id)).to eq(['r1', 7])
+    end
+
+    it 'rejects a missing directory and a path that is a file' do
+      file = write_runner('a.json', valid_runner)
+
+      expect { fleet.load_runners(File.join(@dir, 'nope')) }.to raise_error(ArgumentError, /directory does not exist/)
+      # A file is rejected naming it; the message wrongly says "does not
+      # exist" because Dir.exist? is false for files (TASK-46).
+      expect { fleet.load_runners(file) }.to raise_error(ArgumentError, /#{Regexp.escape(file)}/)
+    end
+
+    it 'names the file when its JSON does not parse' do
+      path = write_runner('broken.json', '{"id": ')
+
+      expect { fleet.load_runners(@dir) }.to raise_error(ArgumentError, /Failed to parse JSON in runner file '#{Regexp.escape(path)}'/)
+    end
+
+    {
+      'missing id' => [->(r) { r.delete('id') }, /missing required field 'id'/],
+      'id of the wrong type' => [->(r) { r['id'] = 1.5 }, /field 'id' must be a string or integer, got Float/],
+      'missing tags' => [->(r) { r.delete('tags') }, /missing required field 'tags' \(or 'tag_list'\)/],
+      'tags not a list' => [->(r) { r['tags'] = 'docker' }, /field 'tags' \(or 'tag_list'\) must be an array, got String/],
+      'missing executor' => [->(r) { r.delete('executor') }, /missing required field 'executor'/],
+      'executor not a string' => [->(r) { r['executor'] = 3 }, /field 'executor' must be a string, got Integer/],
+      'missing max_jobs' => [->(r) { r.delete('max_jobs') }, /missing required field 'max_jobs' \(or 'concurrent'\)/],
+      'max_jobs zero' => [->(r) { r['max_jobs'] = 0 }, /must be a positive integer, got 0/],
+      'max_jobs not an integer' => [->(r) { r['max_jobs'] = '2' }, /must be a positive integer, got "2"/]
+    }.each do |case_name, (mutate, message)|
+      it "rejects a runner with #{case_name}, naming the file, and loads none" do
+        runner = valid_runner.dup
+        mutate.call(runner)
+        path = write_runner('bad.json', runner)
+
+        expect { fleet.load_runners(@dir) }.to raise_error(ArgumentError) { |error|
+          expect(error.message).to match(message)
+          expect(error.message).to include(path)
+        }
+        expect(fleet.runners).to be_empty
+      end
+    end
+  end
+
+  describe '#find_available_runner with real runners' do
+    let(:fleet) { described_class.new }
+    let(:docker_one_slot) { MockRunner.new('id' => 'docker1', 'tags' => %w[docker linux], 'max_jobs' => 1) }
+    let(:docker_two_slots) { MockRunner.new('id' => 'docker2', 'tags' => %w[docker], 'max_jobs' => 2) }
+    let(:untagged_ok) { MockRunner.new('id' => 'any', 'tags' => %w[shell], 'max_jobs' => 1, 'run_untagged' => true) }
+
+    def job(name, tags)
+      MockJob.new('id' => name.hash, 'name' => name, 'stage' => 'test', 'script' => ['true'], 'tags' => tags)
+    end
+
+    before { fleet.runners.push(docker_one_slot, docker_two_slots, untagged_ok) }
+
+    it 'picks the first runner, in load order, that has all the job tags and a free slot' do
+      expect(fleet.find_available_runner(job('a', %w[docker linux]))).to be(docker_one_slot)
+      expect(fleet.find_available_runner(job('b', %w[docker]))).to be(docker_one_slot)
+    end
+
+    it 'skips a matching runner that is full' do
+      docker_one_slot.assign_job(job('busy', %w[docker]))
+
+      expect(fleet.find_available_runner(job('b', %w[docker]))).to be(docker_two_slots)
+    end
+
+    it 'returns nil when matching runners are all full, and when no runner has the tags' do
+      docker_one_slot.assign_job(job('x', %w[docker linux]))
+      expect(fleet.find_available_runner(job('a', %w[docker linux]))).to be_nil
+      expect(fleet.find_available_runner(job('gpu', %w[gpu]))).to be_nil
+    end
+
+    it 'gives an untagged job only to a runner with run_untagged' do
+      expect(fleet.find_available_runner(job('plain', []))).to be(untagged_ok)
+    end
+
+    it 'fails fast on a nil job' do
+      expect { fleet.find_available_runner(nil) }.to raise_error(ArgumentError, /job cannot be nil/)
     end
   end
 end

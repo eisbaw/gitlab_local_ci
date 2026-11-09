@@ -344,4 +344,76 @@ RSpec.describe IncludeProcessor do
       end
     end
   end
+
+  # Upstream include:local accepts wildcards (`*` within one directory,
+  # `**` across directories) and include:project accepts a list of files,
+  # each included in order. project: is simulated from a sibling directory
+  # of the project (no network), so these run offline.
+  describe 'expanding local globs and project file lists' do
+    def in_layout(files)
+      Dir.mktmpdir do |root|
+        files.each do |path, body|
+          full = File.join(root, path)
+          FileUtils.mkdir_p(File.dirname(full))
+          File.write(full, body)
+        end
+        project = File.join(root, 'app')
+        FileUtils.mkdir_p(project)
+        yield described_class.new(project_path: project, cache_root: File.join(root, 'cache'))
+      end
+    end
+
+    it 'includes every file a single-directory * matches, in name order, and not files in subdirectories' do
+      in_layout(
+        'app/ci/b.yml' => "jb: {script: [b]}\nvariables: {V: b}\n",
+        'app/ci/a.yml' => "ja: {script: [a]}\nvariables: {V: a}\n",
+        'app/ci/nested/c.yml' => "jc: {script: [c]}\n",
+        'app/ci/notes.txt' => "jt: {script: [t]}\n"
+      ) do |processor|
+        result = processor.process_includes('include' => [{ 'local' => '/ci/*.yml' }])
+
+        expect(result.keys).to eq(%w[ja variables jb])
+        expect(result['variables']).to eq('V' => 'b')
+      end
+    end
+
+    it 'descends into subdirectories with **' do
+      in_layout(
+        'app/ci/a.yml' => "ja: {script: [a]}\n",
+        'app/ci/nested/c.yml' => "jc: {script: [c]}\n"
+      ) do |processor|
+        expect(processor.process_includes('include' => 'ci/**/*.yml').keys).to contain_exactly('ja', 'jc')
+      end
+    end
+
+    it 'rejects a glob that climbs out of the project with ..' do
+      in_layout('secret/x.yml' => "jx: {script: [x]}\n") do |processor|
+        expect { processor.process_includes('include' => [{ 'local' => '../secret/*.yml' }]) }
+          .to raise_error(/Pattern cannot contain '\.\.'/)
+      end
+    end
+
+    it 'includes each file of a project file: list in order, later files winning' do
+      in_layout(
+        'group/lib/base.yml' => "variables: {V: base, ONLY_BASE: x}\nbuild: {script: [base]}\n",
+        'group/lib/extra.yml' => "variables: {V: extra}\ntest: {script: [extra]}\n"
+      ) do |processor|
+        result = processor.process_includes(
+          'include' => [{ 'project' => 'group/lib', 'ref' => 'v1', 'file' => ['/base.yml', 'extra.yml'] }]
+        )
+
+        expect(result['variables']).to eq('V' => 'extra', 'ONLY_BASE' => 'x')
+        expect(result.keys).to eq(%w[variables build test])
+      end
+    end
+
+    it 'rejects .. in a project path or file before looking anywhere' do
+      in_layout({}) do |processor|
+        expect { processor.process_includes('include' => [{ 'project' => 'group/../x', 'file' => 'a.yml' }]) }
+          .to raise_error(/Invalid project path: group\/\.\.\/x/)
+        expect { processor.process_includes('include' => [{ 'project' => 'group/lib', 'file' => '../a.yml' }]) }
+          .to raise_error(/Invalid file path: \.\.\/a\.yml/)
+      end
+    end
+  end
 end
