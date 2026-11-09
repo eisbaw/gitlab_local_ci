@@ -14,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require_relative '../extends_resolver'
 require_relative '../pipeline_builder'
-require 'yaml'
 require 'time'
 
 module GitlabCiCli
@@ -56,7 +54,7 @@ module GitlabCiCli
       #
       # @return [Integer] Exit code (0 for success, 1 for failure)
       def execute
-        load_config
+        return 1 unless load_config
 
         # Generate appropriate justfile
         output = if @options[:flat]
@@ -95,31 +93,26 @@ module GitlabCiCli
           graph: options[:graph] || false,
           shell: options[:shell] || 'bash',
           variables: options[:variables] || {},
+          project: options[:project],
+          pipeline: options[:pipeline],
           verbose: options[:verbose] || false
         }
       end
 
       # Load and process configuration
+      #
+      # @return [Boolean] false if the config could not be resolved (errors printed)
       def load_config
-        unless File.exist?(@options[:entry])
-          raise "CI config file not found: #{@options[:entry]}"
+        result = PipelineBuilder.resolve_config(@options[:entry], PipelineBuilder::Context.from_options(@options))
+        unless result.ok?
+          result.errors.each { |message| log_error(message) }
+          return false
         end
 
-        config_content = File.read(@options[:entry])
-        @config = YAML.safe_load(config_content, permitted_classes: [Symbol], aliases: true)
-
-        # Process includes
-        @config = process_includes(@config)
-
-        # Resolve extends
-        @config = resolve_extends(@config)
-
-        # Expand variables
-        @config = expand_variables(@config, @options[:variables])
-
-        # Extract stages and jobs
-        @stages = @config['stages'] || %w[build test deploy]
+        @config = expand_variables(result.config, @options[:variables])
+        @stages = result.stages
         @all_jobs = PipelineBuilder.job_definitions(@config)
+        true
       end
 
       # Generate flat justfile (no dependencies)
@@ -381,30 +374,6 @@ module GitlabCiCli
           #   just <job-name>             # Run a specific job
           #   just --dry-run <job-name>   # Show what would be executed
         HEADER
-      end
-
-      # Process include directives
-      def process_includes(config)
-        return config unless config['include']
-
-        PipelineBuilder.process_includes(
-          config,
-          project_dir: File.dirname(File.expand_path(@options[:entry])),
-          gitlab_dir: @options[:gitlab_dir],
-          variables: {}
-        )
-      rescue StandardError => e
-        log_error("Error processing includes: #{e.message}")
-        raise
-      end
-
-      # Resolve extends directives
-      def resolve_extends(config)
-        resolver = ExtendsResolver.new
-        resolver.resolve_extends(config)
-      rescue StandardError => e
-        log_error("Error resolving extends: #{e.message}")
-        raise
       end
 
       # Expand variables in configuration

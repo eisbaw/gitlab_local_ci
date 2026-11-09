@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require 'yaml'
-require_relative '../extends_resolver'
 require_relative '../pipeline_builder'
 
 module Commands
@@ -94,31 +92,18 @@ module Commands
       @entry_path = options[:entry] || '.gitlab-ci.yml'
       @gitlab_dir = options[:gitlab_dir] || './gitlab'
       @ref = options[:ref] || 'HEAD'
-      @variables = options[:variables] || {}
+      @context = PipelineBuilder::Context.from_options(options.merge(entry: @entry_path, gitlab_dir: @gitlab_dir))
     end
 
     # Execute the lint validation
     #
     # @return [Result] Validation result
     def execute
-      # Step 1: Validate input file exists and read content
-      file_content = read_yaml_file(@entry_path)
-      return file_content if file_content.is_a?(Result) # Early return on file error
+      # Static config (load, includes, extends); lint does not evaluate rules
+      resolved = PipelineBuilder.resolve_config(@entry_path, @context)
+      return Result.new(valid: false, errors: resolved.errors, exit_code: 1) unless resolved.ok?
 
-      # Step 2: Parse YAML
-      config = parse_yaml(file_content)
-      return config if config.is_a?(Result) # Early return on parse error
-
-      # Step 3: Process includes to merge external configurations
-      config = process_includes(config)
-      return config if config.is_a?(Result) # Early return on include error
-
-      # Step 4: Resolve extends directives
-      config = resolve_extends(config)
-      return config if config.is_a?(Result) # Early return on extends error
-
-      # Step 5: Validate configuration structure
-      validate_configuration(config)
+      validate_configuration(resolved)
     rescue StandardError => e
       # Catch any unexpected errors and return them as validation failures
       # This ensures we never crash silently
@@ -131,120 +116,18 @@ module Commands
 
     private
 
-    # Read YAML file from disk
-    #
-    # @param path [String] Path to YAML file
-    # @return [String, Result] File content or error result
-    def read_yaml_file(path)
-      unless File.exist?(path)
-        return Result.new(
-          valid: false,
-          errors: ["File not found: #{path}"],
-          exit_code: 1
-        )
-      end
-
-      begin
-        File.read(path)
-      rescue Errno::EACCES => e
-        Result.new(
-          valid: false,
-          errors: ["Permission denied reading file: #{path}"],
-          exit_code: 1
-        )
-      rescue StandardError => e
-        Result.new(
-          valid: false,
-          errors: ["Error reading file #{path}: #{e.message}"],
-          exit_code: 1
-        )
-      end
-    end
-
-    # Parse YAML configuration
-    #
-    # @param content [String] YAML content
-    # @return [Hash, Result] Parsed configuration or error result
-    def parse_yaml(content)
-      YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
-    rescue Psych::SyntaxError => e
-      Result.new(
-        valid: false,
-        errors: ["YAML syntax error: #{e.message}"],
-        exit_code: 1
-      )
-    rescue StandardError => e
-      Result.new(
-        valid: false,
-        errors: ["Failed to parse YAML: #{e.message}"],
-        exit_code: 1
-      )
-    end
-
-    # Process include directives in the configuration
-    #
-    # @param config [Hash] Parsed YAML configuration
-    # @return [Hash, Result] Merged configuration with includes or error result
-    def process_includes(config)
-      return config unless config['include']
-
-      PipelineBuilder.process_includes(
-        config,
-        project_dir: File.dirname(File.expand_path(@entry_path)),
-        gitlab_dir: @gitlab_dir,
-        variables: @variables || {}
-      )
-    rescue IncludeDepthExceededError => e
-      Result.new(
-        valid: false,
-        errors: ["Include depth exceeded: #{e.depth} > #{e.max_depth}"],
-        exit_code: 1
-      )
-    rescue StandardError => e
-      Result.new(
-        valid: false,
-        errors: ["Error processing includes: #{e.message}"],
-        exit_code: 1
-      )
-    end
-
-    # Resolve extends directives in the configuration
-    #
-    # @param config [Hash] Configuration with includes resolved
-    # @return [Hash, Result] Configuration with extends resolved or error result
-    def resolve_extends(config)
-      resolver = ExtendsResolver.new
-      resolver.resolve_extends(config)
-    rescue StandardError => e
-      Result.new(
-        valid: false,
-        errors: ["Error resolving extends: #{e.message}"],
-        exit_code: 1
-      )
-    end
-
     # Validate the configuration structure and semantics
     #
-    # @param config [Hash] Parsed YAML configuration
+    # @param resolved [PipelineBuilder::Result] resolved static config
     # @return [Result] Validation result
-    def validate_configuration(config)
+    def validate_configuration(resolved)
       errors = []
       warnings = []
 
-      # Validate that config is a hash
-      unless config.is_a?(Hash)
-        return Result.new(
-          valid: false,
-          errors: ["Configuration must be a YAML hash/dictionary"],
-          exit_code: 1
-        )
-      end
+      stages = resolved.stages
 
-      # Extract stages (default to standard GitLab stages if not specified)
-      stages = config['stages'] || %w[build test deploy]
-
-      # Collect all jobs
-      jobs = PipelineBuilder.job_definitions(config)
+      # Hidden templates included: lint validates them too
+      jobs = resolved.job_definitions
 
       # Validate there's at least one job
       if jobs.empty?

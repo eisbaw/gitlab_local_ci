@@ -63,72 +63,58 @@ class MockServer
   # Ci::Pipeline.workflow_rules_failure_message).
   class WorkflowRulesFilteredError < StandardError; end
 
-  # Create a pipeline from a YAML configuration
+  # Create a pipeline from a config that has not been through
+  # PipelineBuilder (YAML string or parsed hash; no includes/extends):
+  # evaluates workflow and job rules, then create_pipeline_from.
   #
   # @param config [String, Hash] YAML config content or parsed hash
-  # @param options [Hash] Pipeline creation options (ref, variables, etc.)
+  # @param options [Hash] :ref, :variables (CLI/trigger variables)
   # @return [MockPipeline] Created pipeline object
+  # @raise [WorkflowRulesFilteredError] workflow:rules created no pipeline
   def create_pipeline(config, options = {})
-    # Parse configuration
     parsed_config = parse_configuration(config)
-
-    # Extract stages and jobs
-    stages = extract_stages(parsed_config)
-    job_configs = PipelineBuilder.visible_jobs(parsed_config)
-
-    # GAP 4: workflow:rules:variables cascade. Variable assembly order:
-    #   1. predefined CI_* vars (from PredefinedVariables.build)
-    #   2. top-level `variables:` defaults
-    #   3. trigger overlay (options[:variables])
-    #   4. matched workflow.rules' `variables:` (if any)
-    # The merged set is then visible to BOTH include-rules (already
-    # evaluated upstream of MockServer in DryRunCommand) and per-job
-    # rules. If `workflow:rules:` is present and NO rule matches, the
-    # pipeline is empty — matches upstream EvaluateWorkflowRules.
-    effective_vars = PipelineBuilder.pipeline_variables(
+    evaluated = PipelineBuilder.evaluate_rules(
       parsed_config,
       predefined: PredefinedVariables.build(project_dir: @project_dir, pipeline_source: @pipeline_source),
-      cli_variables: options[:variables] || {}
+      cli_variables: options[:variables] || {},
+      project_dir: @project_dir
     )
-    workflow_result = PipelineBuilder.apply_workflow_rules(parsed_config, effective_vars, project_dir: @project_dir)
-    effective_vars = workflow_result[:variables]
+    raise WorkflowRulesFilteredError, 'workflow:rules: matched no rule, skipping pipeline' if evaluated[:workflow_skipped]
 
-    if workflow_result[:filtered]
-      warn 'Warning: workflow:rules: matched no rule, skipping pipeline'
-      raise WorkflowRulesFilteredError, 'workflow:rules: matched no rule, skipping pipeline'
-    end
+    create_pipeline_from(
+      stages: extract_stages(parsed_config),
+      jobs: evaluated[:pipeline_jobs],
+      ref: options[:ref],
+      variables: options[:variables]
+    )
+  end
 
-    job_configs = PipelineBuilder.filter_jobs_by_rules(job_configs, effective_vars, project_dir: @project_dir)
+  # Create a pipeline from jobs already resolved and rule-filtered
+  # (PipelineBuilder::Result#pipeline_jobs).
+  #
+  # @param stages [Array<String>]
+  # @param jobs [Hash] job name => job config
+  # @return [MockPipeline]
+  def create_pipeline_from(stages:, jobs:, ref: nil, variables: nil)
+    raise ConfigurationError, "No jobs defined in configuration" if jobs.empty?
 
-    # Validate there are jobs
-    if job_configs.empty?
-      raise ConfigurationError, "No jobs defined in configuration"
-    end
+    validate_job_configs(jobs)
+    validate_dag(jobs)
 
-    # Validate job configurations
-    validate_job_configs(job_configs)
-
-    # Validate DAG for circular dependencies
-    validate_dag(job_configs)
-
-    # Build pipeline object
-    # MockPipeline will convert job_configs to MockJob objects internally
     @pipeline_counter += 1
     pipeline = MockPipeline.new(
       id: @pipeline_counter,
       stages: stages,
-      jobs: job_configs,
-      ref: options[:ref] || 'HEAD',
-      variables: options[:variables] || {}
+      jobs: jobs,
+      ref: ref || 'HEAD',
+      variables: variables || {}
     )
-
     @pipelines[pipeline.id] = pipeline
 
-    # Emit creation event
     emit_event(EVENT_PIPELINE_CREATED, {
       pipeline_id: pipeline.id,
       stages: stages,
-      job_count: job_configs.size
+      job_count: jobs.size
     })
 
     pipeline
@@ -163,7 +149,7 @@ class MockServer
   # @param config [Hash] Parsed configuration
   # @return [Array<String>] List of stages
   def extract_stages(config)
-    config['stages'] || %w[build test deploy]
+    config['stages'] || PipelineBuilder::DEFAULT_STAGES
   end
 
   # Validate job configurations

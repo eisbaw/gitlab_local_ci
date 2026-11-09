@@ -28,7 +28,8 @@ RSpec.describe GitlabCiCli::CLI do
       it 'uses default options' do
         options, = described_class.parse_args([])
         expect(options[:entry]).to eq('./.gitlab-ci.yml')
-        expect(options[:project]).to eq(Dir.pwd)
+        # nil: PipelineBuilder::Context.from_options uses the entry file's directory
+        expect(options[:project]).to be_nil
         expect(options[:runners]).to eq('./runners')
         expect(options[:ref]).to eq('HEAD')
         expect(options[:pipeline]).to eq('push')

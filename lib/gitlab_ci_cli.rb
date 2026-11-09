@@ -39,7 +39,8 @@ module GitlabCiCli
     # Default values
     DEFAULTS = {
       entry: './.gitlab-ci.yml',
-      project: Dir.pwd,
+      # nil = directory of --entry (PipelineBuilder::Context.from_options)
+      project: nil,
       runners: './runners',
       ref: 'HEAD',
       pipeline: 'push',
@@ -213,8 +214,9 @@ module GitlabCiCli
         end
       end
 
-      # Commands that need the project directory
-      if %w[dry-run].include?(command)
+      # --project, when given, must exist (every command resolves includes
+      # and rules against it)
+      if options[:project]
         project = options[:project]
         unless Dir.exist?(project)
           raise ArgumentError, "Project directory not found: #{project}"
@@ -291,7 +293,8 @@ module GitlabCiCli
 
         OPTIONS:
             --entry FILE      Path to CI config (default: ./.gitlab-ci.yml)
-            --project DIR     Project directory (default: current directory)
+            --project DIR     Project root: include:local, exists:/changes:, CI_PROJECT_DIR
+                              (default: directory of --entry)
             --runners DIR     Runner fleet directory (default: ./runners)
             --ref REF         Git ref to simulate (default: HEAD)
             --pipeline TYPE   Pipeline type: push|merge_request|schedule|manual (default: push)

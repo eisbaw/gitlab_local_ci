@@ -18,10 +18,7 @@ require_relative '../mock_server'
 require_relative '../runner_fleet'
 require_relative '../mock_runner'
 require_relative '../mock_job'
-require_relative '../extends_resolver'
 require_relative '../pipeline_builder'
-require_relative '../predefined_variables'
-require 'yaml'
 
 module GitlabCiCli
   module Commands
@@ -68,14 +65,15 @@ module GitlabCiCli
       def execute
         validate_prerequisites
 
+        context = PipelineBuilder::Context.from_options(@options)
         @server = MockServer.new(
           @options[:gitlab_dir],
-          project_dir: @options[:project],
-          pipeline_source: @options[:pipeline]
+          project_dir: context.project_dir,
+          pipeline_source: context.pipeline_source
         )
         @fleet = load_runner_fleet
 
-        pipeline = create_pipeline
+        pipeline = create_pipeline(context)
         return 1 if pipeline.nil?
 
         run_simulation(pipeline)
@@ -101,10 +99,7 @@ module GitlabCiCli
           ref: options[:ref] || 'HEAD',
           variables: options[:variables] || {},
           verbose: options[:verbose] || false,
-          # Project root used for `exists:` / `changes:` clauses and the
-          # CI_PROJECT_DIR predefined variable.
-          project: options[:project] || Dir.pwd,
-          # CI_PIPELINE_SOURCE — feeds workflow / include / job rules.
+          project: options[:project],
           pipeline: options[:pipeline] || 'push'
         }
       end
@@ -144,17 +139,18 @@ module GitlabCiCli
 
       # Create pipeline from configuration
       #
+      # @param context [PipelineBuilder::Context]
       # @return [Pipeline, nil] Created pipeline or nil on error
-      def create_pipeline
-        config_content = File.read(@options[:entry])
-
-        # Parse YAML and process includes
-        config = YAML.safe_load(config_content, permitted_classes: [Symbol], aliases: true)
-        config = process_includes(config)
-        config = resolve_extends(config)
-
-        # Convert back to YAML for server
-        processed_config_content = YAML.dump(config)
+      def create_pipeline(context)
+        result = PipelineBuilder.build(@options[:entry], context)
+        unless result.ok?
+          result.errors.each { |message| log_error(message) }
+          return nil
+        end
+        if result.workflow_skipped
+          log_info('workflow:rules: matched no rule, skipping pipeline')
+          return nil
+        end
 
         # Display variables in verbose mode
         if @options[:verbose] && !@options[:variables].empty?
@@ -165,8 +161,9 @@ module GitlabCiCli
           log_info("")
         end
 
-        pipeline = @server.create_pipeline(
-          processed_config_content,
+        pipeline = @server.create_pipeline_from(
+          stages: result.stages,
+          jobs: expand_variables(result.pipeline_jobs, @options[:variables]),
           ref: @options[:ref],
           variables: @options[:variables]
         )
@@ -175,58 +172,9 @@ module GitlabCiCli
         log_info("")
 
         pipeline
-      rescue MockServer::WorkflowRulesFilteredError => e
-        log_info(e.message)
-        nil
-      rescue StandardError => e
+      rescue MockServer::ConfigurationError => e
         log_error("Failed to create pipeline: #{e.message}")
         nil
-      end
-
-      # Process include directives in the configuration
-      #
-      # @param config [Hash] Parsed YAML configuration
-      # @return [Hash] Merged configuration with includes resolved
-      def process_includes(config)
-        return config unless config['include']
-
-        # Include rules see (in this precedence order):
-        #   - predefined CI_* vars (CI_PIPELINE_SOURCE etc.)
-        #   - CLI/trigger variables (--variables, overlay last)
-        # Top-level `variables:` defaults are NOT visible to include
-        # rules — matches GitLab's documented scope.
-        predefined = PredefinedVariables.build(
-          project_dir: @options[:project] || Dir.pwd,
-          pipeline_source: @options[:pipeline] || 'push'
-        )
-        include_vars = predefined.merge((@options[:variables] || {}).transform_keys(&:to_s))
-        PipelineBuilder.process_includes(
-          config,
-          project_dir: File.dirname(File.expand_path(@options[:entry])),
-          gitlab_dir: @options[:gitlab_dir],
-          variables: include_vars
-        )
-      rescue IncludeDepthExceededError => e
-        log_error("Include depth exceeded: #{e.depth} > #{e.max_depth}")
-        raise
-      rescue StandardError => e
-        log_error("Error processing includes: #{e.message}")
-        raise
-      end
-
-      # Resolve extends directives in the configuration
-      #
-      # @param config [Hash] Configuration with includes resolved
-      # @return [Hash] Configuration with extends resolved
-      def resolve_extends(config)
-        resolver = ExtendsResolver.new
-        resolved_config = resolver.resolve_extends(config)
-
-        # Expand variables in the configuration
-        expand_variables(resolved_config, @options[:variables])
-      rescue StandardError => e
-        log_error("Error resolving extends: #{e.message}")
-        raise
       end
 
       # Extract job name from key_path for error messages

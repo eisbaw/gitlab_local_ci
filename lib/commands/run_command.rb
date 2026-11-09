@@ -14,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require_relative '../extends_resolver'
 require_relative '../pipeline_builder'
-require 'yaml'
 require 'open3'
 
 module GitlabCiCli
@@ -51,7 +49,7 @@ module GitlabCiCli
       #
       # @return [Integer] Exit code (0 for success, 1 for failure)
       def execute
-        load_config
+        return 1 unless load_config
 
         # Validate job exists
         unless @all_jobs.key?(@job_name)
@@ -101,60 +99,25 @@ module GitlabCiCli
           gitlab_dir: options[:gitlab_dir] || './gitlab',
           run_deps: options[:run_deps] || 'excl',
           variables: options[:variables] || {},
+          project: options[:project],
+          pipeline: options[:pipeline],
           verbose: options[:verbose] || false
         }
       end
 
       # Load and process configuration
+      #
+      # @return [Boolean] false if the config could not be resolved (errors printed)
       def load_config
-        unless File.exist?(@options[:entry])
-          raise "CI config file not found: #{@options[:entry]}"
+        result = PipelineBuilder.resolve_config(@options[:entry], PipelineBuilder::Context.from_options(@options))
+        unless result.ok?
+          result.errors.each { |message| log_error(message) }
+          return false
         end
 
-        config_content = File.read(@options[:entry])
-        @config = YAML.safe_load(config_content, permitted_classes: [Symbol], aliases: true)
-
-        # Process includes
-        @config = process_includes(@config)
-
-        # Resolve extends
-        @config = resolve_extends(@config)
-
-        # Expand variables
-        @config = expand_variables(@config, @options[:variables])
-
-        # Extract all jobs
+        @config = expand_variables(result.config, @options[:variables])
         @all_jobs = PipelineBuilder.job_definitions(@config)
-      end
-
-      # Process include directives in the configuration
-      #
-      # @param config [Hash] Parsed YAML configuration
-      # @return [Hash] Merged configuration with includes resolved
-      def process_includes(config)
-        return config unless config['include']
-
-        PipelineBuilder.process_includes(
-          config,
-          project_dir: File.dirname(File.expand_path(@options[:entry])),
-          gitlab_dir: @options[:gitlab_dir],
-          variables: {}
-        )
-      rescue StandardError => e
-        log_error("Error processing includes: #{e.message}")
-        raise
-      end
-
-      # Resolve extends directives in the configuration
-      #
-      # @param config [Hash] Configuration with includes resolved
-      # @return [Hash] Configuration with extends resolved
-      def resolve_extends(config)
-        resolver = ExtendsResolver.new
-        resolver.resolve_extends(config)
-      rescue StandardError => e
-        log_error("Error resolving extends: #{e.message}")
-        raise
+        true
       end
 
       # Recursively expand variables in configuration

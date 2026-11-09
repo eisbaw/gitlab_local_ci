@@ -46,13 +46,13 @@ mapfile -t ambient_ci_vars < <(env | sed -n -E 's/^((CI|GITLAB)_[A-Za-z0-9_]*)=.
 unset_ci_args=()
 for var in "${ambient_ci_vars[@]}"; do unset_ci_args+=(-u "$var"); done
 
-# dry-run derives CI_COMMIT_* and CI_DEFAULT_BRANCH from the git state of
-# this checkout (lib/predefined_variables.rb), and proj8/12/16/20 rules test
-# them, so the goldens would differ on a feature branch, a detached HEAD (how
-# GitLab CI checks out) or a tagged commit. The goldens describe a push
-# pipeline on the default branch 'main', untagged, at a fixed SHA; --variables
-# overlays the git-derived values. Only dry-run reads git context: lint and
-# dag get no --variables, since that would change their include-rule scope.
+# Every command derives CI_COMMIT_* and CI_DEFAULT_BRANCH from the git state
+# of this checkout (lib/predefined_variables.rb) for include and job rules,
+# and proj8/12/16/20 rules test them, so
+# the goldens would differ on a feature branch, a detached HEAD (how GitLab
+# CI checks out) or a tagged commit. The goldens describe a push pipeline on
+# the default branch 'main', untagged, at a fixed SHA; --variables overlays
+# the git-derived values, the same for every command.
 pinned_git_context=(
     --variables CI_COMMIT_BRANCH=main
     --variables CI_COMMIT_REF_NAME=main
@@ -92,10 +92,10 @@ generate_reference() {
     mkdir -p "$output_dir"
 
     local o="$output_dir"
-    snapshot "$o/lint.txt"       "$o/lint.exit_code"       lint --entry "$config" --format text
-    snapshot "$o/lint.json"      "$o/lint.json.exit_code"  lint --entry "$config" --format json
-    snapshot "$o/lint.junit.xml" "$o/lint.junit.exit_code" lint --entry "$config" --format junit
-    snapshot "$o/dag.dot"        "$o/dag.exit_code"        dag  --entry "$config"
+    snapshot "$o/lint.txt"       "$o/lint.exit_code"       lint --entry "$config" --format text "${pinned_git_context[@]}"
+    snapshot "$o/lint.json"      "$o/lint.json.exit_code"  lint --entry "$config" --format json "${pinned_git_context[@]}"
+    snapshot "$o/lint.junit.xml" "$o/lint.junit.exit_code" lint --entry "$config" --format junit "${pinned_git_context[@]}"
+    snapshot "$o/dag.dot"        "$o/dag.exit_code"        dag  --entry "$config" "${pinned_git_context[@]}"
     # Simulated time, so the timeline is deterministic.
     snapshot "$o/dry-run.txt"    "$o/dry-run.exit_code"    dry-run --entry "$config" --runners ./runners "${pinned_git_context[@]}"
 
