@@ -124,11 +124,35 @@ module GitlabCiCli
           log_error("Job '#{@job_name}' is excluded by rules in this pipeline context: #{reason}")
         elsif result.job_definitions.key?(@job_name)
           log_error("Job '#{@job_name}' is a hidden template and never runs")
+        elsif !(instances = parallel_instances(result.job_definitions, @job_name)).empty?
+          log_error("Job '#{@job_name}' is a parallel job; run one instance by its full name, e.g. " \
+                    "run #{shell_quote(instances.first)}. Instances: #{instances.join(', ')}")
         else
           log_error("Job '#{@job_name}' not found in configuration")
         end
         log_error("Jobs in this pipeline: #{result.pipeline_jobs.keys.join(', ')}")
         false
+      end
+
+      # Names of the instances `base` expanded to (ParallelExpander), config
+      # order: a job runs by its full name only, never all instances at once,
+      # so `run` always runs what the user named. Matched by the names
+      # upstream generates, not by CI_JOB_GROUP_NAME's suffix regex, which
+      # also strips suffixes a user wrote.
+      #
+      # @return [Array<String>]
+      def parallel_instances(job_definitions, base)
+        job_definitions.filter_map do |name, job|
+          index, total = PipelineBuilder.parallel_instance(job)
+          next if index.nil?
+
+          name if name == "#{base} #{index}/#{total}" || (name.start_with?("#{base}: [") && name.end_with?(']'))
+        end
+      end
+
+      # Single-quoted for a POSIX shell.
+      def shell_quote(text)
+        "'#{text.gsub("'") { %q('\\'') }}'"
       end
 
       # The jobs to run, as a pipeline of their own, in stage order (config

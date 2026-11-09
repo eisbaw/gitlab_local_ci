@@ -120,6 +120,32 @@ RSpec.describe 'export-just', type: :integration do
     expect(status).to eq(0), stderr
   end
 
+  it 'names parallel instances as just identifiers, keeps the real name in a comment, and runs them (TASK-18)' do
+    justfile = export(<<~YAML)
+      t:
+        parallel: 2
+        script: [echo "node=$CI_NODE_INDEX/$CI_NODE_TOTAL"]
+      m:
+        parallel: {matrix: [{P: [aws], A: [x86, arm/v7]}]}
+        script: [echo "p=$P a=$A"]
+    YAML
+    expect(justfile).to include("# t 1/2\n", "\nt_1_2:\n", "# m: [aws, arm/v7]\n", "\nm_aws_arm_v7:\n")
+    stdout, stderr, status = just('t_2_2')
+    expect(status).to eq(0), stderr
+    expect(stdout).to eq("node=2/2\n")
+    stdout, stderr, status = just('m_aws_x86')
+    expect(status).to eq(0), stderr
+    expect(stdout).to eq("p=aws a=x86\n")
+  end
+
+  it 'gives colliding recipe names a -2, -3 suffix in config order' do
+    justfile = export("'a b': {script: [echo 1]}\n'a/b': {script: [echo 2]}\n'a:b': {script: [echo 3]}\n")
+    expect(justfile).to include("# a b\n", "\na_b:\n", "# a/b\n", "\na_b-2:\n", "# a:b\n", "\na_b-3:\n")
+    stdout, stderr, status = just('a_b-3')
+    expect(status).to eq(0), stderr
+    expect(stdout).to eq("3\n")
+  end
+
   it 'no longer accepts --shell' do
     File.write(File.join(@project_dir, '.gitlab-ci.yml'), "job: {script: [echo]}\n")
     _stdout, stderr, status = Open3.capture3(bin_path, 'export-just', '--shell', 'sh',

@@ -125,19 +125,33 @@ module GitlabCiCli
         [generate_header, *recipes].join("\n\n") + "\n"
       end
 
-      # job name => recipe name: just identifiers are [A-Za-z_][A-Za-z0-9_-]*.
-      #
-      # @raise [RuntimeError] when two jobs map to one recipe name
+      # job name => recipe name, deterministic, config order. just
+      # identifiers are [A-Za-z_][A-Za-z0-9_-]*: each run of other
+      # characters becomes one '_', a trailing one is dropped, and a name
+      # not starting with a letter or '_' gets a leading '_'. Parallel
+      # instances read naturally: 'rspec 1/3' -> rspec_1_3,
+      # 'build: [aws, x]' -> build_aws_x. When names collide ('a b' and
+      # 'a/b'), the first keeps the name and each later one gets the first
+      # free '-2', '-3', ... suffix; the recipe's comment keeps the job's
+      # real name.
       def recipe_names(job_names)
-        names = job_names.to_h do |name|
-          recipe = name.gsub(/[^a-zA-Z0-9_-]/, '_')
-          recipe = "_#{recipe}" unless recipe.match?(/\A[A-Za-z_]/)
+        taken = {}
+        job_names.to_h do |name|
+          base = name.gsub(/[^A-Za-z0-9_-]+/, '_')
+          base = base.delete_suffix('_') if name.match?(/[^A-Za-z0-9_-]\z/) && base.size > 1
+          base = "_#{base}" unless base.match?(/\A[A-Za-z_]/)
+          recipe = base
+          # Bounded: at most job_names.size names are taken.
+          (2..job_names.size + 1).each do |n|
+            break unless taken.key?(recipe)
+
+            recipe = "#{base}-#{n}"
+          end
+          raise "recipe name #{recipe} still taken" if taken.key?(recipe)
+
+          taken[recipe] = true
           [name, recipe]
         end
-        clash = names.group_by { |_, recipe| recipe }.find { |_, pairs| pairs.size > 1 }
-        raise "jobs #{clash[1].map(&:first).map(&:inspect).join(' and ')} would both be recipe '#{clash[0]}'" if clash
-
-        names
       end
 
       # name => names of the jobs its recipe depends on (class comment).

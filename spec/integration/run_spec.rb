@@ -246,6 +246,38 @@ RSpec.describe 'run', type: :integration do
     end
   end
 
+  describe 'a parallel job (TASK-18)' do
+    before do
+      write_config(<<~YAML)
+        t:
+          parallel: 2
+          script:
+            - echo "node=[$CI_NODE_INDEX/$CI_NODE_TOTAL]"
+        m:
+          parallel: {matrix: [{P: [aws, gcp]}]}
+          script:
+            - echo "p=[$P] node=[$CI_NODE_INDEX/$CI_NODE_TOTAL]"
+      YAML
+    end
+
+    it 'runs one instance by its full name, with its CI_NODE_* and matrix variables' do
+      stdout, stderr, status = run_job('t 2/2')
+      expect(status).to eq(0), stderr
+      expect(stdout).to include('node=[2/2]')
+      stdout, stderr, status = run_job('m: [gcp]')
+      expect(status).to eq(0), stderr
+      expect(stdout).to include('p=[gcp] node=[2/2]')
+    end
+
+    it 'refuses the base name and lists the instances to pick from' do
+      stdout, stderr, status = run_job('m')
+      expect(status).to eq(1)
+      expect(stdout).not_to include('p=[')
+      expect(stderr).to include("Job 'm' is a parallel job; run one instance by its full name, e.g. run 'm: [aws]'. " \
+                                'Instances: m: [aws], m: [gcp]')
+    end
+  end
+
   it 'refuses a trigger job as the target' do
     write_config("child:\n  trigger: {include: child.yml}\n")
     _stdout, stderr, status = run_job('child')

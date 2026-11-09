@@ -188,6 +188,27 @@ target waits for, scheduled as dry-run schedules them. `export-just` writes
 one shebang recipe per job doing the same; its variables are a snapshot taken
 at export time.
 
+### Parallel jobs
+
+`parallel: N` and `parallel:matrix` expand as GitLab does, before rules, so
+every command sees the instances under GitLab's names: `rspec 1/3` ..
+`rspec 3/3`, and `build: [aws, x86]` (matrix values in key order, one matrix
+entry after another). Each instance gets its matrix variables as job
+variables (`rules:variables` and `--variables` still win), `CI_NODE_INDEX`
+(1-based) and `CI_NODE_TOTAL`; every other job gets `CI_NODE_TOTAL=1`.
+`needs:`/`dependencies:` on a parallel job mean all its instances;
+`needs:parallel:matrix` picks instances, also with `$[[ matrix.X ]]`.
+
+`run` takes one instance by its full name, quoted:
+`gitlab_ci_cli run 'build: [aws, x86]'`. The base name (`run build`) is
+refused with the list of instances; it never runs them all.
+
+`export-just` recipe names are just identifiers: each run of characters
+other than letters, digits, `_` and `-` becomes one `_`, a trailing one is
+dropped (`rspec 1/3` -> `rspec_1_3`, `build: [aws, x86]` -> `build_aws_x86`).
+If two jobs map to the same name, later ones (config order) get `-2`, `-3`,
+... The comment above each recipe keeps the job's real name.
+
 **Example output:**
 ```
 Pipeline #1 created with 12 jobs
