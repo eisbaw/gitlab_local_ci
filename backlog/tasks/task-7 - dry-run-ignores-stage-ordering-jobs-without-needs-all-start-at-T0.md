@@ -4,7 +4,7 @@ title: 'dry-run ignores stage ordering: jobs without needs all start at T+0'
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T18:08:00Z'
+updated_date: '2026-11-09T19:23:00Z'
 labels:
   - audit
   - dry-run
@@ -33,4 +33,6 @@ Repro: stages [build, test]; b (build), t (test) -> ours both T+0.
 
 <!-- SECTION:NOTES:BEGIN -->
 Forward-carried from TASK-1: just e2e diffs CLI output for test_ci_projects against projN.output_reference/, including dry-run.txt (stdout timeline, simulated time). These goldens PIN this bug, e.g. proj2 dry-run.txt has build_job, test_job, deploy_job all at T+0s. After the fix expect many dry-run.txt diffs: run just e2e-update, review git diff test_ci_projects/ (each job should now start after the previous stage completes), and explain the changes in the commit message. Never regenerate blindly.
+
+Forward-carried from TASK-4: dry-run's job set now comes from PipelineBuilder.build(...).pipeline_jobs (rule-evaluated, rule attributes applied, cascade-dropped needs removed), passed with Result#stages to MockServer#create_pipeline_from (lib/mock_server.rb). The ordering fix stays in the simulator (DryRunCommand#dependencies_satisfied? / MockPipeline), not in the builder. Result#stages defaults to PipelineBuilder::DEFAULT_STAGES (build test deploy; .pre/.post is TASK-17), the one default every command shares now. The dry-run goldens pin T+0 starts; dag goldens are unaffected by this fix.
 <!-- SECTION:NOTES:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T17:54:00Z'
+updated_date: '2026-11-09T19:24:00Z'
 labels:
   - audit
   - variables
@@ -36,3 +36,9 @@ Upstream: gitlab/doc/ci/variables/predefined_variables.md, Enums::Ci::Pipeline, 
 - [ ] #2 Variables not applicable to a pipeline type are unset, not empty
 - [ ] #3 Emitted set cross-checked against predefined_variables.md
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From TASK-4 QA: --pipeline merge_request is now what include rules see in every command too (PipelineBuilder.Context, predefined vars computed once per build), so this bug now affects lint/dag/run/export-just include and job rules, not only dry-run. The parity spec's merge_request examples use the tool's own string 'merge_request'; update them when switching to merge_request_event.
+<!-- SECTION:NOTES:END -->

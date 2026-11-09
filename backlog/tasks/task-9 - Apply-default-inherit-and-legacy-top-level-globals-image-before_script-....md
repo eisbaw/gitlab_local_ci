@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T18:42:00Z'
+updated_date: '2026-11-09T19:23:00Z'
 labels:
   - audit
   - config
@@ -34,4 +34,7 @@ default: and inherit: (default/variables true|false|list) are ignored, as are le
 
 <!-- SECTION:NOTES:BEGIN -->
 Forward-carried from TASK-5/6: default:/inherit: merging should reuse ConfigMerge.deep_merge (lib/config_merge.rb) rather than a new merge; upstream default: keys are NOT deep-merged into jobs (job key replaces default key wholesale, see Entry::Job/Default inherit), so check before reusing. ExtendsResolver excludes 'default' from job resolution; extends inside default: is not supported upstream either.
+
+Forward-carried from TASK-4: apply default:/inherit:/legacy globals in PipelineBuilder.resolve_config (lib/pipeline_builder.rb) after extends (and after !reference, TASK-8): rewrite each visible job entry in Result#config in place (not hidden templates; upstream does not apply defaults to Entry::Hidden). Then every consumer gets them: lint via Result#job_definitions, dag/run/export-just/dry-run via build's pipeline_jobs. Rules (PipelineBuilder.evaluate_rules) run after this step, as upstream: normalize before Pipeline::Chain. The legacy top-level keys are CiKeywords::ROOT (lib/ci_keywords.rb), now the only root-key list. inherit:variables also governs which top-level variables a job's rules see: PipelineBuilder.pipeline_variables builds one variable set for all jobs today; filter_jobs_by_rules overlays CI_JOB_NAME/STAGE per job, which is the place for a per-job variables view.
+Seam decision (TASK-4 architect review, not implemented, no user yet): today Result#jobs/#job_definitions are derived from Result#config on demand. Once defaults apply, a job no longer equals its config entry, so store the composed jobs instead of writing defaults into config: resolve_config sets a stored Result#job_definitions (defaults applied, config order), Result#jobs and build's pipeline_jobs derive from it, and Result#config stays the raw post-extends/!reference hash (TASK-8 works on config, TASK-9 produces job_definitions). Mirrors upstream Config#to_hash vs Root#jobs_value. Pipeline variables do not reach jobs at all yet: TASK-33.
 <!-- SECTION:NOTES:END -->
