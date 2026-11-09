@@ -23,7 +23,7 @@ require_relative 'predefined_variables'
 #
 #   load YAML              load_yaml
 #   includes               process_includes   (include:rules see predefined + CLI vars)
-#   extends                ExtendsResolver    (TASK-31: hidden roots, error texts)
+#   extends                ExtendsResolver    (every key a root, as upstream Extendable)
 #   !reference             -                  (TASK-8: after extends, before split)
 #   default:/inherit:      -                  (TASK-9: on the split jobs, before rules)
 #   workflow:rules         apply_workflow_rules
@@ -121,10 +121,12 @@ module PipelineBuilder
       return failure("Error processing includes: #{e.message}")
     end
 
+    # Upstream's texts name the entry and the keyword ("<key>: ... in
+    # `extends`"), so they are reported as-is, like upstream lint does.
     begin
       config = ExtendsResolver.new.resolve_extends(config)
-    rescue StandardError => e
-      return failure("Error resolving extends: #{e.message}")
+    rescue ExtendsResolver::ExtensionError => e
+      return failure(e.message)
     end
 
     Result.new(config: config, errors: [])

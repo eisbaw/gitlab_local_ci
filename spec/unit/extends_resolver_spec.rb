@@ -148,14 +148,85 @@ RSpec.describe ExtendsResolver do
         .to raise_error(ExtendsResolver::NestingTooDeepError, '.l11: nesting too deep in `extends`')
     end
 
-    it 'still detects circular extends' do
-      expect { resolve(".a: {extends: .b}\n.b: {extends: .a}\njob: {extends: .a}\n") }
-        .to raise_error(/[Cc]ircular/)
+  end
+
+  # Upstream Extendable#each: every top-level key is a root, so these fail
+  # upstream even though no job uses the templates.
+  describe 'templates no job uses' do
+    it 'resolves a hidden template in place' do
+      config = resolve(<<~YAML)
+        .base: {tags: [a], variables: {A: a}}
+        .tpl: {extends: .base, variables: {B: b}}
+        job: {script: [echo]}
+      YAML
+
+      expect(config['.tpl']).to eq('tags' => ['a'], 'variables' => { 'A' => 'a', 'B' => 'b' })
+      expect(config.keys).to eq(%w[.base .tpl job])
     end
 
-    it 'reports an unknown parent' do
+    it 'raises on a circular pair' do
+      expect { resolve(".a: {extends: .b}\n.b: {extends: .a}\njob: {script: [x]}\n") }
+        .to raise_error(ExtendsResolver::CircularDependencyError, '.a: circular dependency detected in `extends`')
+    end
+
+    it 'raises on a 12-level chain' do
+      lines = (1..12).map { |i| ".l#{i}: {extends: .l#{i + 1}}" } << '.l13: {stage: test}' << 'job: {script: [x]}'
+      expect { resolve(lines.join("\n")) }
+        .to raise_error(ExtendsResolver::NestingTooDeepError, '.l12: nesting too deep in `extends`')
+    end
+
+    it 'raises on an unknown parent' do
+      expect { resolve(".tpl: {extends: [.gone, .also_gone]}\njob: {script: [x]}\n") }
+        .to raise_error(ExtendsResolver::InvalidExtensionError, '.tpl: unknown keys in `extends` (.gone, .also_gone)')
+    end
+  end
+
+  describe 'upstream error texts' do
+    it 'circular, named after the entry the walk revisits' do
+      expect { resolve(".a: {extends: .b}\n.b: {extends: .a}\njob: {extends: .a}\n") }
+        .to raise_error(ExtendsResolver::CircularDependencyError, '.a: circular dependency detected in `extends`')
+    end
+
+    it 'self-extension is circular' do
+      expect { resolve("job: {extends: job, script: [x]}\n") }
+        .to raise_error(ExtendsResolver::CircularDependencyError, 'job: circular dependency detected in `extends`')
+    end
+
+    it 'unknown parent' do
       expect { resolve("job: {extends: .missing, script: [x]}\n") }
-        .to raise_error(/\.missing/)
+        .to raise_error(ExtendsResolver::InvalidExtensionError, 'job: unknown keys in `extends` (.missing)')
+    end
+
+    it 'a parent that is not a Hash is an invalid base, not unknown' do
+      expect { resolve(".str: hello\njob: {extends: [.str], script: [x]}\n") }
+        .to raise_error(ExtendsResolver::InvalidExtensionError, 'job: invalid base hashes in `extends` (.str)')
+    end
+  end
+
+  # The memo must not hide a nesting error upstream would raise: .l1 is
+  # resolved first as its own root (11 levels, fine), then reached again
+  # one level deeper from job (12 levels).
+  describe 'memoisation' do
+    it 'still reports nesting through an already-resolved template' do
+      lines = (1..10).map { |i| ".l#{i}: {extends: .l#{i + 1}}" } << '.l11: {extends: .l12}' << '.l12: {stage: test}'
+      lines << 'job: {extends: .l1, script: [x]}'
+      expect { resolve(lines.join("\n")) }
+        .to raise_error(ExtendsResolver::NestingTooDeepError, '.l11: nesting too deep in `extends`')
+    end
+
+    it 'merges a diamond of shared templates once per template' do
+      # 10 levels, each extending the next level twice: 2^10 paths unmemoised.
+      lines = (0...10).map { |i| ".d#{i}: {extends: [.d#{i + 1}, .d#{i + 1}], variables: {V#{i}: x}}" }
+      lines << '.d10: {stage: test}' << 'job: {extends: .d0, script: [x]}'
+      config = YAML.safe_load(lines.join("\n"))
+      resolver = described_class.new
+      calls = 0
+      allow(ConfigMerge).to receive(:deep_merge).and_wrap_original { |original, *args| calls += 1; original.call(*args) }
+
+      result = resolver.resolve_extends(config)
+
+      expect(result['job']['variables'].keys).to match_array((0...10).map { |i| "V#{i}" })
+      expect(calls).to be < 200
     end
   end
 
@@ -183,6 +254,27 @@ RSpec.describe ExtendsResolver do
   end
 
   describe 'via lint' do
+    def lint(yaml)
+      Dir.mktmpdir do |dir|
+        entry = File.join(dir, '.gitlab-ci.yml')
+        File.write(entry, yaml)
+        Commands::LintCommand.execute(entry: entry, **PinnedPipelineContext.options)
+      end
+    end
+
+    it 'reports a circular pair among unused templates' do
+      result = lint(".a: {extends: .b}\n.b: {extends: .a}\njob: {script: [x]}\n")
+      expect(result.exit_code).to eq 1
+      expect(result.errors).to eq(['.a: circular dependency detected in `extends`'])
+    end
+
+    it 'reports a 12-level chain no job uses' do
+      lines = (1..12).map { |i| ".l#{i}: {extends: .l#{i + 1}}" } << '.l13: {stage: test}' << 'job: {script: [x]}'
+      result = lint(lines.join("\n"))
+      expect(result.exit_code).to eq 1
+      expect(result.errors).to eq(['.l12: nesting too deep in `extends`'])
+    end
+
     it 'reports too-deep extends nesting as a lint error' do
       Dir.mktmpdir do |dir|
         entry = File.join(dir, '.gitlab-ci.yml')
@@ -192,7 +284,7 @@ RSpec.describe ExtendsResolver do
 
         expect(result.valid).to be false
         expect(result.exit_code).to eq 1
-        expect(result.errors).to include('Error resolving extends: .l11: nesting too deep in `extends`')
+        expect(result.errors).to eq(['.l11: nesting too deep in `extends`'])
       end
     end
   end

@@ -195,11 +195,6 @@ module Commands
         validate_needs(job_name, job_config['needs'], all_job_names, errors)
       end
 
-      # Validate extends references
-      if job_config['extends']
-        validate_extends(job_name, job_config['extends'], all_job_names, errors, warnings)
-      end
-
       # Warn about hidden jobs (templates starting with .)
       if job_name.start_with?('.')
         warnings << "Job '#{job_name}' is a hidden job template (starts with '.')"
@@ -259,36 +254,6 @@ module Commands
           unless needed_job.include?('/')
             errors << "Job '#{job_name}' needs undefined job '#{needed_job}'"
           end
-        end
-      end
-    end
-
-    # Validate extends references
-    #
-    # @param job_name [String] Job name for error messages
-    # @param extends [Object] Extends configuration
-    # @param all_job_names [Array<String>] All job names for reference checking
-    # @param errors [Array<String>] Error accumulator
-    # @param warnings [Array<String>] Warning accumulator
-    def validate_extends(job_name, extends, all_job_names, errors, warnings)
-      # Extends can be string or array of strings
-      extends_list = case extends
-                     when String
-                       [extends]
-                     when Array
-                       extends
-                     else
-                       []
-                     end
-
-      extends_list.each do |template|
-        # Check if template exists (should start with . for templates)
-        unless template.start_with?('.')
-          warnings << "Job '#{job_name}' extends non-hidden job '#{template}' (consider using '.' prefix for templates)"
-        end
-
-        unless all_job_names.include?(template)
-          errors << "Job '#{job_name}' extends undefined template '#{template}'"
         end
       end
     end

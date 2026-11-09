@@ -15,82 +15,97 @@
 # limitations under the License.
 
 require_relative 'config_merge'
-require_relative 'ci_keywords'
 
-# Resolves 'extends' directives in GitLab CI configuration
+# Resolves `extends:` like upstream Config::Extendable (gitlab/ submodule,
+# lib/gitlab/ci/config/extendable{,/entry}.rb):
 #
-# Mirrors upstream Extendable::Entry#extend! (gitlab/ submodule): parents are
-# resolved recursively, deep-merged in `extends:` order (later parent wins),
-# then the job's own keys are merged on top. The merge is ConfigMerge, the
-# same one includes use: hashes merge, arrays replace.
+# - Every top-level key is a root (Extendable#each), hidden templates and
+#   global keys included, so errors in a template no job uses are raised and
+#   a template's merged result is what a later `!reference` sees.
+# - Parents are resolved recursively, deep-merged in `extends:` order (later
+#   parent wins), then the entry's own keys on top. The merge is ConfigMerge,
+#   the one includes use: hashes merge, arrays replace.
+# - Each merged entry is written back at its own position.
+# - Checks and their texts are upstream's, in upstream's order: unknown
+#   keys, invalid base hashes, nesting too deep, circular dependency.
+#
+# Deliberate difference: the `extends` key is removed from the merged entry.
+# Upstream keeps it in the hash but no Entry exposes it as a job value, and
+# every consumer here reads this hash as job values.
 class ExtendsResolver
-  NestingTooDeepError = Class.new(StandardError)
+  ExtensionError = Class.new(StandardError)
+  NestingTooDeepError = Class.new(ExtensionError)
+  CircularDependencyError = Class.new(ExtensionError)
+  InvalidExtensionError = Class.new(ExtensionError)
 
   # Upstream Extendable::Entry::MAX_NESTING_LEVELS: an entry with more than
   # this many ancestors may not itself extend, i.e. 11 levels are allowed.
   MAX_NESTING_LEVELS = 10
 
-  # Resolve all extends directives in a configuration
-  #
-  # @param config [Hash] The GitLab CI configuration
-  # @return [Hash] Configuration with extends resolved
+  # @param config [Hash] configuration after includes
+  # @return [Hash] new configuration, every extensible entry merged, key order kept
+  # @raise [ExtensionError] with upstream's message
   def resolve_extends(config)
-    # Separate jobs and templates
-    jobs = {}
-    templates = {}
+    raise ArgumentError, "config must be a Hash, got #{config.class}" unless config.is_a?(Hash)
 
-    config.each do |key, value|
-      next unless CiKeywords.job_entry?(key, value)
-
-      if CiKeywords.hidden?(key)
-        templates[key] = value
-      else
-        jobs[key] = value
-      end
-    end
-
-    # Resolve extends for all jobs
-    resolved_jobs = {}
-    jobs.each do |job_name, job_config|
-      resolved_jobs[job_name] = resolve_job_extends(job_name, job_config, jobs, templates, [])
-    end
-
-    # Every key keeps its position (upstream writes the merged entry back
-    # in place: Extendable::Entry#extend!). Order is observable: lint's
-    # job list, dag node order, dry-run dispatch order.
-    config.to_h { |key, value| [key, resolved_jobs.fetch(key, value)] }
+    @config = config
+    # key => merged entry, and key => longest extends chain (edges) below it.
+    # Memoised so a template shared by many entries is merged once instead of
+    # once per path (fan-out^depth).
+    @resolved = {}
+    @height = {}
+    config.each_key { |key| extend_entry(key, []) }
+    config.to_h { |key, value| [key, @resolved.fetch(key, value)] }
   end
 
   private
 
-  # @param job_name [String] Name of the job or template being resolved
-  # @param job_config [Hash] Its unresolved configuration
-  # @param jobs [Hash] All jobs in config
-  # @param templates [Hash] All hidden (.) templates
-  # @param ancestors [Array<String>] Entries that extend (transitively) into this one
-  # @return [Hash] Resolved configuration without the extends key
-  def resolve_job_extends(job_name, job_config, jobs, templates, ancestors)
-    return ConfigMerge.deep_dup(job_config) unless job_config.key?('extends')
+  def extensible?(value)
+    value.is_a?(Hash) && value.key?('extends')
+  end
 
-    # Same check order as upstream Entry#extend! (unknown, too deep, circular);
-    # only the nesting message is upstream-verbatim.
-    parent_names = Array(job_config['extends']).map(&:to_s)
-    unknown = parent_names.reject { |name| templates.key?(name) || jobs.key?(name) }
-    unless unknown.empty?
-      raise "Job '#{job_name}' extends from '#{unknown.first}' but '#{unknown.first}' is not defined"
-    end
-    raise NestingTooDeepError, "#{job_name}: nesting too deep in `extends`" if ancestors.size > MAX_NESTING_LEVELS
-    if ancestors.include?(job_name)
-      raise "Circular extends dependency detected: #{job_name} is part of a circular chain"
-    end
+  # Upstream Entry#extend!. ancestors are the entries that extend
+  # (transitively) into key, root first.
+  #
+  # @return [Hash, Object] merged entry, or the value itself if not extensible
+  def extend_entry(key, ancestors)
+    value = @config.fetch(key)
+    return value unless extensible?(value)
+    return @resolved.fetch(key) if memo_valid?(key, ancestors)
 
-    merged = parent_names.reduce({}) do |acc, parent_name|
-      parent_config = templates[parent_name] || jobs[parent_name]
-      ConfigMerge.deep_merge(acc, resolve_job_extends(parent_name, parent_config, jobs, templates, ancestors + [job_name]))
-    end
+    parent_keys = Array(value['extends']).map(&:to_s)
+    check_entry!(key, parent_keys, ancestors)
 
-    result = ConfigMerge.deep_merge(merged, job_config)
+    merged = parent_keys.reduce({}) do |acc, parent_key|
+      ConfigMerge.deep_merge(acc, extend_entry(parent_key, ancestors + [key]))
+    end
+    result = ConfigMerge.deep_merge(merged, value)
     result.delete('extends')
-    result
+
+    @height[key] = 1 + parent_keys.map { |parent_key| @height.fetch(parent_key, 0) }.max.to_i
+    @resolved[key] = result
+  end
+
+  # A memoised entry is only reusable if upstream, re-walking it from here,
+  # would not hit the nesting limit: its deepest extensible descendant sits
+  # at ancestors.size + height - 1. Otherwise fall through and re-walk, so
+  # the error names the same entry upstream's walk would.
+  def memo_valid?(key, ancestors)
+    @resolved.key?(key) && ancestors.size + @height.fetch(key) - 1 <= MAX_NESTING_LEVELS
+  end
+
+  def check_entry!(key, parent_keys, ancestors)
+    unknown = parent_keys.reject { |parent_key| @config.key?(parent_key) }
+    unless unknown.empty?
+      raise InvalidExtensionError, "#{key}: unknown keys in `extends` (#{unknown.join(', ')})"
+    end
+
+    invalid = parent_keys.reject { |parent_key| @config[parent_key].is_a?(Hash) }
+    unless invalid.empty?
+      raise InvalidExtensionError, "#{key}: invalid base hashes in `extends` (#{invalid.join(', ')})"
+    end
+
+    raise NestingTooDeepError, "#{key}: nesting too deep in `extends`" if ancestors.size > MAX_NESTING_LEVELS
+    raise CircularDependencyError, "#{key}: circular dependency detected in `extends`" if ancestors.include?(key)
   end
 end
