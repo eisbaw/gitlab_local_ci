@@ -305,7 +305,7 @@ module GitlabCiCli
             --undefined MODE  Handle undefined vars: warning|error|empty (default: warning)
             --verbose         Increase output verbosity
             --format FORMAT   Output format: text|json|junit (default: text)
-            --gitlab-dir DIR  Path to GitLab submodule (default: ./gitlab)
+            --gitlab-dir DIR  GitLab checkout, read only by include:template (default: ./gitlab)
             --run-deps MODE   For 'run' command: incl (with deps) | excl (only job) (default: excl)
             --output FILE     Output file for export-just (default: stdout)
             -o FILE           Alias for --output

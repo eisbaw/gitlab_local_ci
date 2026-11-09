@@ -18,22 +18,7 @@ require 'spec_helper'
 require_relative '../../lib/mock_server'
 
 RSpec.describe 'GitLab Integration', :integration do
-  let(:gitlab_path) { File.expand_path('../../gitlab', __dir__) }
-  let(:server) { MockServer.new(gitlab_path) }
-
-  describe 'GitLab class loading' do
-    it 'successfully initializes MockServer in standalone mode' do
-      expect { server }.not_to raise_error
-      expect(server).to be_a(MockServer)
-      expect(server.gitlab_path).to eq(gitlab_path)
-    end
-
-    it 'fails with clear error when GitLab path is invalid' do
-      expect {
-        MockServer.new('/nonexistent/path')
-      }.to raise_error(ArgumentError, /GitLab lib directory not found/)
-    end
-  end
+  let(:server) { MockServer.new }
 
   describe '#create_pipeline with valid configuration' do
     let(:config) do

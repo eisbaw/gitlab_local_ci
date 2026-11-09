@@ -18,37 +18,17 @@ require 'spec_helper'
 require 'mock_server'
 
 RSpec.describe MockServer do
-  let(:gitlab_path) { nil }
-
   describe '#initialize' do
-    it 'should initialize with a valid gitlab_path' do
-      server = described_class.new(gitlab_path)
-
-      expect(server.gitlab_path).to eq(gitlab_path)
-    end
-
     it 'should initialize with an empty event queue' do
-      server = described_class.new(gitlab_path)
+      server = described_class.new
 
       expect(server.event_queue).to be_an(Array)
       expect(server.event_queue).to be_empty
     end
-
-    it 'should handle nil gitlab_path gracefully' do
-      server = described_class.new(nil)
-
-      expect(server.gitlab_path).to be_nil
-    end
-
-    it 'should handle empty string gitlab_path' do
-      server = described_class.new('')
-
-      expect(server.gitlab_path).to eq('')
-    end
   end
 
   describe '#emit_event' do
-    let(:server) { described_class.new(gitlab_path) }
+    let(:server) { described_class.new }
 
     it 'should add event to event queue with correct structure' do
       event_type = MockServer::EVENT_JOB_STARTED
@@ -104,7 +84,7 @@ RSpec.describe MockServer do
   end
 
   describe '#create_pipeline' do
-    let(:server) { described_class.new(gitlab_path) }
+    let(:server) { described_class.new }
     let(:config) { load_yaml_fixture('valid_simple.yml') }
 
     context 'implementation tests' do
@@ -180,7 +160,7 @@ RSpec.describe MockServer do
   end
 
   describe '#process_pipeline' do
-    let(:server) { described_class.new(gitlab_path) }
+    let(:server) { described_class.new }
     let(:config) { load_yaml_fixture('valid_simple.yml') }
     let(:pipeline) { server.create_pipeline(config) }
 
@@ -222,7 +202,7 @@ RSpec.describe MockServer do
   end
 
   describe '#has_pending_jobs?' do
-    let(:server) { described_class.new(gitlab_path) }
+    let(:server) { described_class.new }
     let(:config) { load_yaml_fixture('valid_simple.yml') }
     let(:pipeline) { server.create_pipeline(config) }
 
@@ -249,7 +229,7 @@ RSpec.describe MockServer do
   end
 
   describe '#pending_jobs' do
-    let(:server) { described_class.new(gitlab_path) }
+    let(:server) { described_class.new }
     let(:config) { load_yaml_fixture('valid_simple.yml') }
     let(:pipeline) { server.create_pipeline(config) }
 
@@ -299,7 +279,7 @@ RSpec.describe MockServer do
   end
 
   describe 'job-level rules filtering' do
-    let(:server) { described_class.new(nil) }
+    let(:server) { described_class.new }
 
     let(:config_with_gated_job) do
       {

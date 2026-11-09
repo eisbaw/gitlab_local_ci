@@ -416,4 +416,44 @@ RSpec.describe IncludeProcessor do
       end
     end
   end
+
+  # TASK-43: the GitLab checkout is needed only by include:template, and
+  # without one the error says how to provide it instead of quietly
+  # downloading gitlab.com master (a different template version).
+  describe 'include:template source' do
+    let(:config) { { 'include' => [{ 'template' => 'Foo.gitlab-ci.yml' }], 'job' => { 'script' => 'x' } } }
+
+    it 'reads the template from the checkout' do
+      Dir.mktmpdir do |dir|
+        templates = File.join(dir, 'templates')
+        FileUtils.mkdir_p(templates)
+        File.write(File.join(templates, 'Foo.gitlab-ci.yml'), "from_template:\n  script: echo t\n")
+        processor = described_class.new(project_path: dir, gitlab_templates_path: templates,
+                                        cache_root: File.join(dir, 'cache'))
+
+        expect(processor.process_includes(config).keys).to include('from_template', 'job')
+      end
+    end
+
+    it 'names the missing directory and --gitlab-dir when the checkout is absent' do
+      Dir.mktmpdir do |dir|
+        missing = File.join(dir, 'gitlab', 'lib', 'gitlab', 'ci', 'templates')
+        processor = described_class.new(project_path: dir, gitlab_templates_path: missing,
+                                        cache_root: File.join(dir, 'cache'))
+        expect_any_instance_of(ExternalResourceCache).not_to receive(:fetch_template)
+
+        expect { processor.process_includes(config) }
+          .to raise_error(/Foo\.gitlab-ci\.yml.*'#{Regexp.escape(missing)}' not found.*--gitlab-dir/)
+      end
+    end
+
+    it 'says no checkout is configured when there is none' do
+      Dir.mktmpdir do |dir|
+        processor = described_class.new(project_path: dir, cache_root: File.join(dir, 'cache'))
+
+        expect { processor.process_includes(config) }
+          .to raise_error(/no GitLab checkout configured.*--gitlab-dir/)
+      end
+    end
+  end
 end

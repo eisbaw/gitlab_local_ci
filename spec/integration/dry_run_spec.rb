@@ -497,6 +497,33 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
     end
   end
 
+  # TASK-43: only include:template needs the GitLab checkout; a normal
+  # repo has no ./gitlab.
+  context 'without a GitLab checkout' do
+    it 'simulates a config without template includes' do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, '.gitlab-ci.yml'), "job:\n  script: echo hi\n")
+        stdout, stderr, status = Open3.capture3(bin_path, 'dry-run', '--runners', runners_path,
+                                                *PinnedPipelineContext::CLI_ARGS, chdir: dir)
+
+        expect(status.exitstatus).to eq(0), "STDERR: #{stderr}"
+        expect(stdout).to include("Job 'job'")
+      end
+    end
+
+    it 'fails a template include with an error naming --gitlab-dir' do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, '.gitlab-ci.yml'),
+                   "include:\n  - template: Workflows/MergeRequest-Pipelines.gitlab-ci.yml\njob:\n  script: echo hi\n")
+        _stdout, stderr, status = Open3.capture3(bin_path, 'dry-run', '--runners', runners_path,
+                                                 *PinnedPipelineContext::CLI_ARGS, chdir: dir)
+
+        expect(status.exitstatus).to eq(1)
+        expect(stderr).to match(%r{Workflows/MergeRequest-Pipelines.*'\./gitlab/lib/gitlab/ci/templates' not found.*--gitlab-dir})
+      end
+    end
+  end
+
   context 'complex pipeline simulation' do
     describe 'complex_pipeline.yml' do
       it 'handles large pipeline with many stages and jobs' do

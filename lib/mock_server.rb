@@ -39,18 +39,14 @@ class MockServer
   EVENT_PIPELINE_STARTED = :pipeline_started
   EVENT_PIPELINE_COMPLETED = :pipeline_completed
 
-  attr_reader :gitlab_path, :event_queue
+  attr_reader :event_queue
 
-  # Initialize the mock server with a path to the GitLab submodule
+  # No GitLab checkout: the server is standalone. include:template is the
+  # only consumer of one, and that lives in PipelineBuilder (TASK-43).
   #
-  # @param gitlab_path [String] Path to the GitLab CE git submodule (not used in standalone mode)
-  def initialize(gitlab_path = nil, project_dir: nil, pipeline_source: 'push')
-    # Validate gitlab_path if provided and not empty
-    if gitlab_path && !gitlab_path.empty? && !Dir.exist?(gitlab_path)
-      raise ArgumentError, "GitLab lib directory not found at: #{gitlab_path}"
-    end
-
-    @gitlab_path = gitlab_path
+  # @param project_dir [String] repository root (rules exists:/changes:)
+  # @param pipeline_source [String] CI_PIPELINE_SOURCE
+  def initialize(project_dir: nil, pipeline_source: 'push')
     @event_queue = []
     @pipelines = {}
     @pipeline_counter = 0

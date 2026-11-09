@@ -274,10 +274,9 @@ module PipelineBuilder
   def process_includes(config, project_dir:, gitlab_dir:, variables:)
     return config unless config['include']
 
-    gitlab_templates_path = nil
-    if gitlab_dir && Dir.exist?(gitlab_dir)
-      gitlab_templates_path = File.join(gitlab_dir, 'lib', 'gitlab', 'ci', 'templates')
-    end
+    # Passed even when the directory is missing: only an include:template
+    # needs the checkout, and IncludeProcessor reports that one (TASK-43).
+    gitlab_templates_path = gitlab_dir && File.join(gitlab_dir, 'lib', 'gitlab', 'ci', 'templates')
 
     IncludeProcessor.new(
       project_path: project_dir,

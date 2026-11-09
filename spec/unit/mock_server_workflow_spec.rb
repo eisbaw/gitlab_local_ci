@@ -44,7 +44,7 @@ RSpec.describe MockServer, 'workflow:rules: cascade and per-rule attributes' do
 
   it 'cascades workflow rule variables into job rule evaluation' do
     # KIND=submodule => ENABLE_SMOKE flips to "false", so build/smoke drop.
-    server = MockServer.new(nil, project_dir: Dir.mktmpdir, pipeline_source: 'push')
+    server = MockServer.new(project_dir: Dir.mktmpdir, pipeline_source: 'push')
     pipeline = server.create_pipeline(config_yaml, variables: { 'KIND' => 'submodule' })
     job_names = pipeline.jobs.map(&:name)
     expect(job_names).to include('maintenance')
@@ -61,14 +61,14 @@ RSpec.describe MockServer, 'workflow:rules: cascade and per-rule attributes' do
       job:
         script: ["echo"]
     YAML
-    server = MockServer.new(nil, project_dir: Dir.mktmpdir, pipeline_source: 'push')
+    server = MockServer.new(project_dir: Dir.mktmpdir, pipeline_source: 'push')
     expect do
       server.create_pipeline(cfg, variables: {})
     end.to raise_error(MockServer::WorkflowRulesFilteredError, /workflow:rules: matched no rule/)
   end
 
   it 'merges per-rule variables into the matched job' do
-    server = MockServer.new(nil, project_dir: Dir.mktmpdir, pipeline_source: 'push')
+    server = MockServer.new(project_dir: Dir.mktmpdir, pipeline_source: 'push')
     pipeline = server.create_pipeline(config_yaml, variables: {})
     smoke = pipeline.jobs.find { |j| j.name == 'smoke' }
     expect(smoke).not_to be_nil

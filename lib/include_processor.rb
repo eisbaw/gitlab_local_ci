@@ -54,7 +54,8 @@ class IncludeProcessor
   # Initialize the include processor
   #
   # @param project_path [String] Path to the project root
-  # @param gitlab_templates_path [String] Path to GitLab templates directory
+  # @param gitlab_templates_path [String, nil] GitLab checkout's
+  #   lib/gitlab/ci/templates; may be missing, only include:template needs it
   # @param cache_root [String] Root directory for external resource cache
   # @param variables [Hash] CI variables used to evaluate `include: rules: if:`
   #   expressions. Pipeline-trigger variables (i.e. those passed via
@@ -434,11 +435,17 @@ class IncludeProcessor
     # Strip leading slash if present (normalize path)
     template_name = template_name.sub(%r{^/}, '')
 
-    # Use external cache to fetch template
-    # This will:
-    # 1. Check local gitlab_templates_path if available
-    # 2. Check cache (ext_tmp/templates/)
-    # 3. Download from gitlab.com if needed
+    # The checkout is the pinned template source. Without it the cache
+    # would fall back to gitlab.com master, a different template version
+    # than the one the rest of the tool is checked against, so fail here
+    # and say how to point at one.
+    unless @gitlab_templates_path && Dir.exist?(@gitlab_templates_path)
+      where = @gitlab_templates_path ? "'#{@gitlab_templates_path}' not found" : 'no GitLab checkout configured'
+      raise "include:template needs a GitLab source checkout (#{where}); pass --gitlab-dir <path to gitlab repo>"
+    end
+
+    # Checkout first; ext_tmp/ cache and gitlab.com only for a template the
+    # checkout does not have (e.g. one newer than it).
     @external_cache.fetch_template(template_name, gitlab_templates_path: @gitlab_templates_path)
   rescue StandardError => e
     raise "Failed to fetch template '#{template_name}': #{e.message}"

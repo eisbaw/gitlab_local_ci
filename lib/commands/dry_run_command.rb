@@ -67,7 +67,6 @@ module GitlabCiCli
 
         context = PipelineBuilder::Context.from_options(@options)
         @server = MockServer.new(
-          @options[:gitlab_dir],
           project_dir: context.project_dir,
           pipeline_source: context.pipeline_source
         )
@@ -110,10 +109,6 @@ module GitlabCiCli
       def validate_prerequisites
         unless File.exist?(@options[:entry])
           raise "CI config file not found: #{@options[:entry]}"
-        end
-
-        unless File.directory?(@options[:gitlab_dir])
-          raise "GitLab directory not found: #{@options[:gitlab_dir]}"
         end
 
         unless File.directory?(@options[:runners])

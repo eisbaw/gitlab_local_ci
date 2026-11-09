@@ -161,7 +161,7 @@ Pipeline status: success
 
 ```
 --entry FILE      Path to CI config (default: ./.gitlab-ci.yml)
---gitlab-dir DIR  Path to GitLab submodule (not used, kept for compatibility)
+--gitlab-dir DIR  GitLab checkout, read only by include:template (default: ./gitlab)
 --runners DIR     Runner fleet directory (default: ./runners)
 --ref REF         Git ref to simulate (default: HEAD)
 --variables K=V   Set CI variables (can be repeated)
