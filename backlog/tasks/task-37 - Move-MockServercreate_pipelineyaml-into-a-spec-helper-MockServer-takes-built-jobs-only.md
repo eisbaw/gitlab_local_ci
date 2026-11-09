@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:23:00Z'
-updated_date: '2026-11-09T19:32:00Z'
+updated_date: '2026-11-09T19:52:00Z'
 labels:
   - audit
   - architecture
@@ -32,4 +32,6 @@ From TASK-4 architect review. MockServer#create_pipeline(yaml) is a second, spec
 
 <!-- SECTION:NOTES:BEGIN -->
 From TASK-4 f0cb362: the spec helper that replaces MockServer#create_pipeline(yaml) must pass PinnedPipelineContext (spec/support/pinned_pipeline_context.rb), so mock-server specs do not depend on the checkout's git state.
+
+From TASK-8: MockServer#create_pipeline(String) is now the only YAML.safe_load of CI config left in lib/ (lib/mock_server.rb parse_configuration); it bypasses CiYaml (no !reference), includes, extends and flatten_lists. Moving it to a spec helper that goes through PipelineBuilder removes the last divergent load path.
 <!-- SECTION:NOTES:END -->
