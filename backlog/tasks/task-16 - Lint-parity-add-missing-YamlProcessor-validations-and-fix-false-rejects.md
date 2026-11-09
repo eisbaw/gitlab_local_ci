@@ -4,7 +4,7 @@ title: 'Lint parity: add missing YamlProcessor validations and fix false rejects
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T20:16:00Z'
+updated_date: '2026-11-09T23:29:00Z'
 labels:
   - audit
   - lint
@@ -47,4 +47,6 @@ From QA of TASK-31/8: (1) lint accepts rules: ['string'] (valid, exit 0) while d
 Forward-carried from TASK-9 (8dc4b74): resolve_config now errors (upstream wording) on default: non-hash / unknown keys, legacy global + default: same key, inherit: non-hash / unknown keys, inherit:default unknown values, inherit:<k> not bool/list. Gaps left: hidden templates' inherit: is not validated (only visible jobs); default:{extends:} is accepted because ExtendsResolver deletes extends while upstream keeps it and Entry::Default rejects it as an unknown key. Lint now validates composed jobs (Result#job_definitions), so default keys appear in each visible job's config; all CiKeywords::DEFAULT keys are in CiKeywords::JOB, so no new non-standard-keyword warnings.
 
 COMPASS 2026-11-09: split - keep 'one validator on PipelineBuilder::Result' as the core; the exhaustive upstream case list is breadth work for later.
+
+From TASK-73: lint now validates only visible jobs (PipelineBuilder::Result#jobs); hidden keys are no longer listed, counted, warned about or validated as jobs (upstream Entry::Hidden). The QA note '.unused_tpl: {script: 42} fails' was already stale before TASK-73 (commands_errors skips hidden keys); TASK-73 removed the remaining hidden-job checks in lint (empty script array, unknown keys, needs). Consequences for this task's list: lint now rejects 'needs on hidden job' ("needs undefined job '.tpl'", not upstream wording 'undefined need: .tpl') and an 'only-hidden-jobs file' ('No jobs defined in configuration', upstream: 'jobs config should contain at least one visible job'); dag/dry-run/export-just still cascade-drop needs on hidden jobs silently. Still open: upstream Entry::Hidden validates presence, so '.tpl: {}' / '.tpl:' (null) is an error upstream ('jobs:.tpl config can't be blank'), accepted here.
 <!-- SECTION:NOTES:END -->

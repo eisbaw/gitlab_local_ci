@@ -235,8 +235,9 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
       expect(stderr).to include("Job '.tpl' is a hidden template")
     end
 
-    it 'leave lint validating every job regardless of rules' do
-      expect(lint_jobs).to include('never_job', 'mr_only', '.tpl')
+    it 'leave lint validating every visible job regardless of rules' do
+      expect(lint_jobs).to include('never_job', 'mr_only')
+      expect(lint_jobs).not_to include('.tpl') # Entry::Hidden is no job (TASK-73)
     end
   end
 

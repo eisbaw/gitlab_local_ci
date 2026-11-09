@@ -8,11 +8,6 @@
     ".post"
   ],
   "jobs": [
-    ".base",
-    ".build_template",
-    ".test_template",
-    ".deploy_template",
-    ".advanced_build",
     "build_simple",
     "build_complex",
     "build_advanced",
@@ -29,10 +24,6 @@
 
   ],
   "warnings": [
-    "Job '.base' is a hidden job template (starts with '.')",
-    "Job '.build_template' is a hidden job template (starts with '.')",
-    "Job '.test_template' is a hidden job template (starts with '.')",
-    "Job '.deploy_template' is a hidden job template (starts with '.')",
-    "Job '.advanced_build' is a hidden job template (starts with '.')"
+
   ]
 }

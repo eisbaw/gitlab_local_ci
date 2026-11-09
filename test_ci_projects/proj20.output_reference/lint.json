@@ -17,27 +17,15 @@
     ".post"
   ],
   "jobs": [
-    ".frontend_base",
     "audit:frontend:dependencies",
     "bundle:frontend:analyze",
-    ".backend_base",
     "audit:backend:dependencies",
     "database:migrations:check",
-    ".security_base",
     "security:container:scan: [frontend]",
     "security:container:scan: [backend]",
     "security:container:scan: [api]",
     "security:container:scan: [workers]",
     "security:license:check",
-    ".base_config",
-    ".docker_config",
-    ".node_config",
-    ".ruby_config",
-    ".python_config",
-    ".base_job",
-    ".test_job",
-    ".deploy_job",
-    ".docker_build_job",
     "validate:yaml",
     "validate:dependencies",
     "lint:frontend",
@@ -99,17 +87,6 @@
 
   ],
   "warnings": [
-    "Job '.frontend_base' is a hidden job template (starts with '.')",
-    "Job '.backend_base' is a hidden job template (starts with '.')",
-    "Job '.security_base' is a hidden job template (starts with '.')",
-    "Job '.base_config' is a hidden job template (starts with '.')",
-    "Job '.docker_config' is a hidden job template (starts with '.')",
-    "Job '.node_config' is a hidden job template (starts with '.')",
-    "Job '.ruby_config' is a hidden job template (starts with '.')",
-    "Job '.python_config' is a hidden job template (starts with '.')",
-    "Job '.base_job' is a hidden job template (starts with '.')",
-    "Job '.test_job' is a hidden job template (starts with '.')",
-    "Job '.deploy_job' is a hidden job template (starts with '.')",
-    "Job '.docker_build_job' is a hidden job template (starts with '.')"
+
   ]
 }

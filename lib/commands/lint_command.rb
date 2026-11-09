@@ -117,10 +117,12 @@ module Commands
 
       stages = resolved.stages
 
-      # Hidden templates included: lint validates them too
-      jobs = resolved.job_definitions
+      # Visible jobs only: a hidden key ('.foo') is upstream Entry::Hidden,
+      # not a job. It is neither listed, counted nor validated as one (it is
+      # never Entry::Job, so job validations never see it).
+      jobs = resolved.jobs
 
-      # Validate there's at least one job
+      # Validate there's at least one (visible) job
       if jobs.empty?
         errors << "No jobs defined in configuration"
       end
@@ -171,8 +173,7 @@ module Commands
       end
 
       # Validate script or trigger is present (one of them is required)
-      # Template jobs (starting with .) don't need scripts
-      unless job_name.start_with?('.') || job_config['script'] || job_config['trigger'] || job_config['pages']
+      unless job_config['script'] || job_config['trigger'] || job_config['pages']
         errors << "Job '#{job_name}' must have 'script', 'trigger', or 'pages' defined"
       end
 
@@ -184,14 +185,9 @@ module Commands
       # Stages are checked once for every command, in
       # PipelineBuilder.stage_errors (upstream YamlProcessor).
 
-      # Validate needs dependencies (skip for template jobs)
-      if job_config['needs'] && !job_name.start_with?('.')
+      # Validate needs dependencies
+      if job_config['needs']
         validate_needs(job_name, job_config['needs'], all_job_names, errors)
-      end
-
-      # Warn about hidden jobs (templates starting with .)
-      if job_name.start_with?('.')
-        warnings << "Job '#{job_name}' is a hidden job template (starts with '.')"
       end
     end
 

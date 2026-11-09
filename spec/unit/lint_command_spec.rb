@@ -140,4 +140,65 @@ RSpec.describe Commands::LintCommand do
       end
     end
   end
+
+  # Upstream Entry::Jobs types a '.'-key as Entry::Hidden: not visible, not
+  # relevant, never an Entry::Job. CI Lint neither lists, counts, warns
+  # about nor validates it as a job (TASK-73).
+  describe 'hidden templates' do
+    def lint(yaml)
+      Dir.mktmpdir('lint_hidden') do |dir|
+        entry = File.join(dir, '.gitlab-ci.yml')
+        File.write(entry, yaml)
+        described_class.execute({ entry: entry, gitlab_dir: dir }.merge(PinnedPipelineContext.options))
+      end
+    end
+
+    it 'leaves them out of the job list and warnings' do
+      result = lint(<<~YAML)
+        .unit:
+          script: [echo unit]
+        test:
+          extends: .unit
+          parallel:
+            matrix:
+              - OS: [linux, macos]
+        build:
+          script: [echo build]
+      YAML
+      expect(result.errors).to eq([])
+      expect(result.jobs).to eq(['test: [linux]', 'test: [macos]', 'build'])
+      expect(result.warnings).to eq([])
+    end
+
+    it 'does not validate them as jobs' do
+      result = lint(<<~YAML)
+        .unused_tpl:
+          script: []
+          needs: [nowhere]
+          bogus_key: 1
+        job:
+          script: [echo]
+      YAML
+      expect(result.errors).to eq([])
+      expect(result.jobs).to eq(['job'])
+      expect(result.warnings).to eq([])
+    end
+
+    it 'is not a config with jobs when only hidden keys exist' do
+      result = lint(".tpl:\n  script: [echo]\n")
+      expect(result.valid).to be false
+      expect(result.jobs).to eq([])
+    end
+
+    it 'cannot be needed: a hidden key is no job' do
+      result = lint(<<~YAML)
+        .tpl:
+          script: [echo]
+        job:
+          script: [echo]
+          needs: [.tpl]
+      YAML
+      expect(result.errors).to eq(["Job 'job' needs undefined job '.tpl'"])
+    end
+  end
 end

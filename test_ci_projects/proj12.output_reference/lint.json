@@ -9,16 +9,6 @@
     ".post"
   ],
   "jobs": [
-    ".base_config",
-    ".docker_config",
-    ".cache_config",
-    ".artifacts_config",
-    ".base_job",
-    ".test_job_base",
-    ".build_job_base",
-    ".on_merge_request",
-    ".on_main_branch",
-    ".rule_set_standard",
     "build:app",
     "build:library",
     "test:unit",
@@ -27,7 +17,6 @@
     "deploy:staging",
     "deploy:production",
     "security:scan",
-    ".complex_matrix",
     "test:matrix: [linux, 3.9]",
     "test:matrix: [linux, 3.10]",
     "test:matrix: [linux, 3.11]",
@@ -42,18 +31,6 @@
 
   ],
   "warnings": [
-    "Job '.base_config' is a hidden job template (starts with '.')",
-    "Job '.docker_config' is a hidden job template (starts with '.')",
-    "Job '.cache_config' is a hidden job template (starts with '.')",
-    "Job '.artifacts_config' is a hidden job template (starts with '.')",
-    "Job '.base_job' is a hidden job template (starts with '.')",
-    "Job '.test_job_base' is a hidden job template (starts with '.')",
-    "Job '.build_job_base' is a hidden job template (starts with '.')",
-    "Job '.on_merge_request' uses non-standard keyword: if",
-    "Job '.on_merge_request' is a hidden job template (starts with '.')",
-    "Job '.on_main_branch' uses non-standard keyword: if",
-    "Job '.on_main_branch' is a hidden job template (starts with '.')",
-    "Job '.rule_set_standard' is a hidden job template (starts with '.')",
-    "Job '.complex_matrix' is a hidden job template (starts with '.')"
+
   ]
 }

@@ -8,14 +8,11 @@
     ".post"
   ],
   "jobs": [
-    ".build-template",
     "build-app",
     "build-docker",
-    ".test-template",
     "unit-tests",
     "integration-tests",
     "security-scan",
-    ".deploy-template",
     "deploy-staging",
     "deploy-production",
     "rollback-production",
@@ -26,8 +23,6 @@
 
   ],
   "warnings": [
-    "Job '.build-template' is a hidden job template (starts with '.')",
-    "Job '.test-template' is a hidden job template (starts with '.')",
-    "Job '.deploy-template' is a hidden job template (starts with '.')"
+
   ]
 }
