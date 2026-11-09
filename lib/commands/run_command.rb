@@ -17,6 +17,7 @@
 require_relative '../pipeline_builder'
 require_relative '../job_environment'
 require_relative '../mock_pipeline'
+require_relative '../shell_quote'
 
 module GitlabCiCli
   module Commands
@@ -126,7 +127,7 @@ module GitlabCiCli
           log_error("Job '#{@job_name}' is a hidden template and never runs")
         elsif !(instances = parallel_instances(result.job_definitions, @job_name)).empty?
           log_error("Job '#{@job_name}' is a parallel job; run one instance by its full name, e.g. " \
-                    "run #{shell_quote(instances.first)}. Instances: #{instances.join(', ')}")
+                    "run #{ShellQuote.quote(instances.first)}. Instances: #{instances.join(', ')}")
         else
           log_error("Job '#{@job_name}' not found in configuration")
         end
@@ -148,11 +149,6 @@ module GitlabCiCli
 
           name if name == "#{base} #{index}/#{total}" || (name.start_with?("#{base}: [") && name.end_with?(']'))
         end
-      end
-
-      # Single-quoted for a POSIX shell.
-      def shell_quote(text)
-        "'#{text.gsub("'") { %q('\\'') }}'"
       end
 
       # The jobs to run, as a pipeline of their own, in stage order (config

@@ -17,6 +17,7 @@
 require_relative '../pipeline_builder'
 require_relative '../job_environment'
 require_relative '../mock_pipeline'
+require_relative '../shell_quote'
 require 'time'
 
 module GitlabCiCli
@@ -42,12 +43,33 @@ module GitlabCiCli
     # except `when: on_failure` jobs. just runs dependencies and stops at the
     # first failure, so a recipe is the success path: on_failure jobs never
     # run there, `always` and `manual` jobs do (as in dry-run and run).
+    #
+    # Injection safety: config text (job names, stages, tags, ...) is
+    # untrusted, and just evaluates top-level assignments and backticks
+    # whatever recipe is run. Config text therefore reaches the justfile
+    # only in three forms, each of which cannot end where it is put:
+    # - recipe body lines: indented (a value's newlines are split and each
+    #   part indented again), `{{` doubled, values single-quoted for bash,
+    #   scripts inside a quoted heredoc;
+    # - recipe names: identifiers built from [A-Za-z0-9_-] only;
+    # - `#` comment lines: through #comment_text, which escapes every
+    #   control character, so the text cannot end its line.
     class ExportJustCommand
       attr_reader :options
 
       # Quoted heredoc delimiter the job scripts are embedded with. A script
       # line equal to it would end the heredoc early, so that is an error.
       SCRIPT_DELIMITER = 'GITLAB_CI_CLI_SCRIPT_EOF'
+
+      # A just identifier. Every recipe name written must match: anything
+      # else could carry `:`, `:=` or a newline into the justfile.
+      RECIPE_NAME_PATTERN = /\A[A-Za-z_][A-Za-z0-9_-]*\z/
+
+      # Characters that could end a `#` comment line or hide its text:
+      # control characters (\n, \r, \t, ESC, ...), Unicode line/paragraph
+      # separators, and the backslash (escaped too, so the escaping is
+      # unambiguous: `\n` in a comment is always an escaped newline).
+      COMMENT_UNSAFE = /[\\[:cntrl:]\u0085\u2028\u2029]/
 
       # @param options [Hash] Command options
       # @option options [String] :entry Path to .gitlab-ci.yml file
@@ -166,11 +188,15 @@ module GitlabCiCli
       # @param environment [JobEnvironment::Job]
       # @param job [Hash] job config (stage, tags, script presence)
       def format_recipe(environment, job, recipe_names, dependencies)
-        lines = ["# #{environment.name}", "#   Stage: #{job['stage'] || PipelineBuilder::DEFAULT_JOB_STAGE}"]
+        lines = ["# #{comment_text(environment.name)}",
+                 "#   Stage: #{comment_text(job['stage'] || PipelineBuilder::DEFAULT_JOB_STAGE)}"]
         tags = Array(job['tags'])
-        lines << "#   Tags: #{tags.join(', ')}" unless tags.empty?
-        lines << "#   Depends: #{dependencies.join(', ')}" unless dependencies.empty?
+        lines << "#   Tags: #{comment_text(tags.join(', '))}" unless tags.empty?
+        lines << "#   Depends: #{comment_text(dependencies.join(', '))}" unless dependencies.empty?
         signature = [recipe_names.fetch(environment.name), *dependencies.map { |name| recipe_names.fetch(name) }]
+        bad_name = signature.find { |name| !RECIPE_NAME_PATTERN.match?(name) }
+        raise "recipe name #{bad_name.inspect} is not a just identifier" if bad_name
+
         lines << "#{signature.first}:#{signature.drop(1).map { |name| " #{name}" }.join}"
         body = job['script'].nil? ? trigger_body(environment) : recipe_body(environment)
         # Split again: a value or script entry may span lines, and each
@@ -181,7 +207,8 @@ module GitlabCiCli
       end
 
       def trigger_body(environment)
-        ['#!/usr/bin/env bash', "echo #{shell_quote("#{environment.name}: no script (a trigger job), nothing to run locally")}"]
+        ['#!/usr/bin/env bash',
+         "echo #{ShellQuote.quote("#{environment.name}: no script (a trigger job), nothing to run locally")}"]
       end
 
       # The recipe's bash program (class comment). Every line goes into the
@@ -191,8 +218,8 @@ module GitlabCiCli
       # @return [Array<String>]
       def recipe_body(environment)
         body = ['#!/usr/bin/env bash']
-        body.concat(environment.variables.map { |key, value| "export #{key}=#{shell_quote(value)}" })
-        body << "cd #{shell_quote(environment.project_dir)} || exit"
+        body.concat(environment.variables.map { |key, value| "export #{key}=#{ShellQuote.quote(value)}" })
+        body << "cd #{ShellQuote.quote(environment.project_dir)} || exit"
         body.concat(embedded_script('gitlab_ci_main_script', environment.main_script))
         body << 'bash -c "$gitlab_ci_main_script" </dev/null'
         body << 'gitlab_ci_exit_code=$?'
@@ -218,9 +245,14 @@ module GitlabCiCli
         ["IFS= read -r -d '' #{variable} <<'#{SCRIPT_DELIMITER}'", text, SCRIPT_DELIMITER]
       end
 
-      # Single-quoted for bash: nothing inside is expanded.
-      def shell_quote(value)
-        "'#{value.gsub("'") { %q('\\'') }}'"
+      # `text` for the rest of a `#` comment line: every COMMENT_UNSAFE
+      # character as its Ruby escape (\n, \r, \e, \u2028, \\), the rest
+      # verbatim (readable non-ASCII names stay readable).
+      #
+      # @param text [#to_s] config- or CLI-derived text
+      # @return [String] one line
+      def comment_text(text)
+        text.to_s.gsub(COMMENT_UNSAFE) { |char| char.dump[1..-2] }
       end
 
       def generate_header
@@ -230,11 +262,11 @@ module GitlabCiCli
 
         <<~HEADER.chomp
           # Auto-generated justfile from GitLab CI configuration (#{mode})
-          # Source: #{@options[:entry]}
+          # Source: #{comment_text(@options[:entry])}
           # Generated: #{Time.now.iso8601}
           #
           # DO NOT EDIT - Regenerate with:
-          #   gitlab_ci_cli export-just #{flag} --output #{@options[:output] || default_output}
+          #   gitlab_ci_cli export-just #{flag} --output #{comment_text(@options[:output] || default_output)}
           #
           # Each recipe runs its job like `gitlab_ci_cli run`: the job's variables
           # (as of this export) exported, cwd = the project directory,

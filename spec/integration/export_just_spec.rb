@@ -11,6 +11,7 @@
 require 'spec_helper'
 require 'open3'
 require 'tmpdir'
+require 'yaml'
 
 # export-just writes recipes that behave like `run` (TASK-51, TASK-23).
 # The generated recipes are executed with `just` (from the dev shell);
@@ -136,6 +137,98 @@ RSpec.describe 'export-just', type: :integration do
     stdout, stderr, status = just('m_aws_x86')
     expect(status).to eq(0), stderr
     expect(stdout).to eq("p=aws a=x86\n")
+  end
+
+  # Config text is untrusted: just evaluates top-level assignments (and
+  # their backticks) whatever recipe runs, so text that escapes its comment
+  # line runs code. Every sentinel lives in the per-example temp dir.
+  describe 'config text cannot inject justfile syntax' do
+    def sentinel
+      File.join(@project_dir, 'pwned')
+    end
+
+    def recipe_list
+      stdout, stderr, status = just('--list')
+      raise "just --list failed: #{stderr}" unless status.zero?
+
+      stdout.lines.drop(1).map { |line| line.split.first }
+    end
+
+    it 'keeps a job name with a newline from adding a recipe' do
+      export(YAML.dump("evil\nboom:\n    touch #{sentinel}" => { 'script' => ['echo hi'] }))
+      expect(recipe_list).to eq(["evil_boom_touch#{sentinel.gsub(/[^A-Za-z0-9_-]+/, '_')}"])
+      _stdout, _stderr, status = just('boom')
+      expect(status).not_to eq(0)
+      expect(File.exist?(sentinel)).to be(false)
+    end
+
+    it 'keeps a tag with a newline from adding an assignment that runs with any recipe' do
+      export(YAML.dump('harmless' => { 'script' => ['echo harmless'] },
+                       'tagged' => { 'tags' => ["t\npwn := `touch #{sentinel}`"], 'script' => ['echo x'] }))
+      stdout, stderr, status = just('harmless')
+      expect(status).to eq(0), stderr
+      expect(stdout).to eq("harmless\n")
+      expect(File.exist?(sentinel)).to be(false)
+    end
+
+    it 'keeps --entry and --output paths with a newline inside the header comment' do
+      # A file name cannot hold '/', so the payload reads the sentinel path
+      # from the environment (unset: `touch ''` fails, touching nothing).
+      env = { 'EXPORT_JUST_SENTINEL' => sentinel }
+      dir = File.join(@project_dir, "d\npwn := `touch \"$EXPORT_JUST_SENTINEL\"`")
+      Dir.mkdir(dir)
+      entry = File.join(dir, '.gitlab-ci.yml')
+      output = File.join(dir, "out\nalso := `touch \"$EXPORT_JUST_SENTINEL\"`")
+      File.write(entry, "job: {script: [echo job]}\n")
+      _stdout, stderr, status = Open3.capture3(bin_path, 'export-just', *PinnedPipelineContext::CLI_ARGS,
+                                               '--entry', entry, '--output', output)
+      expect(status.success?).to be(true), stderr
+      stdout, stderr, status = Open3.capture3(env, 'just', '--justfile', output, 'job', chdir: '/')
+      expect(status.success?).to be(true), stderr
+      expect(stdout).to eq("job\n")
+      expect(File.exist?(sentinel)).to be(false)
+    end
+
+    # Seeded random job names, stages, tags, environment names and variable
+    # values made of the characters that end or open just syntax. Job names
+    # start with a unique "j<i>z" so they never collide (collisions have
+    # their own spec) and the expected recipe names follow from the README
+    # rule alone.
+    it 'writes exactly one recipe per job and runs nothing at --list/--evaluate, for random hostile text' do
+      seed = Integer(ENV.fetch('EXPORT_JUST_SEED', '20261110'))
+      random = Random.new(seed)
+      pieces = ["\n", "\r", "\r\n", "\u2028", "\t", '`', ':=', '{{', '}}', "'", '"', '#', '\\', ' ', ':', 'a', '7',
+                'export', 'set', 'alias', "x := `touch #{sentinel}`", "$(touch #{sentinel})", "\nrec:\n    touch #{sentinel}"]
+      junk = -> { Array.new(random.rand(1..6)) { pieces.sample(random: random) }.join }
+      expected_name = lambda do |name|
+        base = name.gsub(/[^A-Za-z0-9_-]+/, '_')
+        name.match?(/[^A-Za-z0-9_-]\z/) && base.size > 1 ? base.delete_suffix('_') : base
+      end
+
+      6.times do |trial|
+        stages = Array.new(3) { |i| "s#{i}#{junk.call}" }
+        jobs = Array.new(random.rand(1..5)) do |i|
+          ["j#{i}z#{junk.call}", {
+            'stage' => stages.sample(random: random),
+            'tags' => Array.new(random.rand(0..2)) { junk.call },
+            'environment' => { 'name' => junk.call },
+            'variables' => { 'HOSTILE' => junk.call },
+            'script' => ["echo job-#{i}"]
+          }]
+        end.to_h
+        context = "seed #{seed}, trial #{trial}: #{jobs.keys.inspect}"
+        ['--graph', '--flat'].each do |mode|
+          export(YAML.dump({ 'stages' => stages }.merge(jobs)), mode)
+          expect(recipe_list.sort).to eq(jobs.keys.map(&expected_name).sort), "#{mode} #{context}"
+          _stdout, stderr, status = just('--evaluate')
+          expect(status).to eq(0), "#{mode} #{context}: #{stderr}"
+          stdout, stderr, status = just(expected_name.call(jobs.keys.last))
+          expect(status).to eq(0), "#{mode} #{context}: #{stderr}"
+          expect(stdout).to include("job-#{jobs.size - 1}\n")
+          expect(File.exist?(sentinel)).to be(false), "#{mode} #{context}"
+        end
+      end
+    end
   end
 
   it 'gives colliding recipe names a -2, -3 suffix in config order' do
