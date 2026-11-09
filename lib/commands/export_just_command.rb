@@ -45,7 +45,6 @@ module GitlabCiCli
       # @option options [Boolean] :verbose Enable verbose output
       def initialize(options = {})
         @options = validate_options(options)
-        @config = nil
         @all_jobs = nil
         @stages = nil
       end
@@ -103,15 +102,18 @@ module GitlabCiCli
       #
       # @return [Boolean] false if the config could not be resolved (errors printed)
       def load_config
-        result = PipelineBuilder.resolve_config(@options[:entry], PipelineBuilder::Context.from_options(@options))
+        result = PipelineBuilder.build(@options[:entry], PipelineBuilder::Context.from_options(@options))
         unless result.ok?
           result.errors.each { |message| log_error(message) }
           return false
         end
+        if result.workflow_skipped
+          log_error(PipelineBuilder::WORKFLOW_SKIPPED_MESSAGE)
+          return false
+        end
 
-        @config = expand_variables(result.config, @options[:variables])
         @stages = result.stages
-        @all_jobs = PipelineBuilder.job_definitions(@config)
+        @all_jobs = expand_variables(result.pipeline_jobs, @options[:variables])
         true
       end
 
@@ -136,7 +138,6 @@ module GitlabCiCli
 
         # Generate recipe for each job (alphabetically sorted)
         @all_jobs.keys.sort.each do |job_name|
-          next if job_name.start_with?('.') # Skip template jobs
           job = @all_jobs[job_name]
           lines << format_recipe(job_name, job, dependencies: [])
           lines << ""
@@ -167,7 +168,6 @@ module GitlabCiCli
         # Generate recipes in topological order
         processed = Set.new
         @all_jobs.keys.sort.each do |job_name|
-          next if job_name.start_with?('.') # Skip templates
           next if processed.include?(job_name)
 
           generate_recipe_with_deps(job_name, lines, processed)
@@ -222,7 +222,6 @@ module GitlabCiCli
         # All jobs from previous stage
         previous_stage = @stages[job_stage_index - 1]
         @all_jobs.keys.select do |other_name|
-          next if other_name.start_with?('.') # Skip templates
           other_job = @all_jobs[other_name]
           other_stage = other_job['stage'] || other_job[:stage] || 'test'
           other_stage == previous_stage

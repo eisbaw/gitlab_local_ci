@@ -146,6 +146,94 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
     end
   end
 
+  context 'rules' do
+    before do
+      write('.gitlab-ci.yml', <<~YAML)
+        image: {name: alpine}
+        cache: {paths: [vendor]}
+        stages: [build, test]
+        .tpl:
+          stage: build
+          script: [echo tpl]
+        compile:
+          extends: .tpl
+        never_job:
+          stage: test
+          script: [echo SHOULD-NOT-RUN]
+          rules:
+            - when: never
+        mr_only:
+          stage: test
+          script: [echo mr]
+          rules:
+            - if: $CI_PIPELINE_SOURCE == "merge_request"
+        needs_mr_only:
+          stage: test
+          script: [echo cascade]
+          needs: [mr_only]
+        unit:
+          stage: test
+          script: [echo unit]
+          needs: [compile]
+      YAML
+    end
+
+    it 'give dag, dry-run and export-just the identical job set' do
+      expected = %w[compile unit]
+      expect(dag_jobs.sort).to eq(expected)
+      expect(dry_run_jobs.sort).to eq(expected)
+      expect(export_just_jobs.sort).to eq(expected)
+    end
+
+    it 'follow the pipeline context the same way in every command' do
+      expected = %w[compile mr_only needs_mr_only unit]
+      args = ['--pipeline', 'merge_request']
+      expect(dag_jobs(*args).sort).to eq(expected)
+      expect(dry_run_jobs(*args).sort).to eq(expected)
+      expect(export_just_jobs(*args).sort).to eq(expected)
+    end
+
+    it 'make run refuse a rule-excluded job, saying why, without executing it' do
+      stdout, stderr, status = cli('run', 'never_job')
+      expect(status).to eq(1)
+      expect(stdout).not_to include('SHOULD-NOT-RUN')
+      expect(stderr).to include("Job 'never_job' is excluded by rules in this pipeline context: matching rule has when: never")
+
+      _stdout, stderr, = cli('run', 'needs_mr_only')
+      expect(stderr).to include("needs 'mr_only', which is not in this pipeline")
+    end
+
+    it 'make run refuse a hidden template' do
+      _stdout, stderr, status = cli('run', '.tpl')
+      expect(status).to eq(1)
+      expect(stderr).to include("Job '.tpl' is a hidden template")
+    end
+
+    it 'leave lint validating every job regardless of rules' do
+      expect(lint_jobs).to include('never_job', 'mr_only', '.tpl')
+    end
+  end
+
+  context 'workflow:rules matching nothing' do
+    before do
+      write('.gitlab-ci.yml', <<~YAML)
+        workflow:
+          rules:
+            - if: $NOPE == "1"
+        job:
+          script: [echo]
+      YAML
+    end
+
+    it 'create no pipeline in any command' do
+      [['dag'], ['dry-run', '--runners', runners_dir], ['export-just'], %w[run job]].each do |command, *extra|
+        stdout, stderr, status = cli(command, *extra)
+        expect(status).not_to eq(0), "#{command} exited 0"
+        expect(stdout + stderr).to include('workflow:rules: matched no rule'), command
+      end
+    end
+  end
+
   context '--project' do
     it 'is where include:local resolves from' do
       Dir.mktmpdir('pipeline_parity_root') do |root|

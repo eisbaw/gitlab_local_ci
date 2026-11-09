@@ -17,6 +17,7 @@
 require 'spec_helper'
 require 'open3'
 require 'json'
+require 'tmpdir'
 
 RSpec.describe 'GitLab CI DAG Command', type: :integration do
   let(:bin_path) { File.expand_path('../../bin/gitlab_ci_cli', __dir__) }
@@ -191,7 +192,13 @@ RSpec.describe 'GitLab CI DAG Command', type: :integration do
         expect(stdout).to include('test')
         expect(stdout).to include('security')
         expect(stdout).to include('deploy')
-        expect(stdout).to include('cleanup')
+        # Both cleanup jobs have rules (develop branch / schedule source):
+        # a push pipeline does not create them, so dag does not draw them.
+        expect(stdout).not_to include('cleanup_artifacts')
+
+        stdout, stderr, status = run_dag(complex_pipeline_file, extra_args: %w[--pipeline schedule])
+        expect(status).to eq(0), "Failed on complex pipeline. STDERR: #{stderr}"
+        expect(stdout).to include('cluster_cleanup', 'cleanup_artifacts')
       end
 
       it 'includes parallel jobs within same stage' do

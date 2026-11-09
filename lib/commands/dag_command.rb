@@ -36,6 +36,9 @@ class DagCommand
   # missing file, invalid YAML, include or extends failure)
   class InvalidConfigError < StandardError; end
 
+  # Error raised when workflow:rules create no pipeline, so there is no graph
+  class NoPipelineError < StandardError; end
+
   # Initialize with options hash
   #
   # @param options [Hash] Command options
@@ -56,12 +59,15 @@ class DagCommand
   #
   # @return [String] Graphviz DOT format output
   # @raise [InvalidConfigError] if the config cannot be resolved
+  # @raise [NoPipelineError] if workflow:rules create no pipeline
   # @raise [CircularDependencyError] if pipeline has circular dependencies
   def execute
-    result = PipelineBuilder.resolve_config(@entry, @context)
+    result = PipelineBuilder.build(@entry, @context)
     raise InvalidConfigError, result.errors.join("\n") unless result.ok?
+    raise NoPipelineError, PipelineBuilder::WORKFLOW_SKIPPED_MESSAGE if result.workflow_skipped
 
-    pipeline = build_pipeline_structure(result.stages, result.jobs)
+    # Jobs of this pipeline context: rules decide (--pipeline, --variables)
+    pipeline = build_pipeline_structure(result.stages, result.pipeline_jobs)
     validate_dag(pipeline)
     generate_dot(pipeline)
   end

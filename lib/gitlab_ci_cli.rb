@@ -357,6 +357,7 @@ module GitlabCiCli
       puts dot_output
       EXIT_SUCCESS
     rescue DagCommand::InvalidConfigError,
+           DagCommand::NoPipelineError,
            DagCommand::CircularDependencyError => e
       $stderr.puts "Error: #{e.message}"
       EXIT_COMMAND_FAILED

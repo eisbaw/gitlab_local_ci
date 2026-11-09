@@ -79,7 +79,7 @@ class MockServer
       cli_variables: options[:variables] || {},
       project_dir: @project_dir
     )
-    raise WorkflowRulesFilteredError, 'workflow:rules: matched no rule, skipping pipeline' if evaluated[:workflow_skipped]
+    raise WorkflowRulesFilteredError, PipelineBuilder::WORKFLOW_SKIPPED_MESSAGE if evaluated[:workflow_skipped]
 
     create_pipeline_from(
       stages: extract_stages(parsed_config),

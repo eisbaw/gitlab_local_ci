@@ -12,8 +12,6 @@ digraph pipeline {
     __stage_anchor_build [style=invis, width=0, height=0];
 
     build_main [label="build_main", tooltip="---\nstage: build\nscript:\n- echo \"Building on main branch\"\n- echo \"Build artifacts created\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
-    build_feature [label="build_feature", tooltip="---\nstage: build\nscript:\n- echo \"Building feature branch: $CI_COMMIT_BRANCH\"\n- echo \"Feature build completed\"\nrules:\n- if: $CI_COMMIT_BRANCH != \"main\"\n"];
-    nightly_build [label="nightly_build", tooltip="---\nstage: build\nscript:\n- echo \"Running nightly build\"\n- echo \"Nightly build completed\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"schedule\"\n"];
   }
 
   subgraph cluster_test {
@@ -23,14 +21,9 @@ digraph pipeline {
 
     __stage_anchor_test [style=invis, width=0, height=0];
 
-    test_mr [label="test_mr", tooltip="---\nstage: test\nscript:\n- echo \"Running tests for merge request\"\n- echo \"MR pipeline ID: $CI_MERGE_REQUEST_IID\"\n- echo \"Source branch: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME\"\n- echo \"Target branch: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n"];
     test_comprehensive [label="test_comprehensive", tooltip="---\nstage: test\nscript:\n- echo \"Running comprehensive tests\"\n- echo \"Test suite completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n"];
-    test_backend [label="test_backend", tooltip="---\nstage: test\nscript:\n- echo \"Running backend tests\"\n- echo \"Backend tests passed\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n  changes:\n  - \"**/*.rb\"\n  - \"**/*.py\"\n  - \"**/*.go\"\n"];
-    test_frontend [label="test_frontend", tooltip="---\nstage: test\nscript:\n- echo \"Running frontend tests\"\n- echo \"Frontend tests passed\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n  changes:\n  - \"**/*.js\"\n  - \"**/*.jsx\"\n  - \"**/*.ts\"\n  - \"**/*.tsx\"\n  - \"**/*.vue\"\n"];
-    security_scan [label="security_scan", tooltip="---\nstage: test\nscript:\n- echo \"Running security scan\"\n- echo \"Security scan completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  exists:\n  - Dockerfile\n  - \"**/*.dockerfile\"\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n  exists:\n  - Dockerfile\n"];
-    experimental_test [label="experimental_test", tooltip="---\nstage: test\nscript:\n- echo \"Running experimental tests\"\n- echo \"This may fail without blocking pipeline\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: manual\n  allow_failure: true\n"];
+    experimental_test [label="experimental_test", tooltip="---\nstage: test\nscript:\n- echo \"Running experimental tests\"\n- echo \"This may fail without blocking pipeline\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: manual\n  allow_failure: true\nallow_failure: true\nwhen: manual\n"];
     integration_test [label="integration_test", tooltip="---\nstage: test\nscript:\n- echo \"Running integration tests\"\n- echo \"Integration tests completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\" && $CI_PIPELINE_SOURCE != \"schedule\"\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME\n    == \"main\"\n"];
-    skip_on_draft [label="skip_on_draft", tooltip="---\nstage: test\nscript:\n- echo \"Running full test suite\"\n- echo \"Tests completed\"\nrules:\n- if: \"$CI_MERGE_REQUEST_TITLE =~ /^(Draft|WIP):/\"\n  when: never\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n"];
   }
 
   subgraph cluster_deploy {
@@ -40,11 +33,9 @@ digraph pipeline {
 
     __stage_anchor_deploy [style=invis, width=0, height=0];
 
-    deploy_staging [label="deploy_staging", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to staging environment\"\n- echo \"Deployment completed to: $DEPLOY_ENV\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: manual\nenvironment:\n  name: staging\n"];
-    deploy_production [label="deploy_production", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to production\"\n- echo \"Production deployment completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n- if: \"$CI_COMMIT_TAG\"\n  when: on_success\nenvironment:\n  name: production\n"];
-    notify_success [label="notify_success", tooltip="---\nstage: deploy\nscript:\n- echo \"All tests passed, sending success notification\"\n- echo \"Notification sent to team\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: on_success\n"];
-    release [label="release", tooltip="---\nstage: deploy\nscript:\n- echo \"Creating release for tag: $CI_COMMIT_TAG\"\n- echo \"Release artifacts generated\"\nrules:\n- if: \"$CI_COMMIT_TAG\"\n"];
-    deploy_custom [label="deploy_custom", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to custom environment: $CUSTOM_ENV\"\nrules:\n- if: \"$CUSTOM_ENV != null\"\n  when: manual\n"];
+    deploy_staging [label="deploy_staging", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to staging environment\"\n- echo \"Deployment completed to: $DEPLOY_ENV\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: manual\nenvironment:\n  name: staging\nwhen: manual\n"];
+    deploy_production [label="deploy_production", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to production\"\n- echo \"Production deployment completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n- if: \"$CI_COMMIT_TAG\"\n  when: on_success\nenvironment:\n  name: production\nwhen: manual\n"];
+    notify_success [label="notify_success", tooltip="---\nstage: deploy\nscript:\n- echo \"All tests passed, sending success notification\"\n- echo \"Notification sent to team\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: on_success\nwhen: on_success\n"];
   }
 
   subgraph cluster_cleanup {
@@ -54,23 +45,16 @@ digraph pipeline {
 
     __stage_anchor_cleanup [style=invis, width=0, height=0];
 
-    notify_failure [label="notify_failure", tooltip="---\nstage: cleanup\nscript:\n- echo \"Pipeline failed, sending failure notification\"\n- echo \"Failure details sent to team\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: on_failure\n"];
-    cleanup_always [label="cleanup_always", tooltip="---\nstage: cleanup\nscript:\n- echo \"Performing cleanup operations\"\n- echo \"Temporary files removed\"\n- echo \"Resources released\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: always\n"];
+    notify_failure [label="notify_failure", tooltip="---\nstage: cleanup\nscript:\n- echo \"Pipeline failed, sending failure notification\"\n- echo \"Failure details sent to team\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: on_failure\nwhen: on_failure\n"];
+    cleanup_always [label="cleanup_always", tooltip="---\nstage: cleanup\nscript:\n- echo \"Performing cleanup operations\"\n- echo \"Temporary files removed\"\n- echo \"Resources released\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: always\nwhen: always\n"];
   }
 
-  __stage_anchor_build -> test_mr [ltail=cluster_build, style=bold, color="#E41A1C"];
   __stage_anchor_build -> test_comprehensive [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> test_backend [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> test_frontend [ltail=cluster_build, style=bold, color="#E41A1C"];
   __stage_anchor_test -> deploy_staging [ltail=cluster_test, style=bold, color="#4DAF4A"];
   __stage_anchor_test -> deploy_production [ltail=cluster_test, style=bold, color="#4DAF4A"];
   __stage_anchor_test -> notify_success [ltail=cluster_test, style=bold, color="#4DAF4A"];
   __stage_anchor_deploy -> notify_failure [ltail=cluster_deploy, style=bold, color="#377EB8"];
   __stage_anchor_deploy -> cleanup_always [ltail=cluster_deploy, style=bold, color="#377EB8"];
-  __stage_anchor_build -> security_scan [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_test -> release [ltail=cluster_test, style=bold, color="#4DAF4A"];
   __stage_anchor_build -> experimental_test [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_test -> deploy_custom [ltail=cluster_test, style=bold, color="#4DAF4A"];
   __stage_anchor_build -> integration_test [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> skip_on_draft [ltail=cluster_build, style=bold, color="#E41A1C"];
 }

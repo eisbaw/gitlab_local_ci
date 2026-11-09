@@ -35,6 +35,9 @@ module PipelineBuilder
   # Upstream's default is .pre build test deploy .post (TASK-17).
   DEFAULT_STAGES = %w[build test deploy].freeze
 
+  # Printed by every command when Result#workflow_skipped.
+  WORKFLOW_SKIPPED_MESSAGE = 'workflow:rules: matched no rule, no pipeline is created'
+
   # What a pipeline is built for. One per CLI invocation, the same for every
   # subcommand.
   #

@@ -148,7 +148,7 @@ module GitlabCiCli
           return nil
         end
         if result.workflow_skipped
-          log_info('workflow:rules: matched no rule, skipping pipeline')
+          log_info(PipelineBuilder::WORKFLOW_SKIPPED_MESSAGE)
           return nil
         end
 

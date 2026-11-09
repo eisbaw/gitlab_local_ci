@@ -41,7 +41,7 @@ module GitlabCiCli
       def initialize(job_name, options = {})
         @job_name = job_name
         @options = validate_options(options)
-        @config = nil
+        @stages = nil
         @all_jobs = nil
       end
 
@@ -49,15 +49,15 @@ module GitlabCiCli
       #
       # @return [Integer] Exit code (0 for success, 1 for failure)
       def execute
-        return 1 unless load_config
-
-        # Validate job exists
-        unless @all_jobs.key?(@job_name)
-          log_error("Job '#{@job_name}' not found in configuration")
-          available_jobs = @all_jobs.keys.reject { |j| j.start_with?('.') }
-          log_error("Available jobs: #{available_jobs.join(', ')}")
+        result = PipelineBuilder.build(@options[:entry], PipelineBuilder::Context.from_options(@options))
+        unless result.ok?
+          result.errors.each { |message| log_error(message) }
           return 1
         end
+        return 1 unless runnable?(result)
+
+        @stages = result.stages
+        @all_jobs = expand_variables(result.pipeline_jobs, @options[:variables])
 
         # Determine which jobs to run
         jobs_to_run = if @options[:run_deps] == 'incl'
@@ -105,19 +105,26 @@ module GitlabCiCli
         }
       end
 
-      # Load and process configuration
+      # Is @job_name a job of this pipeline? Says why not, otherwise.
       #
-      # @return [Boolean] false if the config could not be resolved (errors printed)
-      def load_config
-        result = PipelineBuilder.resolve_config(@options[:entry], PipelineBuilder::Context.from_options(@options))
-        unless result.ok?
-          result.errors.each { |message| log_error(message) }
+      # @param result [PipelineBuilder::Result] from build
+      # @return [Boolean]
+      def runnable?(result)
+        if result.workflow_skipped
+          log_error(PipelineBuilder::WORKFLOW_SKIPPED_MESSAGE)
           return false
         end
+        return true if result.pipeline_jobs.key?(@job_name)
 
-        @config = expand_variables(result.config, @options[:variables])
-        @all_jobs = PipelineBuilder.job_definitions(@config)
-        true
+        if (reason = result.excluded_jobs[@job_name])
+          log_error("Job '#{@job_name}' is excluded by rules in this pipeline context: #{reason}")
+        elsif result.job_definitions.key?(@job_name)
+          log_error("Job '#{@job_name}' is a hidden template and never runs")
+        else
+          log_error("Job '#{@job_name}' not found in configuration")
+        end
+        log_error("Jobs in this pipeline: #{result.pipeline_jobs.keys.join(', ')}")
+        false
       end
 
       # Recursively expand variables in configuration
@@ -149,7 +156,7 @@ module GitlabCiCli
       # @param job_name [String] Name of the job
       # @return [Array<String>] Ordered list of jobs (dependencies first)
       def resolve_dependencies(job_name)
-        stages = @config['stages'] || %w[build test deploy]
+        stages = @stages
         visited = {}
         result = []
 
@@ -180,7 +187,6 @@ module GitlabCiCli
               # All jobs in previous stages are dependencies
               previous_stages = stages[0...job_stage_index]
               @all_jobs.each do |other_name, other_job|
-                next if other_name.start_with?('.') # Skip templates
                 other_stage = other_job['stage'] || other_job[:stage] || 'test'
                 if previous_stages.include?(other_stage)
                   if visited[other_name] == :visiting

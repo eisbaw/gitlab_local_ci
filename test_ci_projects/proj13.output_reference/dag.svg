@@ -73,7 +73,7 @@
 <!-- test_security -->
 <g id="node10" class="node">
 <title>test_security</title>
-<g id="a_node10"><a xlink:title="&#45;&#45;&#45;&#10;image: alpine:latest&#10;tags:&#10;&#45; docker&#10;&#45; test&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10;before_script:&#10;&#45; echo &quot;Test template before_script&quot;&#10;&#45; apk add &#45;&#45;no&#45;cache python3 py3&#45;pip&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running security scans&quot;&#10;&#45; echo &quot;Vulnerability check passed&quot;&#10;coverage: &quot;/TOTAL.*\s+(\d+%)$/&quot;&#10;allow_failure: true&#10;timeout: 30m&#10;rules:&#10;&#45; if: $CI_COMMIT_BRANCH == &quot;master&quot;&#10; &#160;when: always&#10;&#45; when: manual&#10;">
+<g id="a_node10"><a xlink:title="&#45;&#45;&#45;&#10;image: alpine:latest&#10;tags:&#10;&#45; docker&#10;&#45; test&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10;before_script:&#10;&#45; echo &quot;Test template before_script&quot;&#10;&#45; apk add &#45;&#45;no&#45;cache python3 py3&#45;pip&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running security scans&quot;&#10;&#45; echo &quot;Vulnerability check passed&quot;&#10;coverage: &quot;/TOTAL.*\s+(\d+%)$/&quot;&#10;allow_failure: true&#10;timeout: 30m&#10;rules:&#10;&#45; if: $CI_COMMIT_BRANCH == &quot;master&quot;&#10; &#160;when: always&#10;&#45; when: manual&#10;when: manual&#10;">
 <polygon fill="lightblue" stroke="black" points="460.12,-361 351.88,-361 351.88,-325 460.12,-325 460.12,-361"/>
 <text text-anchor="middle" x="406" y="-338.32" font-family="Times,serif" font-size="14.00">test_security</text>
 </a>
