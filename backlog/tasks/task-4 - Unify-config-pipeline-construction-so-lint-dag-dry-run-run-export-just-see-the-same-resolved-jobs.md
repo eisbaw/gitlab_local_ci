@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:53:00Z'
-updated_date: '2026-11-09T19:24:00Z'
+updated_date: '2026-11-09T19:32:00Z'
 labels:
   - audit
   - architecture
@@ -57,6 +57,8 @@ From architect review of TASK-5/6: reserved top-level key list %w[stages variabl
 Implemented in 35af1a2 (extract primitives, no golden change), 6791beb (PipelineBuilder.build/resolve_config + Context/Result; lint, dry-run, run, export-just; include rules see predefined+CLI vars; --project routed; errors once), 9fac8c4 (dag: extends, no hidden, no globals), 589dc49 (rules in dag/run/export-just; run refuses excluded/hidden jobs with a reason), 9443d72 (CiKeywords::JOB), 16e9c82 (extends keeps key order = TASK-31 AC#2), efda999 (review fixes: optional/cross-project needs, CLI > workflow vars).
 Gotchas: (1) e2e covers only lint/dag/dry-run; export-just/run need their own checks. export-just crashes on 10/20 test projects before and after (TASK-38, TASK-8), so parity there was checked on the 10 that run. (2) generate_output_references.sh now pins git context for lint and dag too, because include rules read CI_COMMIT_* in every command. (3) The --project default is the entry file's dir (CLI DEFAULTS[:project]=nil); upstream uses the repo root, documented in --help. (4) The needs cascade still drops jobs whose required need is missing; upstream errors (TASK-15). (5) Seam decision for TASK-9: store composed job_definitions on Result rather than write defaults into config (note on TASK-9).
 Follow-ups filed: TASK-33 (pipeline vars never reach jobs), 34 (one variable expansion step), 35 (narrow rescue), 36 (no-pipeline exit convention), 37 (MockServer yaml path to spec helper), 38 (Hash script entries). Notes appended to 7, 8, 9, 10, 15, 16, 31, 32.
+
+Gate NO-GO fixed in f0cb362. Gotcha: any spec that exercises rules (through the CLI or PipelineBuilder) must pin CI_COMMIT_* / CI_DEFAULT_BRANCH / CI_PIPELINE_SOURCE. PredefinedVariables derives them from the checkout's git state, so an unpinned spec passes on main and fails on a feature branch, a detached HEAD or a GitLab CI checkout (dag_spec complex_pipeline after dag started applying rules). Use spec/support/pinned_pipeline_context.rb (PinnedPipelineContext::CLI_ARGS for bin/gitlab_ci_cli, .options for in-process commands); same values as generate_output_references.sh pinned_git_context. Verify state-independence by running the suite in a detached worktree and on a throwaway branch, not only on main: all three were 579/0/47 at f0cb362. Remaining ambient input: IncludeProcessor reads ENV['CI_DEFAULT_BRANCH'] for include rules' changes: context (lib/include_processor.rb), not the builder variable set; no spec hits it today.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

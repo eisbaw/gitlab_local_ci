@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:23:00Z'
+updated_date: '2026-11-09T19:32:00Z'
 labels:
   - audit
   - architecture
@@ -26,3 +27,9 @@ From TASK-4 architect review. MockServer#create_pipeline(yaml) is a second, spec
 - [ ] #1 MockServer has one creation entry point (create_pipeline_from)
 - [ ] #2 Specs build pipelines through PipelineBuilder
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From TASK-4 f0cb362: the spec helper that replaces MockServer#create_pipeline(yaml) must pass PinnedPipelineContext (spec/support/pinned_pipeline_context.rb), so mock-server specs do not depend on the checkout's git state.
+<!-- SECTION:NOTES:END -->
