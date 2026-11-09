@@ -231,12 +231,6 @@ module Commands
       end
 
       needs.each do |need|
-        # Skip YAML reference tags (parsed as arrays like [".template", "needs"])
-        # These are GitLab's !reference syntax that gets resolved at runtime
-        if need.is_a?(Array) && need.length == 2 && need[0].is_a?(String) && need[1].is_a?(String)
-          next
-        end
-
         # Needs can be string (job name) or hash (with job key)
         needed_job = case need
                      when String

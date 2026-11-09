@@ -8,10 +8,11 @@
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 
-require 'yaml'
+require_relative 'ci_yaml'
 require_relative 'ci_keywords'
 require_relative 'include_processor'
 require_relative 'extends_resolver'
+require_relative 'reference_resolver'
 require_relative 'rules_evaluator'
 require_relative 'predefined_variables'
 
@@ -24,12 +25,14 @@ require_relative 'predefined_variables'
 #   load YAML              load_yaml
 #   includes               process_includes   (include:rules see predefined + CLI vars)
 #   extends                ExtendsResolver    (every key a root, as upstream Extendable)
-#   !reference             -                  (TASK-8: after extends, before split)
+#   !reference             ReferenceResolver  (after extends, before split)
+#   nested lists           flatten_lists      (upstream Entry values)
 #   default:/inherit:      -                  (TASK-9: on the split jobs, before rules)
 #   workflow:rules         apply_workflow_rules
 #   job rules              filter_jobs_by_rules
 #
-# resolve_config stops after extends (the static config lint validates);
+# resolve_config stops after the nested lists (the static config lint
+# validates);
 # build continues through the rules (the jobs of one pipeline).
 module PipelineBuilder
   # Upstream's default is .pre build test deploy .post (TASK-17).
@@ -63,7 +66,8 @@ module PipelineBuilder
   # Outcome of resolve_config / build. Errors are data: when errors is
   # non-empty every other field is nil and the caller reports the errors.
   #
-  # config          merged + extended config (globals, templates, jobs)
+  # config          merged, extended, references resolved, lists flattened
+  #                 (globals, templates, jobs)
   # workflow_skipped workflow:rules created no pipeline (build only)
   # pipeline_jobs   name => job config of the jobs this pipeline creates,
   #                 rule attributes applied, config order (build only)
@@ -94,7 +98,7 @@ module PipelineBuilder
 
   module_function
 
-  # Static config: load, includes, extends.
+  # Static config: load, includes, extends, !reference, nested lists.
   #
   # @param entry [String] path to .gitlab-ci.yml
   # @param context [Context]
@@ -129,7 +133,13 @@ module PipelineBuilder
       return failure(e.message)
     end
 
-    Result.new(config: config, errors: [])
+    begin
+      config = ReferenceResolver.resolve(config)
+    rescue ReferenceResolver::Error => e
+      return failure(e.message)
+    end
+
+    Result.new(config: flatten_lists(config), errors: [])
   end
 
   # The jobs of one pipeline: resolve_config, then workflow and job rules.
@@ -190,7 +200,7 @@ module PipelineBuilder
     end
 
     config = begin
-      YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
+      CiYaml.load(content)
     rescue Psych::SyntaxError => e
       raise LoadError, "YAML syntax error: #{e.message}"
     rescue StandardError => e
@@ -199,6 +209,42 @@ module PipelineBuilder
     raise LoadError, 'Configuration must be a YAML hash/dictionary' unless config.is_a?(Hash)
 
     config
+  end
+
+  # Upstream entry values flatten nested lists completely: Entry::Commands
+  # (script, before_script, after_script) Array(config).flatten,
+  # ComposableArray (rules, needs, services, cache) [config].flatten,
+  # Entry::Stages config.flatten. That is how a `!reference` or a YAML
+  # alias used as one list item contributes its items. Applied here, once,
+  # so every consumer (lint, rules, dag, export-just) sees flat lists.
+  # Non-Array values are left for validation.
+  JOB_LIST_KEYS = %w[script before_script after_script rules needs services cache].freeze
+  ROOT_LIST_KEYS = %w[before_script after_script services cache stages].freeze
+
+  def flatten_lists(config)
+    config.to_h do |key, value|
+      flattened =
+        if CiKeywords.job_entry?(key, value) || key == 'default'
+          flatten_keys(value, JOB_LIST_KEYS)
+        elsif key == 'workflow'
+          flatten_keys(value, %w[rules])
+        elsif ROOT_LIST_KEYS.include?(key)
+          flatten_list(value)
+        else
+          value
+        end
+      [key, flattened]
+    end
+  end
+
+  def flatten_keys(entry, keys)
+    return entry unless entry.is_a?(Hash)
+
+    entry.to_h { |key, value| [key, keys.include?(key) ? flatten_list(value) : value] }
+  end
+
+  def flatten_list(value)
+    value.is_a?(Array) ? value.flatten : value
   end
 
   # Merge `include:`d files into config (IncludeProcessor). `variables` is

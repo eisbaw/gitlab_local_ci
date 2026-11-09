@@ -170,10 +170,6 @@ class MockPipeline
     # Handle simple array format
     if needs.is_a?(Array)
       return needs.map do |need|
-        # Skip YAML reference tags (parsed as arrays like [".template", "needs"])
-        # These are GitLab's !reference syntax that gets resolved at runtime
-        next if need.is_a?(Array) && need.length == 2 && need[0].is_a?(String) && need[1].is_a?(String)
-
         if need.is_a?(Hash)
           need[:name] || need['name']
         else

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require 'yaml'
+require_relative 'ci_yaml'
 require 'net/http'
 require 'uri'
 require 'set'
@@ -128,7 +128,7 @@ class IncludeProcessor
                   end
 
         # Parse YAML content
-        included_config = YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
+        included_config = CiYaml.load(content)
 
         # Recursively process includes in the included file
         included_config = process_includes(included_config, depth + 1)
@@ -158,6 +158,10 @@ class IncludeProcessor
 
     rules = include_spec['rules'] || include_spec[:rules]
     return true if rules.nil?
+
+    # Upstream Entry::Include::Rules is a ComposableArray: [config].flatten,
+    # so a YAML alias used as one rule contributes its rules.
+    rules = rules.flatten if rules.is_a?(Array)
 
     # Include rules use mode: :include so RulesEvaluator validates that
     # `when:` is one of {never, always} (matches upstream

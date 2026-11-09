@@ -111,7 +111,13 @@ class RulesEvaluator
     end
 
     rules.each do |rule|
-      next unless rule.is_a?(Hash)
+      # Callers pass flattened lists (upstream ComposableArray), so a
+      # non-Hash here is a malformed rule, not a nested list: upstream
+      # rejects it ("rule config should be a hash"); skipping it would
+      # silently change which rule matches first.
+      unless rule.is_a?(Hash)
+        raise ParseError, "rules: each rule must be a hash, got #{rule.class}: #{rule.inspect}"
+      end
 
       validate_when!(rule, mode)
 
