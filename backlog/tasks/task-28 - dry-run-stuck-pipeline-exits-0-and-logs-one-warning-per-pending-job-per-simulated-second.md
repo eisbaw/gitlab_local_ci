@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T18:07:00Z'
-updated_date: '2026-11-09T20:11:00Z'
+updated_date: '2026-11-09T20:29:00Z'
 labels:
   - audit
   - dry-run
@@ -33,4 +33,6 @@ test_ci_projects/proj13 (jobs tagged docker+build/test/deploy, no runner in ./ru
 
 <!-- SECTION:NOTES:BEGIN -->
 COMPASS 2026-11-09: every external_projects dry-run (10/10 that run) ends 'stuck' at max iterations with exit 0 - without this no dry-run result on a real config is meaningful. Raised to high.
+
+From TASK-44: the per-tick warning text 'waiting (no eligible runner)' is also misleading - assign_job_to_runner logs it whenever find_available_runner returns nil, which includes 'eligible runners exist but are at capacity' (proj10 golden: runner_001 busy with 4 jobs, the rest log 'no eligible runner'). Distinguish 'no runner matches tags' (stuck, fail fast) from 'all matching runners busy' (normal queueing, no warning).
 <!-- SECTION:NOTES:END -->

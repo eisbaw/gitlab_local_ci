@@ -1,13 +1,26 @@
 {
-  "valid": false,
+  "valid": true,
   "stages": [
-
+    "build",
+    "test",
+    "deploy"
   ],
   "jobs": [
-
+    "job_with_global_hooks",
+    "job_override_before",
+    "job_override_after",
+    "job_override_both",
+    "job_disable_before",
+    "job_disable_after",
+    "job_disable_both",
+    "job_many_before_commands",
+    "job_many_after_commands",
+    "job_script_fails",
+    "job_before_fails",
+    "job_complex_vars"
   ],
   "errors": [
-    "YAML syntax error: (<unknown>): mapping values are not allowed in this context at line 41 column 44"
+
   ],
   "warnings": [
 

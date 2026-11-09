@@ -4,7 +4,7 @@ title: 'Script entries that YAML-parse as a mapping: lint accepts, export-just c
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:23:00Z'
-updated_date: '2026-11-09T20:12:00Z'
+updated_date: '2026-11-09T20:29:00Z'
 labels:
   - audit
   - export-just
@@ -32,4 +32,6 @@ Found in TASK-4. Unquoted ': ' in a script line, e.g. - echo "body { color: blue
 From TASK-8 (cca6a10): proj12's export-just crash (Array script entries) is fixed by flatten_lists; it came from '- *alias' list items, not !reference. Remaining crashes are Hash entries: proj6/8/9/11/13/15/17/18/20 (checked with pinned main/push context).
 
 COMPASS 2026-11-09: on the 'good enough' line (tasks that must land before claiming GitLab parity for common configs).
+
+From TASK-44: proj10 fixed by quoting (all its ': ' lines). Fixture inventory of remaining Hash script entries (YAML scan of test_ci_projects/**/*.yml for script/before_script/after_script items that are not String/Array): proj6, proj8, proj9, proj11 (+.gitlab/ci/test.yml, deploy.yml), proj13, proj15, proj16 (.gitlab/ci/child1.yml), proj17, proj18, proj20 (+.gitlab/ci/monitoring.yml). Lint says 'valid' for all of them; upstream would reject. When lint is fixed, these goldens flip to invalid unless the fixtures are quoted in the same change.
 <!-- SECTION:NOTES:END -->

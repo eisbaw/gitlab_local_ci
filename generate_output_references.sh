@@ -15,8 +15,8 @@
 # dag.svg). Must run with the repo root as cwd: outputs embed the relative
 # config path, so a different cwd would change every golden.
 #
-# Exit codes are recorded, not acted on: a non-zero lint exit (proj10 is
-# invalid YAML) is expected data, and the diff decides pass/fail.
+# Exit codes are recorded, not acted on: a non-zero lint exit (proj11, the
+# missing .pre stage, TASK-17) is expected data, and the diff decides pass/fail.
 set -euo pipefail
 
 [ "$#" -eq 1 ] || { echo "usage: $0 OUT_ROOT" >&2; exit 2; }

@@ -1,19 +1,23 @@
 ---
 # Test project for before_script and after_script behavior
 # Demonstrates global hooks, job-specific hooks, overrides, and extensions
+#
+# Script lines containing ": " are single-quoted on purpose: unquoted,
+# YAML reads `- echo "JOB: x"` as a mapping {'echo "JOB' => 'x"'}, not a
+# command, and the file used to fail to parse altogether (TASK-44).
 
 # Global before_script - runs before every job unless overridden
 before_script:
-  - echo "GLOBAL: before_script - step 1"
-  - echo "GLOBAL: before_script - step 2"
-  - echo "GLOBAL: Setting up common environment"
+  - 'echo "GLOBAL: before_script - step 1"'
+  - 'echo "GLOBAL: before_script - step 2"'
+  - 'echo "GLOBAL: Setting up common environment"'
   - export GLOBAL_VAR="global_value"
 
 # Global after_script - runs after every job unless overridden
 after_script:
-  - echo "GLOBAL: after_script - step 1"
-  - echo "GLOBAL: after_script - step 2"
-  - echo "GLOBAL: Cleanup completed"
+  - 'echo "GLOBAL: after_script - step 1"'
+  - 'echo "GLOBAL: after_script - step 2"'
+  - 'echo "GLOBAL: Cleanup completed"'
 
 stages:
   - build
@@ -24,63 +28,63 @@ stages:
 job_with_global_hooks:
   stage: build
   script:
-    - echo "JOB: job_with_global_hooks - main script"
-    - echo "JOB: GLOBAL_VAR=$GLOBAL_VAR"
-    - echo "JOB: This job inherits global before_script and after_script"
+    - 'echo "JOB: job_with_global_hooks - main script"'
+    - 'echo "JOB: GLOBAL_VAR=$GLOBAL_VAR"'
+    - 'echo "JOB: This job inherits global before_script and after_script"'
 
 # Job 2: Completely overrides global before_script
 job_override_before:
   stage: build
   before_script:
-    - echo "JOB: Overridden before_script - step 1"
-    - echo "JOB: This completely replaces global before_script"
+    - 'echo "JOB: Overridden before_script - step 1"'
+    - 'echo "JOB: This completely replaces global before_script"'
     - export JOB_VAR="job_specific"
   script:
-    - echo "JOB: job_override_before - main script"
-    - echo "JOB: JOB_VAR=$JOB_VAR"
-    - echo "JOB: GLOBAL_VAR should be empty: '$GLOBAL_VAR'"
+    - 'echo "JOB: job_override_before - main script"'
+    - 'echo "JOB: JOB_VAR=$JOB_VAR"'
+    - 'echo "JOB: GLOBAL_VAR should be empty: ''$GLOBAL_VAR''"'
 
 # Job 3: Completely overrides global after_script
 job_override_after:
   stage: build
   after_script:
-    - echo "JOB: Overridden after_script - step 1"
-    - echo "JOB: This completely replaces global after_script"
-    - echo "JOB: Custom cleanup logic here"
+    - 'echo "JOB: Overridden after_script - step 1"'
+    - 'echo "JOB: This completely replaces global after_script"'
+    - 'echo "JOB: Custom cleanup logic here"'
 
   script:
-    - echo "JOB: job_override_after - main script"
-    - echo "JOB: Using global before_script but custom after_script"
+    - 'echo "JOB: job_override_after - main script"'
+    - 'echo "JOB: Using global before_script but custom after_script"'
 
 # Job 4: Overrides both before_script and after_script
 job_override_both:
   stage: test
   before_script:
-    - echo "JOB: Custom before_script for job_override_both"
-    - echo "JOB: No global before_script executed"
+    - 'echo "JOB: Custom before_script for job_override_both"'
+    - 'echo "JOB: No global before_script executed"'
   after_script:
-    - echo "JOB: Custom after_script for job_override_both"
-    - echo "JOB: No global after_script executed"
+    - 'echo "JOB: Custom after_script for job_override_both"'
+    - 'echo "JOB: No global after_script executed"'
   script:
-    - echo "JOB: job_override_both - main script"
-    - echo "JOB: This job is completely independent"
+    - 'echo "JOB: job_override_both - main script"'
+    - 'echo "JOB: This job is completely independent"'
 
 # Job 5: Disables before_script with empty array
 job_disable_before:
   stage: test
   before_script: []
   script:
-    - echo "JOB: job_disable_before - main script"
-    - echo "JOB: No before_script should run"
-    - echo "JOB: GLOBAL_VAR should be empty: '$GLOBAL_VAR'"
+    - 'echo "JOB: job_disable_before - main script"'
+    - 'echo "JOB: No before_script should run"'
+    - 'echo "JOB: GLOBAL_VAR should be empty: ''$GLOBAL_VAR''"'
 
 # Job 6: Disables after_script with empty array
 job_disable_after:
   stage: test
   after_script: []
   script:
-    - echo "JOB: job_disable_after - main script"
-    - echo "JOB: No after_script should run"
+    - 'echo "JOB: job_disable_after - main script"'
+    - 'echo "JOB: No after_script should run"'
 
 # Job 7: Disables both hooks
 job_disable_both:
@@ -88,44 +92,44 @@ job_disable_both:
   before_script: []
   after_script: []
   script:
-    - echo "JOB: job_disable_both - main script"
-    - echo "JOB: Running with no hooks at all"
+    - 'echo "JOB: job_disable_both - main script"'
+    - 'echo "JOB: Running with no hooks at all"'
 
 # Job 8: Multiple before_script commands
 job_many_before_commands:
   stage: deploy
   before_script:
-    - echo "JOB: before_script command 1"
-    - echo "JOB: before_script command 2"
-    - echo "JOB: before_script command 3"
-    - echo "JOB: before_script command 4"
-    - echo "JOB: before_script command 5"
+    - 'echo "JOB: before_script command 1"'
+    - 'echo "JOB: before_script command 2"'
+    - 'echo "JOB: before_script command 3"'
+    - 'echo "JOB: before_script command 4"'
+    - 'echo "JOB: before_script command 5"'
   script:
-    - echo "JOB: job_many_before_commands - main script"
+    - 'echo "JOB: job_many_before_commands - main script"'
 
 # Job 9: Multiple after_script commands
 job_many_after_commands:
   stage: deploy
   before_script: []
   after_script:
-    - echo "JOB: after_script command 1"
-    - echo "JOB: after_script command 2"
-    - echo "JOB: after_script command 3"
-    - echo "JOB: after_script command 4"
-    - echo "JOB: after_script command 5"
+    - 'echo "JOB: after_script command 1"'
+    - 'echo "JOB: after_script command 2"'
+    - 'echo "JOB: after_script command 3"'
+    - 'echo "JOB: after_script command 4"'
+    - 'echo "JOB: after_script command 5"'
   script:
-    - echo "JOB: job_many_after_commands - main script"
+    - 'echo "JOB: job_many_after_commands - main script"'
 
 # Job 10: Script that fails - after_script should still run
 job_script_fails:
   stage: deploy
   before_script:
-    - echo "JOB: before_script for failing job"
+    - 'echo "JOB: before_script for failing job"'
   after_script:
-    - echo "JOB: after_script should run even when script fails"
-    - echo "JOB: Exit code from script is not available here"
+    - 'echo "JOB: after_script should run even when script fails"'
+    - 'echo "JOB: Exit code from script is not available here"'
   script:
-    - echo "JOB: This script will fail"
+    - 'echo "JOB: This script will fail"'
     - exit 1
   allow_failure: true
 
@@ -133,33 +137,33 @@ job_script_fails:
 job_before_fails:
   stage: deploy
   before_script:
-    - echo "JOB: before_script step 1 - will succeed"
-    - echo "JOB: before_script step 2 - will fail"
+    - 'echo "JOB: before_script step 1 - will succeed"'
+    - 'echo "JOB: before_script step 2 - will fail"'
     - exit 1
-    - echo "JOB: before_script step 3 - should not execute"
+    - 'echo "JOB: before_script step 3 - should not execute"'
   after_script:
-    - echo "JOB: after_script should run even when before_script fails"
+    - 'echo "JOB: after_script should run even when before_script fails"'
   script:
-    - echo "JOB: This script should NOT execute if before_script fails"
+    - 'echo "JOB: This script should NOT execute if before_script fails"'
   allow_failure: true
 
 # Job 12: Complex scenario with environment variables
 job_complex_vars:
   stage: deploy
   before_script:
-    - echo "JOB: Setting up complex environment"
+    - 'echo "JOB: Setting up complex environment"'
     - export VAR1="value1"
     - export VAR2="value2"
     - export VAR3="value3"
   script:
-    - echo "JOB: VAR1=$VAR1"
-    - echo "JOB: VAR2=$VAR2"
-    - echo "JOB: VAR3=$VAR3"
+    - 'echo "JOB: VAR1=$VAR1"'
+    - 'echo "JOB: VAR2=$VAR2"'
+    - 'echo "JOB: VAR3=$VAR3"'
     - export VAR4="value4"
-    - echo "JOB: VAR4=$VAR4"
+    - 'echo "JOB: VAR4=$VAR4"'
   after_script:
-    - echo "JOB: Checking variables in after_script"
-    - echo "JOB: VAR1=$VAR1"
-    - echo "JOB: VAR2=$VAR2"
-    - echo "JOB: VAR3=$VAR3"
-    - echo "JOB: VAR4 should be empty (script vars not passed): '$VAR4'"
+    - 'echo "JOB: Checking variables in after_script"'
+    - 'echo "JOB: VAR1=$VAR1"'
+    - 'echo "JOB: VAR2=$VAR2"'
+    - 'echo "JOB: VAR3=$VAR3"'
+    - 'echo "JOB: VAR4 should be empty (script vars not passed): ''$VAR4''"'

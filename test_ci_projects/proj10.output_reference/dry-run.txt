@@ -1,0 +1,32 @@
+Pipeline #1 created with 12 job(s)
+
+[T+0s] Job 'job_with_global_hooks' → Runner 'runner_001'
+[T+0s] Job 'job_override_before' → Runner 'runner_001'
+[T+0s] Job 'job_override_after' → Runner 'runner_001'
+[T+0s] Job 'job_override_both' → Runner 'runner_001'
+[T+5s] Job 'job_with_global_hooks' completed
+[T+5s] Job 'job_override_before' completed
+[T+5s] Job 'job_override_after' completed
+[T+5s] Job 'job_override_both' completed
+[T+6s] Job 'job_disable_before' → Runner 'runner_001'
+[T+6s] Job 'job_disable_after' → Runner 'runner_001'
+[T+6s] Job 'job_disable_both' → Runner 'runner_001'
+[T+6s] Job 'job_many_before_commands' → Runner 'runner_001'
+[T+11s] Job 'job_disable_before' completed
+[T+11s] Job 'job_disable_after' completed
+[T+11s] Job 'job_disable_both' completed
+[T+11s] Job 'job_many_before_commands' completed
+[T+12s] Job 'job_many_after_commands' → Runner 'runner_001'
+[T+12s] Job 'job_script_fails' → Runner 'runner_001'
+[T+12s] Job 'job_before_fails' → Runner 'runner_001'
+[T+12s] Job 'job_complex_vars' → Runner 'runner_001'
+[T+17s] Job 'job_many_after_commands' completed
+[T+17s] Job 'job_script_fails' completed
+[T+17s] Job 'job_before_fails' completed
+[T+17s] Job 'job_complex_vars' completed
+
+Simulation completed at T+18s
+
+Pipeline status: success
+Job summary:
+  completed: 12

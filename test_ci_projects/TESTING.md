@@ -35,8 +35,8 @@ just e2e-update   # rewrite the goldens after an intended behaviour change
 `just e2e` runs lint (text/json/junit), dag and dry-run for every project,
 records stdout, stderr (`<file>.stderr`, only when non-empty, capped at 50
 lines plus `# total_lines=N`) and the exit code of each, and fails on any
-difference from the committed `projN.output_reference/`. Non-zero exit codes are expected data (proj10 is
-invalid YAML, so its lint exit code is 1). `metadata.txt` and `dag.svg` are
+difference from the committed `projN.output_reference/`. Non-zero exit codes are expected data (proj11's lint
+exit code is 1 because `.pre` is not supported yet, TASK-17). `metadata.txt` and `dag.svg` are
 not compared.
 
 When a behaviour fix lands, run `just e2e-update`, review

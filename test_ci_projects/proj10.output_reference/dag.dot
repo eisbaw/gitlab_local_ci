@@ -1,0 +1,55 @@
+digraph pipeline {
+  rankdir="LR";
+  ranksep=2;
+  compound=true;
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  subgraph cluster_build {
+    label="build";
+    style=filled;
+    fillcolor=lightgrey;
+
+    __stage_anchor_build [style=invis, width=0, height=0];
+
+    job_with_global_hooks [label="job_with_global_hooks", tooltip="---\nstage: build\nscript:\n- 'echo \"JOB: job_with_global_hooks - main script\"'\n- 'echo \"JOB: GLOBAL_VAR=$GLOBAL_VAR\"'\n- 'echo \"JOB: This job inherits global before_script and after_script\"'\nbefore_script:\n- 'echo \"GLOBAL: before_script - step 1\"'\n- 'echo \"GLOBAL: before_script - step 2\"'\n- 'echo \"GLOBAL: Setting up common environment\"'\n- export GLOBAL_VAR=\"global_value\"\nafter_script:\n- 'echo \"GLOBAL: after_script - step 1\"'\n- 'echo \"GLOBAL: after_script - step 2\"'\n- 'echo \"GLOBAL: Cleanup completed\"'\n"];
+    job_override_before [label="job_override_before", tooltip="---\nstage: build\nbefore_script:\n- 'echo \"JOB: Overridden before_script - step 1\"'\n- 'echo \"JOB: This completely replaces global before_script\"'\n- export JOB_VAR=\"job_specific\"\nscript:\n- 'echo \"JOB: job_override_before - main script\"'\n- 'echo \"JOB: JOB_VAR=$JOB_VAR\"'\n- 'echo \"JOB: GLOBAL_VAR should be empty: ''$GLOBAL_VAR''\"'\nafter_script:\n- 'echo \"GLOBAL: after_script - step 1\"'\n- 'echo \"GLOBAL: after_script - step 2\"'\n- 'echo \"GLOBAL: Cleanup completed\"'\n"];
+    job_override_after [label="job_override_after", tooltip="---\nstage: build\nafter_script:\n- 'echo \"JOB: Overridden after_script - step 1\"'\n- 'echo \"JOB: This completely replaces global after_script\"'\n- 'echo \"JOB: Custom cleanup logic here\"'\nscript:\n- 'echo \"JOB: job_override_after - main script\"'\n- 'echo \"JOB: Using global before_script but custom after_script\"'\nbefore_script:\n- 'echo \"GLOBAL: before_script - step 1\"'\n- 'echo \"GLOBAL: before_script - step 2\"'\n- 'echo \"GLOBAL: Setting up common environment\"'\n- export GLOBAL_VAR=\"global_value\"\n"];
+  }
+
+  subgraph cluster_test {
+    label="test";
+    style=filled;
+    fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
+
+    job_override_both [label="job_override_both", tooltip="---\nstage: test\nbefore_script:\n- 'echo \"JOB: Custom before_script for job_override_both\"'\n- 'echo \"JOB: No global before_script executed\"'\nafter_script:\n- 'echo \"JOB: Custom after_script for job_override_both\"'\n- 'echo \"JOB: No global after_script executed\"'\nscript:\n- 'echo \"JOB: job_override_both - main script\"'\n- 'echo \"JOB: This job is completely independent\"'\n"];
+    job_disable_before [label="job_disable_before", tooltip="---\nstage: test\nbefore_script: []\nscript:\n- 'echo \"JOB: job_disable_before - main script\"'\n- 'echo \"JOB: No before_script should run\"'\n- 'echo \"JOB: GLOBAL_VAR should be empty: ''$GLOBAL_VAR''\"'\nafter_script:\n- 'echo \"GLOBAL: after_script - step 1\"'\n- 'echo \"GLOBAL: after_script - step 2\"'\n- 'echo \"GLOBAL: Cleanup completed\"'\n"];
+    job_disable_after [label="job_disable_after", tooltip="---\nstage: test\nafter_script: []\nscript:\n- 'echo \"JOB: job_disable_after - main script\"'\n- 'echo \"JOB: No after_script should run\"'\nbefore_script:\n- 'echo \"GLOBAL: before_script - step 1\"'\n- 'echo \"GLOBAL: before_script - step 2\"'\n- 'echo \"GLOBAL: Setting up common environment\"'\n- export GLOBAL_VAR=\"global_value\"\n"];
+    job_disable_both [label="job_disable_both", tooltip="---\nstage: test\nbefore_script: []\nafter_script: []\nscript:\n- 'echo \"JOB: job_disable_both - main script\"'\n- 'echo \"JOB: Running with no hooks at all\"'\n"];
+  }
+
+  subgraph cluster_deploy {
+    label="deploy";
+    style=filled;
+    fillcolor=lightgrey;
+
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
+    job_many_before_commands [label="job_many_before_commands", tooltip="---\nstage: deploy\nbefore_script:\n- 'echo \"JOB: before_script command 1\"'\n- 'echo \"JOB: before_script command 2\"'\n- 'echo \"JOB: before_script command 3\"'\n- 'echo \"JOB: before_script command 4\"'\n- 'echo \"JOB: before_script command 5\"'\nscript:\n- 'echo \"JOB: job_many_before_commands - main script\"'\nafter_script:\n- 'echo \"GLOBAL: after_script - step 1\"'\n- 'echo \"GLOBAL: after_script - step 2\"'\n- 'echo \"GLOBAL: Cleanup completed\"'\n"];
+    job_many_after_commands [label="job_many_after_commands", tooltip="---\nstage: deploy\nbefore_script: []\nafter_script:\n- 'echo \"JOB: after_script command 1\"'\n- 'echo \"JOB: after_script command 2\"'\n- 'echo \"JOB: after_script command 3\"'\n- 'echo \"JOB: after_script command 4\"'\n- 'echo \"JOB: after_script command 5\"'\nscript:\n- 'echo \"JOB: job_many_after_commands - main script\"'\n"];
+    job_script_fails [label="job_script_fails", tooltip="---\nstage: deploy\nbefore_script:\n- 'echo \"JOB: before_script for failing job\"'\nafter_script:\n- 'echo \"JOB: after_script should run even when script fails\"'\n- 'echo \"JOB: Exit code from script is not available here\"'\nscript:\n- 'echo \"JOB: This script will fail\"'\n- exit 1\nallow_failure: true\n"];
+    job_before_fails [label="job_before_fails", tooltip="---\nstage: deploy\nbefore_script:\n- 'echo \"JOB: before_script step 1 - will succeed\"'\n- 'echo \"JOB: before_script step 2 - will fail\"'\n- exit 1\n- 'echo \"JOB: before_script step 3 - should not execute\"'\nafter_script:\n- 'echo \"JOB: after_script should run even when before_script fails\"'\nscript:\n- 'echo \"JOB: This script should NOT execute if before_script fails\"'\nallow_failure: true\n"];
+    job_complex_vars [label="job_complex_vars", tooltip="---\nstage: deploy\nbefore_script:\n- 'echo \"JOB: Setting up complex environment\"'\n- export VAR1=\"value1\"\n- export VAR2=\"value2\"\n- export VAR3=\"value3\"\nscript:\n- 'echo \"JOB: VAR1=$VAR1\"'\n- 'echo \"JOB: VAR2=$VAR2\"'\n- 'echo \"JOB: VAR3=$VAR3\"'\n- export VAR4=\"value4\"\n- 'echo \"JOB: VAR4=$VAR4\"'\nafter_script:\n- 'echo \"JOB: Checking variables in after_script\"'\n- 'echo \"JOB: VAR1=$VAR1\"'\n- 'echo \"JOB: VAR2=$VAR2\"'\n- 'echo \"JOB: VAR3=$VAR3\"'\n- 'echo \"JOB: VAR4 should be empty (script vars not passed): ''$VAR4''\"'\n"];
+  }
+
+  __stage_anchor_build -> job_override_both [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> job_disable_before [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> job_disable_after [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> job_disable_both [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> job_many_before_commands [ltail=cluster_test, style=bold, color="#377EB8"];
+  __stage_anchor_test -> job_many_after_commands [ltail=cluster_test, style=bold, color="#377EB8"];
+  __stage_anchor_test -> job_script_fails [ltail=cluster_test, style=bold, color="#377EB8"];
+  __stage_anchor_test -> job_before_fails [ltail=cluster_test, style=bold, color="#377EB8"];
+  __stage_anchor_test -> job_complex_vars [ltail=cluster_test, style=bold, color="#377EB8"];
+}
