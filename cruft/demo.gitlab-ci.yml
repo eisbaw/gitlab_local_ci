@@ -1,0 +1,35 @@
+stages:
+  - build
+  - test
+  - deploy
+
+build-frontend:
+  stage: build
+  tags:
+    - docker
+    - linux
+  script:
+    - echo "Building frontend"
+
+build-backend:
+  stage: build
+  tags:
+    - docker
+    - linux
+  script:
+    - echo "Building backend"
+
+test-unit:
+  stage: test
+  needs: ["build-frontend"]
+  script:
+    - echo "Running unit tests"
+
+deploy-prod:
+  stage: deploy
+  tags:
+    - kubernetes
+    - production
+  needs: ["test-unit", "build-backend"]
+  script:
+    - echo "Deploying to production"

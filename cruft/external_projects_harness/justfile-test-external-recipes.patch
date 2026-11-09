@@ -1,0 +1,20 @@
+diff --git a/justfile b/justfile
+index b0cdbfb..1e63d55 100644
+--- a/justfile
++++ b/justfile
+@@ -185,3 +185,15 @@ e2e-update:
+     for golden in test_ci_projects/*.output_reference; do
+         [ -d "${golden%.output_reference}" ] || echo "e2e-update: orphaned golden $golden (project removed?)" >&2
+     done
++
++# Test external real-world projects
++test-external:
++    ruby test_external_projects.rb
++
++# Test external projects with cleanup
++test-external-clean:
++    ruby test_external_projects.rb --cleanup
++
++# Run external project tests with verbose output
++test-external-verbose:
++    ruby test_external_projects.rb --verbose

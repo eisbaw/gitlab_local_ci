@@ -22,3 +22,14 @@ tmp/
 
 # Demo artifacts
 dags/
+
+# CLI remote-include cache (lib/external_resource_cache.rb)
+ext_tmp/
+
+# Generated external-project test output
+external_projects/test_results/
+external_projects_ruby_test/
+external_projects_test/
+
+# backlog CLI local state
+backlog/email-preferences.json

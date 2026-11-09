@@ -28,16 +28,16 @@ test-file FILE:
     rspec {{FILE}}
 
 # Lint YAML file
-lint FILE=".gitlab-ci.yml":
+lint FILE="test_ci_projects/proj1/.gitlab-ci.yml":
     ./bin/gitlab_ci_cli lint --entry {{FILE}}
 
 # Generate DAG visualization
-dag FILE=".gitlab-ci.yml" OUTPUT="pipeline.png":
+dag FILE="test_ci_projects/proj1/.gitlab-ci.yml" OUTPUT="pipeline.png":
     ./bin/gitlab_ci_cli dag --entry {{FILE}} | dot -Tpng -o {{OUTPUT}}
     @echo "Generated {{OUTPUT}}"
 
 # Dry run simulation
-dry-run FILE=".gitlab-ci.yml":
+dry-run FILE="test_ci_projects/proj1/.gitlab-ci.yml":
     ./bin/gitlab_ci_cli dry-run --entry {{FILE}}
 
 # Update GitLab submodule to latest version
