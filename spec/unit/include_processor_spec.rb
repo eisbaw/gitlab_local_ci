@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 require 'spec_helper'
+require 'open3'
+require 'tmpdir'
 require 'include_processor'
 require 'tmpdir'
 
@@ -253,6 +255,56 @@ RSpec.describe IncludeProcessor do
         expect {
           processor_tmp.process_includes(config)
         }.to raise_error(/Circular include detected/)
+      end
+    end
+
+    # TASK-10: `changes:` without compare_to diffs against the merge-base
+    # with the default branch, and that is the builder's CI_DEFAULT_BRANCH
+    # (predefined or --variables), never the ambient environment.
+    context 'with include rules changes: and the default branch' do
+      def git!(dir, *args)
+        _out, err, status = Open3.capture3('git', '-C', dir, *args)
+        raise "git #{args.join(' ')}: #{err}" unless status.success?
+      end
+
+      def commit!(dir, file)
+        File.write(File.join(dir, file), file)
+        git!(dir, 'add', file)
+        git!(dir, 'commit', '-q', '-m', file)
+      end
+
+      # trunk: a.txt; mid: + b.txt; feature (HEAD): + c.txt
+      around do |example|
+        Dir.mktmpdir('include_default_branch') do |dir|
+          @repo = dir
+          git!(dir, 'init', '-q', '-b', 'trunk')
+          git!(dir, 'config', 'user.email', 't@example.com')
+          git!(dir, 'config', 'user.name', 'T')
+          git!(dir, 'config', 'commit.gpgsign', 'false')
+          File.write(File.join(dir, 'inc.yml'), "incjob:\n  script: [echo]\n")
+          commit!(dir, 'a.txt')
+          git!(dir, 'checkout', '-q', '-b', 'mid')
+          commit!(dir, 'b.txt')
+          git!(dir, 'checkout', '-q', '-b', 'feature')
+          commit!(dir, 'c.txt')
+          example.run
+        end
+      end
+
+      def merged?(variables)
+        config = { 'include' => [{ 'local' => 'inc.yml', 'rules' => [{ 'changes' => ['b.txt'] }] }] }
+        described_class.new(project_path: @repo, cache_root: File.join(@repo, 'cache'), variables: variables)
+                       .process_includes(config).key?('incjob')
+      end
+
+      it 'diffs against the CI_DEFAULT_BRANCH variable, not ENV' do
+        original = ENV.fetch('CI_DEFAULT_BRANCH', nil)
+        ENV['CI_DEFAULT_BRANCH'] = 'trunk'
+        expect(merged?('CI_DEFAULT_BRANCH' => 'mid')).to be false
+        ENV['CI_DEFAULT_BRANCH'] = 'mid'
+        expect(merged?('CI_DEFAULT_BRANCH' => 'trunk')).to be true
+      ensure
+        ENV['CI_DEFAULT_BRANCH'] = original
       end
     end
 

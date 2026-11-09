@@ -167,7 +167,9 @@ class IncludeProcessor
     # Include rules use mode: :include so RulesEvaluator validates that
     # `when:` is one of {never, always} (matches upstream
     # gitlab/lib/gitlab/ci/config/external/rules.rb ALLOWED_WHEN).
-    context = { project_dir: @project_path, default_branch: ENV['CI_DEFAULT_BRANCH'] || 'main' }
+    # The builder's variable set (predefined + CLI), like workflow and job
+    # rules; never the ambient environment.
+    context = { project_dir: @project_path, default_branch: @variables['CI_DEFAULT_BRANCH'] || 'main' }
     result = RulesEvaluator.evaluate_rules(rules, @variables, context: context, mode: :include)
     return false unless result[:matched]
 

@@ -139,7 +139,44 @@ gitlab_ci_cli dry-run --entry .gitlab-ci.yml \
 
 # Simulate specific git reference
 gitlab_ci_cli dry-run --entry .gitlab-ci.yml --ref feature/my-branch
+
+# A tag pipeline, and an MR pipeline from feature/my-branch into the default branch
+gitlab_ci_cli dag --ref refs/tags/v1.2.0
+gitlab_ci_cli dag --pipeline merge_request_event --ref feature/my-branch
 ```
+
+### Predefined variables
+
+Rules (`workflow:`, `include:` and job `rules:`) see GitLab's predefined
+variables for the simulated pipeline, derived from `--pipeline`, `--ref` and
+the git checkout (`lib/predefined_variables.rb` lists every variable and why).
+As in GitLab, a variable that does not apply is **unset**, not empty:
+`CI_COMMIT_BRANCH` exists only in branch pipelines (not in tag or MR
+pipelines), `CI_COMMIT_TAG` only in tag pipelines, `CI_MERGE_REQUEST_*` only
+in `merge_request_event` pipelines. The standard MR rules
+(`$CI_PIPELINE_SOURCE == "merge_request_event"`, `$CI_MERGE_REQUEST_IID`,
+`$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS`) therefore evaluate as GitLab
+does.
+
+What cannot be known locally is left unset rather than invented, e.g.
+`CI_COMMIT_REF_PROTECTED`, `CI_SERVER_*`, `CI_PROJECT_ID`,
+`CI_OPEN_MERGE_REQUESTS`. Set them with `--variables` to simulate them
+(`--variables CI_OPEN_MERGE_REQUESTS=group/proj!12` simulates a branch with an
+open MR). Exceptions, so MR rules work:
+
+- `CI_MERGE_REQUEST_IID` is a placeholder `1` (override with `--variables`).
+- `CI_MERGE_REQUEST_TARGET_BRANCH_NAME` is the default branch.
+- `CI_DEFAULT_BRANCH` comes from `origin/HEAD`, else `main`.
+- `CI_PROJECT_PATH` is `namespace/name` from the `origin` remote URL; without
+  a usable `origin` it falls back to the project directory's name (and the
+  `CI_PROJECT_NAMESPACE*` variables are unset).
+
+`--pipeline` takes upstream source names (`push`, `web`, `schedule`, `api`,
+`trigger`, `merge_request_event`, ...). The older names `merge_request` and
+`manual` still work as aliases for `merge_request_event` and `web`.
+
+These variables reach rules only; jobs run by `run` do not get them yet
+(TASK-22).
 
 **Example output:**
 ```
@@ -163,7 +200,10 @@ Pipeline status: success
 --entry FILE      Path to CI config (default: ./.gitlab-ci.yml)
 --gitlab-dir DIR  GitLab checkout, read only by include:template (default: ./gitlab)
 --runners DIR     Runner fleet directory (default: ./runners)
---ref REF         Git ref to simulate (default: HEAD)
+--ref REF         Ref the pipeline is for: BRANCH, TAG, refs/heads/X, refs/tags/X
+                  (default: the checked-out branch)
+--pipeline TYPE   CI_PIPELINE_SOURCE: push, merge_request_event, schedule, web, ...
+                  (default: push)
 --variables K=V   Set CI variables (can be repeated)
 --format FORMAT   Output format: text|json|junit (default: text)
 --help            Show help message

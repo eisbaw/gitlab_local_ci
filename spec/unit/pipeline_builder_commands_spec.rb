@@ -24,9 +24,7 @@ RSpec.describe PipelineBuilder, '.commands_errors' do
 
   def errors(yaml)
     File.write(File.join(@dir, '.gitlab-ci.yml'), yaml)
-    context = PipelineBuilder::Context.new(project_dir: @dir, gitlab_dir: nil,
-                                           pipeline_source: PinnedPipelineContext::PIPELINE_SOURCE,
-                                           variables: PinnedPipelineContext::VARIABLES)
+    context = PinnedPipelineContext.context(@dir)
     PipelineBuilder.resolve_config(File.join(@dir, '.gitlab-ci.yml'), context).errors
   end
 

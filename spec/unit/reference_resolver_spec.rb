@@ -30,9 +30,7 @@ RSpec.describe ReferenceResolver do
   end
 
   def context
-    PipelineBuilder::Context.new(project_dir: @dir, gitlab_dir: nil,
-                                 pipeline_source: PinnedPipelineContext::PIPELINE_SOURCE,
-                                 variables: PinnedPipelineContext::VARIABLES.dup)
+    PinnedPipelineContext.context(@dir)
   end
 
   def build(yaml)

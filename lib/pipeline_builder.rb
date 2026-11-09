@@ -63,17 +63,23 @@ module PipelineBuilder
   # project_dir     repository root: include:local base, exists:/changes:,
   #                 CI_PROJECT_DIR and the git-derived CI_COMMIT_* vars
   # gitlab_dir      upstream checkout (include:template source), may be nil
-  # pipeline_source CI_PIPELINE_SOURCE
+  # pipeline_source CI_PIPELINE_SOURCE, an upstream source name
+  #                 (PredefinedVariables::SOURCES)
+  # ref             --ref: nil/'HEAD' (the checkout's branch or tag), NAME,
+  #                 refs/heads/NAME or refs/tags/NAME (PredefinedVariables
+  #                 .resolve_ref)
   # variables       CLI --variables (String => String), highest precedence
-  Context = Struct.new(:project_dir, :gitlab_dir, :pipeline_source, :variables, keyword_init: true) do
+  Context = Struct.new(:project_dir, :gitlab_dir, :pipeline_source, :ref, :variables, keyword_init: true) do
     # --project wins; otherwise the directory holding the entry file, which
     # is where include:local paths have always been resolved from.
+    # --pipeline aliases (merge_request, manual) become upstream names here.
     def self.from_options(options)
       entry = options.fetch(:entry)
       new(
         project_dir: File.expand_path(options[:project] || File.dirname(entry)),
         gitlab_dir: options[:gitlab_dir],
-        pipeline_source: options[:pipeline] || 'push',
+        pipeline_source: PredefinedVariables.canonical_source(options[:pipeline] || 'push'),
+        ref: options[:ref],
         variables: (options[:variables] || {}).to_h { |k, v| [k.to_s, v.to_s] }
       )
     end
@@ -123,9 +129,17 @@ module PipelineBuilder
   #
   # @param entry [String] path to .gitlab-ci.yml
   # @param context [Context]
+  # @param predefined [Hash, nil] predefined_variables(context), computed
+  #   here when nil
   # @return [Result] config or errors
-  def resolve_config(entry, context, predefined: predefined_variables(context))
+  def resolve_config(entry, context, predefined: nil)
     raise ArgumentError, "context must be a PipelineBuilder::Context, got #{context.class}" unless context.is_a?(Context)
+
+    begin
+      predefined ||= predefined_variables(context)
+    rescue PredefinedVariables::RefError => e
+      return failure(e.message)
+    end
 
     begin
       config = load_yaml(entry)
@@ -218,7 +232,11 @@ module PipelineBuilder
   #
   # @return [Result] with pipeline fields set, or errors
   def build(entry, context)
-    predefined = predefined_variables(context)
+    predefined = begin
+      predefined_variables(context)
+    rescue PredefinedVariables::RefError => e
+      return failure(e.message)
+    end
     result = resolve_config(entry, context, predefined: predefined)
     return result unless result.ok?
 
@@ -234,7 +252,8 @@ module PipelineBuilder
   # Workflow rules, then job rules, over a resolved config and its visible
   # composed jobs (Result#jobs).
   #
-  # Variables, lowest precedence first: predefined CI_*, root variables
+  # Variables, lowest precedence first: predefined CI_* (pipeline, then the
+  # job's own CI_JOB_*), root variables
   # (top-level `variables:` overlaid by the matched workflow rule's
   # `variables:`, upstream Chain::Seed#root_variables), CLI variables
   # (pipeline variables outrank every .gitlab-ci.yml variable, doc/ci/variables
@@ -255,7 +274,8 @@ module PipelineBuilder
 
     root = root.merge(workflow[:variables])
     pipeline_jobs, excluded_jobs = filter_jobs_by_rules(jobs, project_dir: project_dir) do |name, job|
-      predefined.merge(inherited_root_variables(name, job, root)).merge(cli)
+      predefined.merge(job_predefined_variables(name, job))
+                .merge(inherited_root_variables(name, job, root)).merge(cli)
     end
     pipeline_jobs, excluded_jobs = drop_only_edge_stage_jobs(pipeline_jobs, excluded_jobs)
     { workflow_skipped: false, pipeline_jobs: pipeline_jobs, excluded_jobs: excluded_jobs }
@@ -279,8 +299,10 @@ module PipelineBuilder
     Result.new(errors: [message])
   end
 
+  # @raise [PredefinedVariables::RefError]
   def predefined_variables(context)
-    PredefinedVariables.build(project_dir: context.project_dir, pipeline_source: context.pipeline_source)
+    PredefinedVariables.build(project_dir: context.project_dir, pipeline_source: context.pipeline_source,
+                              ref: context.ref)
   end
 
   # @return [Hash] parsed config
@@ -530,6 +552,14 @@ module PipelineBuilder
     end
   end
 
+  # CI_JOB_NAME, CI_JOB_STAGE, ... for one job's rules. Upstream appends
+  # them first (Builder#scoped_variables_for_pipeline_seed), so yaml and
+  # CLI variables of the same name win.
+  def job_predefined_variables(name, job)
+    stage = job['stage'].nil? ? DEFAULT_JOB_STAGE : job['stage'].to_s
+    PredefinedVariables.job_variables(name: name.to_s, stage: stage, when_value: job['when'])
+  end
+
   # Evaluate workflow:rules against `variables`. Returns { variables:,
   # filtered: }: variables are the matched rule's `variables:` (String =>
   # String, empty if none); filtered means workflow rules exist and matched
@@ -573,10 +603,7 @@ module PipelineBuilder
         next
       end
 
-      # Per-job overlay so rules can reference CI_JOB_NAME / CI_JOB_STAGE.
-      job_vars = yield(name, job_config).dup
-      job_vars['CI_JOB_NAME']  = name.to_s
-      job_vars['CI_JOB_STAGE'] = (job_config['stage'] || job_config[:stage] || DEFAULT_JOB_STAGE).to_s
+      job_vars = yield(name, job_config)
 
       context = {
         project_dir: project_dir,

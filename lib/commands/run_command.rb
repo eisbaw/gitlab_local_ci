@@ -101,6 +101,7 @@ module GitlabCiCli
           variables: options[:variables] || {},
           project: options[:project],
           pipeline: options[:pipeline],
+          ref: options[:ref],
           verbose: options[:verbose] || false
         }
       end

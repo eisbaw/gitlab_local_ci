@@ -174,6 +174,15 @@ RSpec.describe GitlabCiCli::CLI do
         expect(options[:pipeline]).to eq('merge_request')
       end
 
+      # TASK-10: upstream source names; the aliases are mapped by
+      # PipelineBuilder::Context.from_options.
+      it 'accepts every upstream source name' do
+        %w[merge_request_event web api trigger parent_pipeline].each do |source|
+          options, = described_class.parse_args(['--pipeline', source, 'dry-run'])
+          expect(options[:pipeline]).to eq(source)
+        end
+      end
+
       it 'parses schedule pipeline type' do
         options, = described_class.parse_args(['--pipeline', 'schedule', 'dry-run'])
         expect(options[:pipeline]).to eq('schedule')

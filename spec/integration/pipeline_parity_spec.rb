@@ -166,7 +166,7 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
           stage: test
           script: [echo mr]
           rules:
-            - if: $CI_PIPELINE_SOURCE == "merge_request"
+            - if: $CI_PIPELINE_SOURCE == "merge_request_event"
         needs_mr_only:
           stage: test
           script: [echo cascade]
@@ -187,7 +187,7 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
 
     it 'follow the pipeline context the same way in every command' do
       expected = %w[compile mr_only needs_mr_only unit]
-      args = ['--pipeline', 'merge_request']
+      args = ['--pipeline', 'merge_request_event']
       expect(dag_jobs(*args).sort).to eq(expected)
       expect(dry_run_jobs(*args).sort).to eq(expected)
       expect(export_just_jobs(*args).sort).to eq(expected)
@@ -386,6 +386,81 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
       _stdout, stderr, status = cli('run', 'first')
       expect(status).not_to eq(0)
       expect(stderr).to include("Job 'first' is excluded by rules in this pipeline context: only .pre/.post jobs left")
+    end
+  end
+
+  # TASK-10: the standard MR rules evaluate like GitLab per pipeline type.
+  # Variables that do not apply are unset (CI_COMMIT_TAG == null in a branch
+  # pipeline, no CI_COMMIT_BRANCH in an MR pipeline).
+  context 'predefined variables by pipeline type (TASK-10)' do
+    before do
+      write('.gitlab-ci.yml', <<~YAML)
+        mr_event:
+          script: [echo]
+          rules: [{ if: '$CI_PIPELINE_SOURCE == "merge_request_event"' }]
+        mr_iid:
+          script: [echo]
+          rules: [{ if: '$CI_MERGE_REQUEST_IID' }]
+        branch_with_open_mr:
+          script: [echo]
+          rules: [{ if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS' }]
+        branch:
+          script: [echo]
+          rules: [{ if: '$CI_COMMIT_BRANCH == "feature-x"' }]
+        tag:
+          script: [echo]
+          rules: [{ if: '$CI_COMMIT_TAG' }]
+        not_tag:
+          script: [echo]
+          rules: [{ if: '$CI_COMMIT_TAG == null' }]
+        ci:
+          script: [echo]
+          rules: [{ if: '$CI == "true" && $GITLAB_CI == "true" && $CI_JOB_NAME_SLUG == "ci"' }]
+      YAML
+    end
+
+    {
+      'branch pipeline' => [%w[--ref feature-x], %w[branch ci not_tag]],
+      'tag pipeline' => [%w[--ref refs/tags/v1], %w[ci tag]],
+      'MR pipeline' => [%w[--pipeline merge_request_event --ref feature-x], %w[ci mr_event mr_iid not_tag]],
+      'MR pipeline via the merge_request alias' => [%w[--pipeline merge_request --ref feature-x],
+                                                    %w[ci mr_event mr_iid not_tag]],
+      'branch pipeline with an open MR' => [%w[--ref feature-x --variables CI_OPEN_MERGE_REQUESTS=g/p!1],
+                                            %w[branch branch_with_open_mr ci not_tag]]
+    }.each do |name, (args, expected)|
+      it "selects the same jobs in every command: #{name}" do
+        expect(dag_jobs(*args).sort).to eq(expected)
+        expect(dry_run_jobs(*args).sort).to eq(expected)
+        expect(export_just_jobs(*args).sort).to eq(expected)
+      end
+    end
+
+    it 'runs the standard MR workflow: MR pipelines and branch pipelines, no tag pipeline' do
+      write('.gitlab-ci.yml', <<~YAML)
+        workflow:
+          rules:
+            - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+            - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+              when: never
+            - if: $CI_COMMIT_BRANCH
+        job:
+          script: [echo]
+      YAML
+      expect(dag_jobs('--pipeline', 'merge_request_event', '--ref', 'feature-x')).to eq(%w[job])
+      expect(dag_jobs('--ref', 'feature-x')).to eq(%w[job])
+      [%w[--ref refs/tags/v1], %w[--ref feature-x --variables CI_OPEN_MERGE_REQUESTS=g/p!1]].each do |args|
+        _stdout, stderr, status = cli('dag', *args)
+        expect(status).not_to eq(0)
+        expect(stderr).to include('workflow:rules: matched no rule'), args.join(' ')
+      end
+    end
+
+    it 'reject an MR pipeline for a tag in every command' do
+      [['lint'], ['dag'], ['dry-run', '--runners', runners_dir], ['export-just'], %w[run ci]].each do |command, *extra|
+        stdout, stderr, status = cli(command, *extra, '--pipeline', 'merge_request_event', '--ref', 'refs/tags/v1')
+        expect(status).not_to eq(0), "#{command} exited 0"
+        expect(stdout + stderr).to include('--ref v1 is a tag'), command
+      end
     end
   end
 

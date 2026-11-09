@@ -15,6 +15,7 @@
 # limitations under the License.
 
 require_relative 'version'
+require_relative 'predefined_variables'
 
 # Main module for GitLab CI CLI tool
 module GitlabCiCli
@@ -31,7 +32,9 @@ module GitlabCiCli
     EXIT_COMMAND_FAILED = 2
 
     # Valid values for flags
-    VALID_PIPELINE_TYPES = %w[push merge_request schedule manual].freeze
+    # Upstream source names, plus the aliases this tool accepted before
+    # (merge_request -> merge_request_event, manual -> web).
+    VALID_PIPELINE_TYPES = (PredefinedVariables::SOURCES + PredefinedVariables::SOURCE_ALIASES.keys).freeze
     VALID_UNDEFINED_MODES = %w[warning error empty].freeze
     VALID_FORMATS = %w[text json junit].freeze
     VALID_COMMANDS = %w[lint dag dry-run run export-just help].freeze
@@ -298,8 +301,18 @@ module GitlabCiCli
                               repository root, so pass --project when the entry
                               file is not at the root)
             --runners DIR     Runner fleet directory (default: ./runners)
-            --ref REF         Git ref to simulate (default: HEAD)
-            --pipeline TYPE   Pipeline type: push|merge_request|schedule|manual (default: push)
+            --ref REF         Ref the pipeline runs for: BRANCH, TAG, refs/heads/BRANCH or
+                              refs/tags/TAG. A plain name is a tag if this repository has
+                              that tag, otherwise a branch (may not exist yet). The commit
+                              is always the checkout's HEAD. Default: the checked-out branch;
+                              on a detached HEAD the one tag at HEAD; otherwise no ref
+                              (CI_COMMIT_BRANCH/TAG/REF_NAME unset)
+            --pipeline TYPE   CI_PIPELINE_SOURCE, an upstream source: push, web, schedule,
+                              api, trigger, merge_request_event, parent_pipeline, ...
+                              (default: push). Aliases: merge_request = merge_request_event,
+                              manual = web. merge_request_event simulates a detached MR
+                              pipeline from --ref into the default branch; its IID is a
+                              placeholder (1), override with --variables
             --variables K=V   Set CI variables (can be repeated)
             --env K=V         Set environment variables (alias for --variables)
             --undefined MODE  Handle undefined vars: warning|error|empty (default: warning)

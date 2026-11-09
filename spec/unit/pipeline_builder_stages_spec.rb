@@ -28,9 +28,7 @@ RSpec.describe PipelineBuilder do
 
   def build(yaml, variables: {})
     File.write(File.join(@dir, '.gitlab-ci.yml'), yaml)
-    context = PipelineBuilder::Context.new(project_dir: @dir, gitlab_dir: nil,
-                                           pipeline_source: PinnedPipelineContext::PIPELINE_SOURCE,
-                                           variables: PinnedPipelineContext::VARIABLES.merge(variables))
+    context = PinnedPipelineContext.context(@dir, variables: variables)
     PipelineBuilder.build(File.join(@dir, '.gitlab-ci.yml'), context)
   end
 

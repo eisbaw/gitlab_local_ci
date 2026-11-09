@@ -51,13 +51,12 @@ for var in "${ambient_ci_vars[@]}"; do unset_ci_args+=(-u "$var"); done
 # and proj8/12/16/20 rules test them, so
 # the goldens would differ on a feature branch, a detached HEAD (how GitLab
 # CI checks out) or a tagged commit. The goldens describe a push pipeline on
-# the default branch 'main', untagged, at a fixed SHA; --variables overlays
-# the git-derived values, the same for every command.
+# the default branch 'main' at a fixed SHA, the same for every command. The
+# ref is pinned with --ref (its kind decides which variables are set at all:
+# no CI_COMMIT_TAG in a branch pipeline), the rest by --variables overlay.
+# Same pins as spec/support/pinned_pipeline_context.rb; change both together.
 pinned_git_context=(
-    --variables CI_COMMIT_BRANCH=main
-    --variables CI_COMMIT_REF_NAME=main
-    --variables CI_COMMIT_REF_SLUG=main
-    --variables CI_COMMIT_TAG=
+    --ref refs/heads/main
     --variables CI_DEFAULT_BRANCH=main
     --variables CI_COMMIT_SHA=0000000000000000000000000000000000000000
     --variables CI_COMMIT_SHORT_SHA=00000000
