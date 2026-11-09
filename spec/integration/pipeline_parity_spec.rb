@@ -35,8 +35,8 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
     File.join(@project_dir, '.gitlab-ci.yml')
   end
 
-  def cli(*args)
-    stdout, stderr, status = Open3.capture3(bin_path, *args, '--entry', entry)
+  def cli(command, *args)
+    stdout, stderr, status = Open3.capture3(bin_path, command, *PinnedPipelineContext::CLI_ARGS, *args, '--entry', entry)
     [stdout, stderr, status.exitstatus]
   end
 

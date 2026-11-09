@@ -29,7 +29,7 @@ RSpec.describe Commands::LintCommand do
           gitlab_dir: gitlab_dir
         }
 
-        result = Commands::LintCommand.execute(options)
+        result = Commands::LintCommand.execute(options.merge(PinnedPipelineContext.options))
 
         expect(result.valid).to be true
         expect(result.exit_code).to eq 0
@@ -46,7 +46,7 @@ RSpec.describe Commands::LintCommand do
           gitlab_dir: gitlab_dir
         }
 
-        result = Commands::LintCommand.execute(options)
+        result = Commands::LintCommand.execute(options.merge(PinnedPipelineContext.options))
 
         expect(result.valid).to be false
         expect(result.exit_code).to eq 1
@@ -62,7 +62,7 @@ RSpec.describe Commands::LintCommand do
           gitlab_dir: gitlab_dir
         }
 
-        result = Commands::LintCommand.execute(options)
+        result = Commands::LintCommand.execute(options.merge(PinnedPipelineContext.options))
 
         expect(result.valid).to be false
         expect(result.exit_code).to eq 1
@@ -78,7 +78,7 @@ RSpec.describe Commands::LintCommand do
           gitlab_dir: '/nonexistent/gitlab'
         }
 
-        result = Commands::LintCommand.execute(options)
+        result = Commands::LintCommand.execute(options.merge(PinnedPipelineContext.options))
 
         # Standalone mode ignores gitlab_dir, so validation succeeds
         expect(result.valid).to be true

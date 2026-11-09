@@ -29,7 +29,7 @@ RSpec.describe 'GitLab CI Lint Command', type: :integration do
   # Helper method to execute CLI command
   # Returns: [stdout, stderr, exit_status]
   def run_lint(file_path, format: 'text', extra_args: [])
-    args = ['lint', '--entry', file_path, '--format', format] + extra_args
+    args = ['lint', '--entry', file_path, '--format', format, *PinnedPipelineContext::CLI_ARGS] + extra_args
     stdout, stderr, status = Open3.capture3(bin_path, *args)
     [stdout, stderr, status.exitstatus]
   end

@@ -188,7 +188,7 @@ RSpec.describe ExtendsResolver do
         entry = File.join(dir, '.gitlab-ci.yml')
         File.write(entry, chain_yaml(12))
 
-        result = Commands::LintCommand.execute(entry: entry)
+        result = Commands::LintCommand.execute(entry: entry, **PinnedPipelineContext.options)
 
         expect(result.valid).to be false
         expect(result.exit_code).to eq 1

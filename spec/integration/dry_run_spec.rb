@@ -32,7 +32,7 @@ RSpec.describe 'GitLab CI Dry-Run Command', type: :integration do
   # Helper method to execute dry-run command
   # Returns: [stdout, stderr, exit_status]
   def run_dry_run(file_path, runners_dir: runners_path, extra_args: [])
-    args = ['dry-run', '--entry', file_path, '--runners', runners_dir] + extra_args
+    args = ['dry-run', '--entry', file_path, '--runners', runners_dir, *PinnedPipelineContext::CLI_ARGS] + extra_args
     stdout, stderr, status = Open3.capture3(bin_path, *args)
     [stdout, stderr, status.exitstatus]
   end

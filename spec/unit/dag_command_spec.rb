@@ -54,7 +54,7 @@ RSpec.describe DagCommand do
         config_file.write(config_content)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
         output = command.execute
 
         expect(output).to include('digraph pipeline {')
@@ -72,7 +72,7 @@ RSpec.describe DagCommand do
         config_file.write(config_content)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
         output = command.execute
 
         expect(output).to include('build_job')
@@ -87,7 +87,7 @@ RSpec.describe DagCommand do
         config_file.write(config_content)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
         output = command.execute
 
         expect(output).to include('build_job -> test_job')
@@ -124,7 +124,7 @@ RSpec.describe DagCommand do
         config_file.write(circular_config)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
 
         expect { command.execute }.to raise_error(
           DagCommand::CircularDependencyError,
@@ -152,7 +152,7 @@ RSpec.describe DagCommand do
         config_file.write(invalid_yaml)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
 
         # Same message lint and dry-run print (PipelineBuilder.load_yaml)
         expect { command.execute }.to raise_error(
@@ -166,7 +166,7 @@ RSpec.describe DagCommand do
 
     context 'with missing configuration file' do
       it 'raises InvalidConfigError naming the file' do
-        command = DagCommand.new(entry: '/nonexistent/path/config.yml')
+        command = DagCommand.new(entry: '/nonexistent/path/config.yml', **PinnedPipelineContext.options)
 
         expect { command.execute }.to raise_error(
           DagCommand::InvalidConfigError,
@@ -223,7 +223,7 @@ RSpec.describe DagCommand do
         config_file.write(complex_config)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
         output = command.execute
 
         # Check that all nodes are present
@@ -271,7 +271,7 @@ RSpec.describe DagCommand do
         config_file.write(hash_needs_config)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
         output = command.execute
 
         expect(output).to include('build_job -> test_job')
@@ -298,7 +298,7 @@ RSpec.describe DagCommand do
         config_file.write(default_stage_config)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
         output = command.execute
 
         expect(output).to include('subgraph cluster_test')
@@ -326,7 +326,7 @@ RSpec.describe DagCommand do
         config_file.write(special_chars_config)
         config_file.close
 
-        command = DagCommand.new(entry: config_file.path)
+        command = DagCommand.new(entry: config_file.path, **PinnedPipelineContext.options)
         output = command.execute
 
         # Colons should be replaced with underscores

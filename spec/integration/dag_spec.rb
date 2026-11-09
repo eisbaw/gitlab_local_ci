@@ -30,7 +30,7 @@ RSpec.describe 'GitLab CI DAG Command', type: :integration do
   # Helper method to execute DAG command
   # Returns: [stdout, stderr, exit_status]
   def run_dag(file_path, extra_args: [])
-    args = ['dag', '--entry', file_path] + extra_args
+    args = ['dag', '--entry', file_path, *PinnedPipelineContext::CLI_ARGS] + extra_args
     stdout, stderr, status = Open3.capture3(bin_path, *args)
     [stdout, stderr, status.exitstatus]
   end
