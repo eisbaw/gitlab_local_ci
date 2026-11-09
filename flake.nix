@@ -10,6 +10,12 @@
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in {
+      # `nix run github:eisbaw/gitlab_local_ci -- lint`, `nix profile install`
+      packages = forAllSystems (system:
+        let pkgs = nixpkgs.legacyPackages.${system}; in {
+          default = pkgs.callPackage ./default.nix { ruby = pkgs.ruby_3_3; };
+        });
+
       devShells = forAllSystems (system:
         let pkgs = nixpkgs.legacyPackages.${system}; in {
           default = pkgs.mkShell {
