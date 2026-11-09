@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T17:55:00Z'
+updated_date: '2026-11-09T20:12:00Z'
 labels:
   - audit
   - variables
@@ -29,3 +29,9 @@ VariableExpander is never used outside its spec, so --undefined MODE does nothin
 - [ ] #2 expand_existing vs expand semantics per keyword like upstream where_variables_can_be_used.md
 - [ ] #3 --undefined either works or is removed
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+COMPASS: absorbs TASK-34 (three expand_variables copies) - same root: one expansion path. Prefer removing --undefined over wiring it.
+<!-- SECTION:NOTES:END -->

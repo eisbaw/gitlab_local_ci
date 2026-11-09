@@ -4,11 +4,11 @@ title: 'Script entries that YAML-parse as a mapping: lint accepts, export-just c
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:23:00Z'
-updated_date: '2026-11-09T19:52:00Z'
+updated_date: '2026-11-09T20:12:00Z'
 labels:
   - audit
-  - lint
   - export-just
+  - good-enough
 dependencies: []
 priority: medium
 ordinal: 38000
@@ -30,4 +30,6 @@ Found in TASK-4. Unquoted ': ' in a script line, e.g. - echo "body { color: blue
 
 <!-- SECTION:NOTES:BEGIN -->
 From TASK-8 (cca6a10): proj12's export-just crash (Array script entries) is fixed by flatten_lists; it came from '- *alias' list items, not !reference. Remaining crashes are Hash entries: proj6/8/9/11/13/15/17/18/20 (checked with pinned main/push context).
+
+COMPASS 2026-11-09: on the 'good enough' line (tasks that must land before claiming GitLab parity for common configs).
 <!-- SECTION:NOTES:END -->

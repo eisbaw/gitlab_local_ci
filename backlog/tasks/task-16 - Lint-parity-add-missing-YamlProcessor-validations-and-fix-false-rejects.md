@@ -4,7 +4,7 @@ title: 'Lint parity: add missing YamlProcessor validations and fix false rejects
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T20:13:00Z'
+updated_date: '2026-11-09T20:16:00Z'
 labels:
   - audit
   - lint
@@ -45,4 +45,6 @@ From architect review of TASK-31/8: non-Hash rule error is data in build ('Error
 From QA of TASK-31/8: (1) lint accepts rules: ['string'] (valid, exit 0) while dag/dry-run/export-just reject it; (2) lint validates hidden templates (.unused_tpl: {script: 42} fails) but upstream never validates hidden jobs; only extends errors in unused templates are upstream behaviour; (4) script nested >10 levels silently flattened, upstream Entry::Commands MAX_NESTING_LEVEL=10 rejects.
 
 Forward-carried from TASK-9 (8dc4b74): resolve_config now errors (upstream wording) on default: non-hash / unknown keys, legacy global + default: same key, inherit: non-hash / unknown keys, inherit:default unknown values, inherit:<k> not bool/list. Gaps left: hidden templates' inherit: is not validated (only visible jobs); default:{extends:} is accepted because ExtendsResolver deletes extends while upstream keeps it and Entry::Default rejects it as an unknown key. Lint now validates composed jobs (Result#job_definitions), so default keys appear in each visible job's config; all CiKeywords::DEFAULT keys are in CiKeywords::JOB, so no new non-standard-keyword warnings.
+
+COMPASS 2026-11-09: split - keep 'one validator on PipelineBuilder::Result' as the core; the exhaustive upstream case list is breadth work for later.
 <!-- SECTION:NOTES:END -->

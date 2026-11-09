@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T17:55:00Z'
+updated_date: '2026-11-09T20:12:00Z'
 labels:
   - audit
   - include
@@ -35,3 +35,9 @@ ordinal: 21000
 - [ ] #1 Each item has a spec matching upstream
 - [ ] #2 No crashes on malformed includes; upstream-style errors
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+COMPASS: trim to empty-file crash + $VAR in local:; integrity and 150-file count are low value.
+<!-- SECTION:NOTES:END -->

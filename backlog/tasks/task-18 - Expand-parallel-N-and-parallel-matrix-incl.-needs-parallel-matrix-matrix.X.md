@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T17:55:00Z'
+updated_date: '2026-11-09T20:12:00Z'
 labels:
   - audit
   - config
   - feature
+  - good-enough
 dependencies:
   - TASK-1
 priority: medium
@@ -29,3 +30,9 @@ Not expanded at all: matrix jobs keep original name and vanish from dry-run. Ups
 - [ ] #2 needs/dependencies on a parallel job fan out; needs:parallel:matrix selects
 - [ ] #3 dag, dry-run, run, export-just all show expanded jobs
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+COMPASS 2026-11-09: on the 'good enough' line (tasks that must land before claiming GitLab parity for common configs).
+<!-- SECTION:NOTES:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:23:00Z'
+updated_date: '2026-11-09T20:12:00Z'
 labels:
   - audit
   - variables
@@ -26,3 +27,9 @@ From TASK-4 architect review. dry_run_command.rb, run_command.rb and export_just
 - [ ] #1 Nested variable references expanded once, in PipelineBuilder
 - [ ] #2 No per-command expand_variables copies
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Merged into TASK-24 per COMPASS 2026-11-09.
+<!-- SECTION:NOTES:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:23:00Z'
+updated_date: '2026-11-09T20:16:00Z'
 labels:
   - audit
   - variables
@@ -26,3 +27,9 @@ Found in TASK-4 review. PipelineBuilder.evaluate_rules computes the pipeline var
 - [ ] #1 run exports predefined, top-level, job and rules:variables to the script env with upstream precedence
 - [ ] #2 dry-run jobs carry the same variables
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Merged into TASK-22 per COMPASS 2026-11-09 (same as 22 AC#1 plus the dry-run half).
+<!-- SECTION:NOTES:END -->

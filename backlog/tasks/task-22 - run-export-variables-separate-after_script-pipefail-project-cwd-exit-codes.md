@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T20:13:00Z'
+updated_date: '2026-11-09T20:16:00Z'
 labels:
   - audit
   - run
   - correctness
+  - good-enough
 dependencies:
   - TASK-1
 priority: high
@@ -37,4 +38,6 @@ Confirmed: run job with variables G (global), J (job) echoes G=[] J=[] CI=[] - n
 
 <!-- SECTION:NOTES:BEGIN -->
 Forward-carried from TASK-9 (8dc4b74): run and export-just now get default:/legacy before_script, after_script, image, services, cache etc. already applied on Result#pipeline_jobs (PipelineBuilder.compose_jobs); do not re-apply defaults in RunCommand. A job's own before_script/after_script ([] included) replaces the default whole. When separating after_script into its own shell, read it from the composed job. inherit:variables is in each job's inherit: key; root variables a job may see = top-level variables merged with workflow:rules:variables, filtered by PipelineBuilder.inherited_root_variables (reuse it when exporting variables, with TASK-33).
+
+COMPASS 2026-11-09: absorbs TASK-33 (pipeline variables never reach jobs - run scripts and dry-run see only CLI vars). On the 'good enough' line.
 <!-- SECTION:NOTES:END -->

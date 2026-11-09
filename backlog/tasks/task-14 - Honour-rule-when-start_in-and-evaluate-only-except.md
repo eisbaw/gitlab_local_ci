@@ -4,11 +4,12 @@ title: Honour rule when:/start_in and evaluate only/except
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T17:54:00Z'
+updated_date: '2026-11-09T20:12:00Z'
 labels:
   - audit
   - rules
   - correctness
+  - good-enough
 dependencies:
   - TASK-1
 priority: medium
@@ -30,3 +31,9 @@ ordinal: 14000
 - [ ] #2 delayed + start_in accepted and simulated
 - [ ] #3 only/except refs/variables/changes basic forms evaluated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+COMPASS 2026-11-09: on the 'good enough' line (tasks that must land before claiming GitLab parity for common configs).
+<!-- SECTION:NOTES:END -->
