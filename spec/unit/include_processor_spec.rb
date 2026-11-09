@@ -143,35 +143,6 @@ RSpec.describe IncludeProcessor do
     end
   end
 
-  describe '#deep_merge' do
-    it 'merges nested hashes' do
-      base = {
-        'variables' => { 'VAR1' => 'value1' },
-        'job1' => { 'script' => ['echo 1'] }
-      }
-      overlay = {
-        'variables' => { 'VAR2' => 'value2' },
-        'job2' => { 'script' => ['echo 2'] }
-      }
-
-      result = processor.send(:deep_merge, base, overlay)
-
-      expect(result['variables']['VAR1']).to eq('value1')
-      expect(result['variables']['VAR2']).to eq('value2')
-      expect(result['job1']).to eq({ 'script' => ['echo 1'] })
-      expect(result['job2']).to eq({ 'script' => ['echo 2'] })
-    end
-
-    it 'replaces arrays instead of merging' do
-      base = { 'stages' => ['build'] }
-      overlay = { 'stages' => ['build', 'test'] }
-
-      result = processor.send(:deep_merge, base, overlay)
-
-      expect(result['stages']).to eq(['build', 'test'])
-    end
-  end
-
   describe '#include_identifier' do
     it 'generates identifier for string local include' do
       id = processor.send(:include_identifier, 'test.yml')
@@ -197,6 +168,73 @@ RSpec.describe IncludeProcessor do
     it 'generates identifier for project include' do
       id = processor.send(:include_identifier, { 'project' => 'group/project', 'file' => 'ci.yml', 'ref' => 'main' })
       expect(id).to eq('project:group/project:ci.yml:main')
+    end
+  end
+
+  # Upstream External::Processor#perform: merge_external_files! (in include
+  # order, nested includes expanded first) then append_inline_content!, all
+  # via ActiveSupport deep_merge!: hashes merge, anything else is replaced.
+  # So: main file > later include > earlier include > nested include.
+  describe 'merge precedence' do
+    def process_in_tmpdir(files, config)
+      Dir.mktmpdir do |tmpdir|
+        files.each { |name, body| File.write(File.join(tmpdir, name), body) }
+        described_class.new(project_path: tmpdir).process_includes(config)
+      end
+    end
+
+    it 'lets the main file win over an included file (TASK-5 repro)' do
+      result = process_in_tmpdir(
+        { 'inc.yml' => "job1:\n  script: echo included\n  tags: [x]\n" },
+        { 'include' => [{ 'local' => 'inc.yml' }], 'job1' => { 'script' => 'echo main' } }
+      )
+
+      expect(result['job1']).to eq('script' => 'echo main', 'tags' => ['x'])
+      expect(result).not_to have_key('include')
+    end
+
+    it 'lets a later include win over an earlier include' do
+      result = process_in_tmpdir(
+        {
+          'a.yml' => "variables: {V: a, ONLY_A: a}\njob: {script: [echo a], tags: [a]}\n",
+          'b.yml' => "variables: {V: b}\njob: {script: [echo b]}\n"
+        },
+        { 'include' => ['a.yml', 'b.yml'] }
+      )
+
+      expect(result['variables']).to eq('V' => 'b', 'ONLY_A' => 'a')
+      expect(result['job']).to eq('script' => ['echo b'], 'tags' => ['a'])
+    end
+
+    it 'lets an including file win over its own nested include' do
+      result = process_in_tmpdir(
+        {
+          'outer.yml' => "include: inner.yml\njob: {script: [echo outer]}\n",
+          'inner.yml' => "job: {script: [echo inner], stage: test, tags: [inner]}\n"
+        },
+        { 'include' => 'outer.yml', 'job' => { 'tags' => ['main'] } }
+      )
+
+      expect(result['job']).to eq('script' => ['echo outer'], 'stage' => 'test', 'tags' => ['main'])
+    end
+
+    it 'replaces arrays from includes instead of concatenating them' do
+      result = process_in_tmpdir(
+        { 'inc.yml' => "stages: [build, test, deploy]\njob: {before_script: [inc]}\n" },
+        { 'include' => 'inc.yml', 'stages' => ['build'], 'job' => { 'before_script' => ['main'] } }
+      )
+
+      expect(result['stages']).to eq(['build'])
+      expect(result['job']['before_script']).to eq(['main'])
+    end
+
+    it 'places included keys first, then main-only keys (upstream deep_merge! key order)' do
+      result = process_in_tmpdir(
+        { 'inc.yml' => "inc_job: {script: [x]}\nshared: {script: [x]}\n" },
+        { 'main_job' => { 'script' => ['y'] }, 'include' => 'inc.yml', 'shared' => { 'script' => ['y'] } }
+      )
+
+      expect(result.keys).to eq(%w[inc_job shared main_job])
     end
   end
 

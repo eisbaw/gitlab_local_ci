@@ -28,7 +28,7 @@
 <!-- build_app -->
 <g id="node4" class="node">
 <title>build_app</title>
-<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;variables:&#10; &#160;BUILD_TYPE: optimized&#10;script:&#10;&#45; echo &quot;Building application...&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;app&#45;v1.0.0&quot; &gt; build/app.txt&#10;&#45; echo &quot;Build completed successfully&quot;&#10;after_script:&#10;&#45; echo &quot;Custom post&#45;build step&quot;&#10;&#45; ls &#45;la build/&#10;extends: &quot;.build&#45;template&quot;&#10;">
+<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.build&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Building application with overrides...&quot;&#10;&#45; echo &quot;Build type: ${BUILD_TYPE}&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;app&#45;v${VERSION}&#45;optimized&quot; &gt; build/app.txt&#10;&#45; echo &quot;Build completed with custom configuration&quot;&#10;variables:&#10; &#160;BUILD_TYPE: optimized&#10;after_script:&#10;&#45; echo &quot;Custom post&#45;build step&quot;&#10;&#45; ls &#45;la build/&#10;">
 <polygon fill="lightblue" stroke="black" points="447.38,-172 364.62,-172 364.62,-136 447.38,-136 447.38,-172"/>
 <text text-anchor="middle" x="406" y="-149.32" font-family="Times,serif" font-size="14.00">build&#45;app</text>
 </a>
@@ -40,125 +40,125 @@
 <path fill="none" stroke="#e41a1c" stroke-width="2" d="M118.96,-349C154.22,-310.38 234.84,-227.76 318.75,-181 329.56,-174.98 341.89,-170.1 353.79,-166.24"/>
 <polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="353.08,-170.11 361.63,-163.86 351.05,-163.42 353.08,-170.11"/>
 </g>
-<!-- integration_tests -->
-<g id="node5" class="node">
-<title>integration_tests</title>
-<g id="a_node5"><a xlink:title="&#45;&#45;&#45;&#10;allow_failure: false&#10;script:&#10;&#45; echo &quot;Running integration tests...&quot;&#10;&#45; echo &quot;Test suite: Integration Tests&quot;&#10;&#45; echo &quot;Tests passed: 45/45&quot;&#10;&#45; echo &quot;All integration tests passed&quot;&#10;extends: &quot;.test&#45;template&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;">
-<polygon fill="lightblue" stroke="black" points="473.62,-226 338.38,-226 338.38,-190 473.62,-190 473.62,-226"/>
-<text text-anchor="middle" x="406" y="-203.32" font-family="Times,serif" font-size="14.00">integration&#45;tests</text>
-</a>
-</g>
-</g>
-<!-- __stage_anchor_build&#45;&gt;integration_tests -->
-<g id="edge2" class="edge">
-<title>__stage_anchor_build&#45;&gt;integration_tests</title>
-<path fill="none" stroke="#e41a1c" stroke-width="2" d="M129.05,-349C169.59,-320.09 246.77,-267.89 318.75,-235 322.1,-233.47 325.57,-231.99 329.1,-230.57"/>
-<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="328.89,-234.39 336.99,-227.56 326.4,-227.85 328.89,-234.39"/>
-</g>
-<!-- code_quality -->
-<g id="node6" class="node">
-<title>code_quality</title>
-<g id="a_node6"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running code quality checks...&quot;&#10;&#45; echo &quot;Analyzing code style...&quot;&#10;&#45; echo &quot;Checking for code smells...&quot;&#10;&#45; echo &quot;Quality score: A+&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;allow_failure: true&#10;">
-<polygon fill="lightblue" stroke="black" points="457.5,-280 354.5,-280 354.5,-244 457.5,-244 457.5,-280"/>
-<text text-anchor="middle" x="406" y="-257.32" font-family="Times,serif" font-size="14.00">code&#45;quality</text>
-</a>
-</g>
-</g>
-<!-- __stage_anchor_build&#45;&gt;code_quality -->
-<g id="edge3" class="edge">
-<title>__stage_anchor_build&#45;&gt;code_quality</title>
-<path fill="none" stroke="#e41a1c" stroke-width="2" d="M154.58,-349C198.6,-332.17 262.39,-308.26 318.75,-289 326.7,-286.28 335.1,-283.52 343.41,-280.85"/>
-<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="342.88,-284.69 351.35,-278.33 340.76,-278.02 342.88,-284.69"/>
-</g>
-<!-- deploy_production -->
-<g id="node7" class="node">
-<title>deploy_production</title>
-<g id="a_node7"><a xlink:title="&#45;&#45;&#45;&#10;before_script:&#10;&#45; echo &quot;Preparing production deployment with extra checks...&quot;&#10;&#45; echo &quot;Verifying all tests passed...&quot;&#10;&#45; echo &quot;Checking deployment prerequisites...&quot;&#10;script:&#10;&#45; echo &quot;Deploying to production environment...&quot;&#10;&#45; echo &quot;Target: www.example.com&quot;&#10;&#45; echo &quot;Production deployment completed&quot;&#10;after_script:&#10;&#45; echo &quot;Running post&#45;deployment verification...&quot;&#10;&#45; echo &quot;Sending deployment notification...&quot;&#10;extends: &quot;.deploy&#45;template&quot;&#10;environment:&#10; &#160;name: production&#10; &#160;url: https://www.example.com&#10;only:&#10;&#45; main&#10;when: manual&#10;">
-<polygon fill="lightblue" stroke="black" points="478.5,-334 333.5,-334 333.5,-298 478.5,-298 478.5,-334"/>
-<text text-anchor="middle" x="406" y="-311.32" font-family="Times,serif" font-size="14.00">deploy&#45;production</text>
-</a>
-</g>
-</g>
-<!-- __stage_anchor_build&#45;&gt;deploy_production -->
-<g id="edge4" class="edge">
-<title>__stage_anchor_build&#45;&gt;deploy_production</title>
-<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-353.98C232.35,-346.6 281.4,-337.91 322.05,-330.7"/>
-<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="321.03,-334.44 330.27,-329.25 319.81,-327.55 321.03,-334.44"/>
-</g>
 <!-- build_docker -->
-<g id="node8" class="node">
+<g id="node5" class="node">
 <title>build_docker</title>
-<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.build&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Building Docker image...&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;docker&#45;image:latest&quot; &gt; build/docker.txt&#10;&#45; echo &quot;Docker build completed&quot;&#10;only:&#10;&#45; main&#10;&#45; develop&#10;">
-<polygon fill="lightblue" stroke="black" points="458.25,-388 353.75,-388 353.75,-352 458.25,-352 458.25,-388"/>
-<text text-anchor="middle" x="406" y="-365.32" font-family="Times,serif" font-size="14.00">build&#45;docker</text>
+<g id="a_node5"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.build&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Building Docker image...&quot;&#10;&#45; mkdir &#45;p build&#10;&#45; echo &quot;docker&#45;image:latest&quot; &gt; build/docker.txt&#10;&#45; echo &quot;Docker build completed&quot;&#10;only:&#10;&#45; main&#10;&#45; develop&#10;">
+<polygon fill="lightblue" stroke="black" points="458.25,-226 353.75,-226 353.75,-190 458.25,-190 458.25,-226"/>
+<text text-anchor="middle" x="406" y="-203.32" font-family="Times,serif" font-size="14.00">build&#45;docker</text>
 </a>
 </g>
 </g>
 <!-- __stage_anchor_build&#45;&gt;build_docker -->
-<g id="edge5" class="edge">
+<g id="edge2" class="edge">
 <title>__stage_anchor_build&#45;&gt;build_docker</title>
-<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-370C239.42,-370 298.27,-370 341.96,-370"/>
-<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="340.25,-373.5 350.25,-370 340.25,-366.5 340.25,-373.5"/>
+<path fill="none" stroke="#e41a1c" stroke-width="2" d="M129.05,-349C169.59,-320.09 246.77,-267.89 318.75,-235 326.39,-231.51 334.61,-228.3 342.83,-225.4"/>
+<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="342.35,-229.25 350.71,-222.74 340.12,-222.62 342.35,-229.25"/>
 </g>
 <!-- _test_template -->
-<g id="node9" class="node">
+<g id="node6" class="node">
 <title>_test_template</title>
-<g id="a_node9"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;before_script:&#10;&#45; echo &quot;Setting up test environment...&quot;&#10;">
-<polygon fill="lightblue" stroke="black" points="464.25,-442 347.75,-442 347.75,-406 464.25,-406 464.25,-442"/>
-<text text-anchor="middle" x="406" y="-419.32" font-family="Times,serif" font-size="14.00">.test&#45;template</text>
+<g id="a_node6"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;before_script:&#10;&#45; echo &quot;Setting up test environment...&quot;&#10;">
+<polygon fill="lightblue" stroke="black" points="464.25,-280 347.75,-280 347.75,-244 464.25,-244 464.25,-280"/>
+<text text-anchor="middle" x="406" y="-257.32" font-family="Times,serif" font-size="14.00">.test&#45;template</text>
 </a>
 </g>
 </g>
 <!-- __stage_anchor_build&#45;&gt;_test_template -->
-<g id="edge6" class="edge">
+<g id="edge3" class="edge">
 <title>__stage_anchor_build&#45;&gt;_test_template</title>
-<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-386.02C237.38,-394.29 293.34,-404.21 336.38,-411.84"/>
-<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="334.23,-415.01 344.68,-413.31 335.45,-408.12 334.23,-415.01"/>
+<path fill="none" stroke="#e41a1c" stroke-width="2" d="M154.58,-349C198.6,-332.17 262.39,-308.26 318.75,-289 324.5,-287.03 330.49,-285.04 336.51,-283.08"/>
+<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="336.01,-286.92 344.45,-280.52 333.86,-280.26 336.01,-286.92"/>
 </g>
 <!-- unit_tests -->
-<g id="node10" class="node">
+<g id="node7" class="node">
 <title>unit_tests</title>
-<g id="a_node10"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.test&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Running unit tests...&quot;&#10;&#45; echo &quot;Test suite: Unit Tests&quot;&#10;&#45; echo &quot;Tests passed: 150/150&quot;&#10;&#45; echo &quot;Coverage: 85%&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;">
-<polygon fill="lightblue" stroke="black" points="448.12,-496 363.88,-496 363.88,-460 448.12,-460 448.12,-496"/>
-<text text-anchor="middle" x="406" y="-473.32" font-family="Times,serif" font-size="14.00">unit&#45;tests</text>
+<g id="a_node7"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.test&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Running unit tests...&quot;&#10;&#45; echo &quot;Test suite: Unit Tests&quot;&#10;&#45; echo &quot;Tests passed: 150/150&quot;&#10;&#45; echo &quot;Coverage: 85%&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;">
+<polygon fill="lightblue" stroke="black" points="448.12,-334 363.88,-334 363.88,-298 448.12,-298 448.12,-334"/>
+<text text-anchor="middle" x="406" y="-311.32" font-family="Times,serif" font-size="14.00">unit&#45;tests</text>
 </a>
 </g>
 </g>
 <!-- __stage_anchor_build&#45;&gt;unit_tests -->
-<g id="edge7" class="edge">
+<g id="edge4" class="edge">
 <title>__stage_anchor_build&#45;&gt;unit_tests</title>
-<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-392C249.9,-412.62 260.29,-428.49 318.75,-451 329.51,-455.15 341.2,-459.14 352.4,-462.72"/>
-<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="349.91,-465.61 360.5,-465.25 352,-458.93 349.91,-465.61"/>
+<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-353.98C243.42,-344.64 308.01,-333.19 352.41,-325.32"/>
+<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="351.53,-329.03 360.77,-323.84 350.31,-322.14 351.53,-329.03"/>
+</g>
+<!-- integration_tests -->
+<g id="node8" class="node">
+<title>integration_tests</title>
+<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.test&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Running integration tests (with override)...&quot;&#10;&#45; echo &quot;Test suite: Integration Tests (Extended)&quot;&#10;&#45; echo &quot;Running additional smoke tests...&quot;&#10;&#45; echo &quot;Tests passed: 50/50&quot;&#10;&#45; echo &quot;All integration tests passed&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;allow_failure: true&#10;">
+<polygon fill="lightblue" stroke="black" points="473.62,-388 338.38,-388 338.38,-352 473.62,-352 473.62,-388"/>
+<text text-anchor="middle" x="406" y="-365.32" font-family="Times,serif" font-size="14.00">integration&#45;tests</text>
+</a>
+</g>
+</g>
+<!-- __stage_anchor_build&#45;&gt;integration_tests -->
+<g id="edge5" class="edge">
+<title>__stage_anchor_build&#45;&gt;integration_tests</title>
+<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-370C233.91,-370 285.06,-370 326.56,-370"/>
+<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="325.04,-373.5 335.04,-370 325.04,-366.5 325.04,-373.5"/>
 </g>
 <!-- security_scan -->
-<g id="node11" class="node">
+<g id="node9" class="node">
 <title>security_scan</title>
-<g id="a_node11"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.test&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Running security scan...&quot;&#10;&#45; echo &quot;Scanning for vulnerabilities...&quot;&#10;&#45; echo &quot;No critical vulnerabilities found&quot;&#10;allow_failure: true&#10;">
-<polygon fill="lightblue" stroke="black" points="461.25,-550 350.75,-550 350.75,-514 461.25,-514 461.25,-550"/>
-<text text-anchor="middle" x="406" y="-527.33" font-family="Times,serif" font-size="14.00">security&#45;scan</text>
+<g id="a_node9"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.test&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Running security scan...&quot;&#10;&#45; echo &quot;Scanning for vulnerabilities...&quot;&#10;&#45; echo &quot;No critical vulnerabilities found&quot;&#10;allow_failure: true&#10;">
+<polygon fill="lightblue" stroke="black" points="461.25,-442 350.75,-442 350.75,-406 461.25,-406 461.25,-442"/>
+<text text-anchor="middle" x="406" y="-419.32" font-family="Times,serif" font-size="14.00">security&#45;scan</text>
 </a>
 </g>
 </g>
 <!-- __stage_anchor_build&#45;&gt;security_scan -->
-<g id="edge8" class="edge">
+<g id="edge6" class="edge">
 <title>__stage_anchor_build&#45;&gt;security_scan</title>
-<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-392C258.02,-427.11 252.64,-467.74 318.75,-505 325.36,-508.73 332.56,-512.01 339.87,-514.88"/>
-<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="337.19,-517.63 347.79,-517.77 339.59,-511.05 337.19,-517.63"/>
+<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-386.02C238.41,-394.47 295.83,-404.65 339.23,-412.34"/>
+<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="337.12,-415.52 347.58,-413.82 338.34,-408.63 337.12,-415.52"/>
 </g>
 <!-- deploy_staging -->
-<g id="node12" class="node">
+<g id="node10" class="node">
 <title>deploy_staging</title>
-<g id="a_node12"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.deploy&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Deploying to staging environment...&quot;&#10;&#45; echo &quot;Target: staging.example.com&quot;&#10;&#45; echo &quot;Deployment completed&quot;&#10;environment:&#10; &#160;name: staging&#10; &#160;url: https://staging.example.com&#10;only:&#10;&#45; develop&#10;">
-<polygon fill="lightblue" stroke="black" points="466.5,-604 345.5,-604 345.5,-568 466.5,-568 466.5,-604"/>
-<text text-anchor="middle" x="406" y="-581.33" font-family="Times,serif" font-size="14.00">deploy&#45;staging</text>
+<g id="a_node10"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.deploy&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Deploying to staging environment...&quot;&#10;&#45; echo &quot;Target: staging.example.com&quot;&#10;&#45; echo &quot;Deployment completed&quot;&#10;environment:&#10; &#160;name: staging&#10; &#160;url: https://staging.example.com&#10;only:&#10;&#45; develop&#10;">
+<polygon fill="lightblue" stroke="black" points="466.5,-496 345.5,-496 345.5,-460 466.5,-460 466.5,-496"/>
+<text text-anchor="middle" x="406" y="-473.32" font-family="Times,serif" font-size="14.00">deploy&#45;staging</text>
 </a>
 </g>
 </g>
 <!-- __stage_anchor_build&#45;&gt;deploy_staging -->
-<g id="edge10" class="edge">
+<g id="edge8" class="edge">
 <title>__stage_anchor_build&#45;&gt;deploy_staging</title>
-<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-392C269.08,-443.08 242.11,-505.42 318.75,-559 323.73,-562.48 329.18,-565.53 334.85,-568.2"/>
-<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="331.85,-570.73 342.43,-571.41 334.58,-564.28 331.85,-570.73"/>
+<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-392C249.9,-412.62 260.29,-428.49 318.75,-451 323.93,-452.99 329.32,-454.95 334.76,-456.84"/>
+<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="331.8,-459.54 342.4,-459.43 334.05,-452.91 331.8,-459.54"/>
+</g>
+<!-- deploy_production -->
+<g id="node11" class="node">
+<title>deploy_production</title>
+<g id="a_node11"><a xlink:title="&#45;&#45;&#45;&#10;extends: &quot;.deploy&#45;template&quot;&#10;script:&#10;&#45; echo &quot;Deploying to production environment (verified)...&quot;&#10;&#45; echo &quot;Target: www.example.com&quot;&#10;&#45; echo &quot;Running pre&#45;deployment health checks...&quot;&#10;&#45; echo &quot;Production deployment completed successfully&quot;&#10;environment:&#10; &#160;name: production&#10; &#160;url: https://www.example.com&#10;only:&#10;&#45; main&#10;when: manual&#10;before_script:&#10;&#45; echo &quot;Preparing production deployment with extra checks...&quot;&#10;&#45; echo &quot;Verifying all tests passed...&quot;&#10;&#45; echo &quot;Checking deployment prerequisites...&quot;&#10;after_script:&#10;&#45; echo &quot;Running post&#45;deployment verification...&quot;&#10;&#45; echo &quot;Sending deployment notification...&quot;&#10;">
+<polygon fill="lightblue" stroke="black" points="478.5,-550 333.5,-550 333.5,-514 478.5,-514 478.5,-550"/>
+<text text-anchor="middle" x="406" y="-527.33" font-family="Times,serif" font-size="14.00">deploy&#45;production</text>
+</a>
+</g>
+</g>
+<!-- __stage_anchor_build&#45;&gt;deploy_production -->
+<g id="edge9" class="edge">
+<title>__stage_anchor_build&#45;&gt;deploy_production</title>
+<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-392C258.02,-427.11 252.64,-467.74 318.75,-505 321.11,-506.33 323.55,-507.61 326.04,-508.83"/>
+<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="323.22,-511.4 333.78,-512.3 326.09,-505.01 323.22,-511.4"/>
+</g>
+<!-- code_quality -->
+<g id="node12" class="node">
+<title>code_quality</title>
+<g id="a_node12"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running code quality checks...&quot;&#10;&#45; echo &quot;Analyzing code style...&quot;&#10;&#45; echo &quot;Checking for code smells...&quot;&#10;&#45; echo &quot;Quality score: A+&quot;&#10;dependencies:&#10;&#45; build&#45;app&#10;allow_failure: true&#10;">
+<polygon fill="lightblue" stroke="black" points="457.5,-604 354.5,-604 354.5,-568 457.5,-568 457.5,-604"/>
+<text text-anchor="middle" x="406" y="-581.33" font-family="Times,serif" font-size="14.00">code&#45;quality</text>
+</a>
+</g>
+</g>
+<!-- __stage_anchor_build&#45;&gt;code_quality -->
+<g id="edge11" class="edge">
+<title>__stage_anchor_build&#45;&gt;code_quality</title>
+<path fill="none" stroke="#e41a1c" stroke-width="2" d="M190.75,-392C269.08,-443.08 242.11,-505.42 318.75,-559 326.25,-564.24 334.8,-568.49 343.54,-571.94"/>
+<polygon fill="#e41a1c" stroke="#e41a1c" stroke-width="2" points="340.8,-574.68 351.39,-574.74 343.15,-568.08 340.8,-574.68"/>
 </g>
 <!-- _build_template -->
 <g id="node2" class="node">
@@ -180,7 +180,7 @@
 </g>
 </g>
 <!-- __stage_anchor_test&#45;&gt;_deploy_template -->
-<g id="edge9" class="edge">
+<g id="edge7" class="edge">
 <title>__stage_anchor_test&#45;&gt;_deploy_template</title>
 <path fill="none" stroke="#377eb8" stroke-width="2" d="M493.25,-97.49C538.79,-93.53 594.28,-88.7 638.63,-84.84"/>
 <polygon fill="#377eb8" stroke="#377eb8" stroke-width="2" points="637.28,-88.47 646.94,-84.12 636.67,-81.5 637.28,-88.47"/>
@@ -195,7 +195,7 @@
 </g>
 </g>
 <!-- __stage_anchor_test&#45;&gt;rollback_production -->
-<g id="edge11" class="edge">
+<g id="edge10" class="edge">
 <title>__stage_anchor_test&#45;&gt;rollback_production</title>
 <path fill="none" stroke="#377eb8" stroke-width="2" d="M493.25,-112.51C535.63,-116.19 586.63,-120.63 629.25,-124.34"/>
 <polygon fill="#377eb8" stroke="#377eb8" stroke-width="2" points="627.24,-127.68 637.51,-125.06 627.85,-120.71 627.24,-127.68"/>

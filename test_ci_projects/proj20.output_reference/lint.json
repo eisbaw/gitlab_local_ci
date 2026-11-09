@@ -15,6 +15,9 @@
     "cleanup"
   ],
   "jobs": [
+    ".frontend_base",
+    ".backend_base",
+    ".security_base",
     ".base_config",
     ".docker_config",
     ".node_config",
@@ -24,9 +27,12 @@
     ".test_job",
     ".deploy_job",
     ".docker_build_job",
-    ".frontend_base",
-    ".backend_base",
-    ".security_base",
+    "audit:frontend:dependencies",
+    "bundle:frontend:analyze",
+    "audit:backend:dependencies",
+    "database:migrations:check",
+    "security:container:scan",
+    "security:license:check",
     "validate:yaml",
     "validate:dependencies",
     "lint:frontend",
@@ -71,18 +77,15 @@
     "trigger:monitoring-setup",
     "cleanup:old-images",
     "cleanup:artifacts",
-    "notify:pipeline-status",
-    "audit:frontend:dependencies",
-    "bundle:frontend:analyze",
-    "audit:backend:dependencies",
-    "database:migrations:check",
-    "security:container:scan",
-    "security:license:check"
+    "notify:pipeline-status"
   ],
   "errors": [
 
   ],
   "warnings": [
+    "Job '.frontend_base' is a hidden job template (starts with '.')",
+    "Job '.backend_base' is a hidden job template (starts with '.')",
+    "Job '.security_base' is a hidden job template (starts with '.')",
     "Job '.base_config' is a hidden job template (starts with '.')",
     "Job '.docker_config' is a hidden job template (starts with '.')",
     "Job '.node_config' is a hidden job template (starts with '.')",
@@ -91,9 +94,6 @@
     "Job '.base_job' is a hidden job template (starts with '.')",
     "Job '.test_job' is a hidden job template (starts with '.')",
     "Job '.deploy_job' is a hidden job template (starts with '.')",
-    "Job '.docker_build_job' is a hidden job template (starts with '.')",
-    "Job '.frontend_base' is a hidden job template (starts with '.')",
-    "Job '.backend_base' is a hidden job template (starts with '.')",
-    "Job '.security_base' is a hidden job template (starts with '.')"
+    "Job '.docker_build_job' is a hidden job template (starts with '.')"
   ]
 }

@@ -1,25 +1,25 @@
 Pipeline #1 created with 10 job(s)
 
 [T+0s] Job 'build-app' → Runner 'runner_001'
+[T+0s] Job 'build-docker' → Runner 'runner_001'
+[T+0s] Job 'unit-tests' → Runner 'runner_001'
 [T+0s] Job 'integration-tests' → Runner 'runner_001'
-[T+0s] Job 'code-quality' → Runner 'runner_001'
-[T+0s] Job 'deploy-production' → Runner 'runner_001'
 [T+5s] Job 'build-app' completed
+[T+5s] Job 'build-docker' completed
+[T+5s] Job 'unit-tests' completed
 [T+5s] Job 'integration-tests' completed
-[T+5s] Job 'code-quality' completed
-[T+5s] Job 'deploy-production' completed
-[T+6s] Job 'verify-includes' → Runner 'runner_001'
-[T+6s] Job 'build-docker' → Runner 'runner_001'
-[T+6s] Job 'unit-tests' → Runner 'runner_001'
 [T+6s] Job 'security-scan' → Runner 'runner_001'
-[T+11s] Job 'verify-includes' completed
-[T+11s] Job 'build-docker' completed
-[T+11s] Job 'unit-tests' completed
+[T+6s] Job 'deploy-staging' → Runner 'runner_001'
+[T+6s] Job 'deploy-production' → Runner 'runner_001'
+[T+6s] Job 'rollback-production' → Runner 'runner_001'
 [T+11s] Job 'security-scan' completed
-[T+12s] Job 'deploy-staging' → Runner 'runner_001'
-[T+12s] Job 'rollback-production' → Runner 'runner_001'
-[T+17s] Job 'deploy-staging' completed
-[T+17s] Job 'rollback-production' completed
+[T+11s] Job 'deploy-staging' completed
+[T+11s] Job 'deploy-production' completed
+[T+11s] Job 'rollback-production' completed
+[T+12s] Job 'code-quality' → Runner 'runner_001'
+[T+12s] Job 'verify-includes' → Runner 'runner_001'
+[T+17s] Job 'code-quality' completed
+[T+17s] Job 'verify-includes' completed
 
 Simulation completed at T+18s
 

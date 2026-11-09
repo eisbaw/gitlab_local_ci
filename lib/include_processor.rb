@@ -20,6 +20,7 @@ require 'uri'
 require 'set'
 require_relative 'external_resource_cache'
 require_relative 'rules_evaluator'
+require_relative 'config_merge'
 
 # Custom exception raised when include depth limit is exceeded
 class IncludeDepthExceededError < StandardError
@@ -86,9 +87,9 @@ class IncludeProcessor
     # Expand project includes with array file specs into multiple includes
     includes = expand_array_file_includes(includes)
 
-    # Start with base config (without include key)
-    result = config.dup
-    result.delete('include')
+    # Upstream External::Processor#perform: merge included files in order
+    # (later include wins), then merge the including file on top (it wins).
+    merged_includes = {}
 
     # Process each include
     includes.each do |include_spec|
@@ -132,15 +133,14 @@ class IncludeProcessor
         # Recursively process includes in the included file
         included_config = process_includes(included_config, depth + 1)
 
-        # Deep merge into result
-        result = deep_merge(result, included_config)
+        merged_includes = ConfigMerge.deep_merge(merged_includes, included_config)
       ensure
         # Always cleanup, even if exception occurs
         @processed_includes.delete(identifier)
       end
     end
 
-    result
+    ConfigMerge.deep_merge(merged_includes, config.reject { |key, _| key == 'include' })
   end
 
   private
@@ -561,28 +561,6 @@ class IncludeProcessor
     ci_vars.each do |var_name, var_value|
       result.gsub!("${#{var_name}}", var_value)
       result.gsub!("$#{var_name}", var_value)
-    end
-
-    result
-  end
-
-  # Deep merge two configuration hashes
-  #
-  # @param base [Hash] Base configuration
-  # @param overlay [Hash] Configuration to merge on top
-  # @return [Hash] Merged configuration
-  def deep_merge(base, overlay)
-    result = base.dup
-
-    overlay.each do |key, value|
-      if result[key].is_a?(Hash) && value.is_a?(Hash)
-        # Recursively merge nested hashes
-        result[key] = deep_merge(result[key], value)
-      else
-        # For arrays and primitives, overlay replaces base
-        # This matches GitLab's include behavior
-        result[key] = value
-      end
     end
 
     result
