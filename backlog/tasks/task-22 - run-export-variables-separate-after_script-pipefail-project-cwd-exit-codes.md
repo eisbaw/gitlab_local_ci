@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T20:16:00Z'
+updated_date: '2026-11-09T22:14:00Z'
 labels:
   - audit
   - run
@@ -37,7 +37,5 @@ Confirmed: run job with variables G (global), J (job) echoes G=[] J=[] CI=[] - n
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Forward-carried from TASK-9 (8dc4b74): run and export-just now get default:/legacy before_script, after_script, image, services, cache etc. already applied on Result#pipeline_jobs (PipelineBuilder.compose_jobs); do not re-apply defaults in RunCommand. A job's own before_script/after_script ([] included) replaces the default whole. When separating after_script into its own shell, read it from the composed job. inherit:variables is in each job's inherit: key; root variables a job may see = top-level variables merged with workflow:rules:variables, filtered by PipelineBuilder.inherited_root_variables (reuse it when exporting variables, with TASK-33).
-
-COMPASS 2026-11-09: absorbs TASK-33 (pipeline variables never reach jobs - run scripts and dry-run see only CLI vars). On the 'good enough' line.
+Forward-carried from TASK-10 (7a4b351): run must export the predefined variables to the job shell. Source: PipelineBuilder.predefined_variables(context) (pipeline set, incl. CI, GITLAB_CI, CI_COMMIT_*, CI_PROJECT_*, MR vars only in MR pipelines) merged with PredefinedVariables.job_variables(name:, stage:, when_value:) (CI_JOB_NAME/_SLUG/GROUP_NAME/STAGE/MANUAL), then root (inherit-filtered) and CLI variables on top, as evaluate_rules does; reuse PipelineBuilder.job_predefined_variables. Unset means not exported (do not export ''). Job-only runner variables (CI_JOB_ID, CI_JOB_TOKEN, CI_JOB_STATUS, CI_JOB_TAGS, CI_PIPELINE_ID, CI_BUILDS_DIR, ...) are not in the predefined set: decide which a local run sets (CI_JOB_STATUS for after_script at least) and document. CI_PROJECT_DIR is the project dir. RunCommand#validate_options copies options field by field (it dropped :ref until 7a4b351): pass new Context fields through.
 <!-- SECTION:NOTES:END -->
