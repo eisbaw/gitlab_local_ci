@@ -14,5 +14,4 @@ digraph pipeline {
     test [label="test", tooltip="---\nscript:\n- echo \"Hello World\"\n"];
   }
 
-  __stage_anchor_build -> test [ltail=cluster_build, style=bold, color="#E41A1C"];
 }

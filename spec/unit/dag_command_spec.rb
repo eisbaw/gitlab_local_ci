@@ -335,6 +335,101 @@ RSpec.describe DagCommand do
         config_file.unlink
       end
     end
+
+    # Upstream: a job without needs waits for every job in every earlier
+    # stage, so a stage without jobs is simply skipped (TASK-27). The DOT
+    # draws that as one compound edge from the nearest earlier stage that
+    # has jobs; an edge from an empty stage names a cluster that is never
+    # emitted (graphviz: "cluster named cluster_X not found").
+    context 'with stages that have no jobs' do
+      def dag_for(yaml)
+        Tempfile.create(['empty-stage-config', '.yml']) do |file|
+          file.write(yaml)
+          file.close
+          DagCommand.new(entry: file.path, **PinnedPipelineContext.options).execute
+        end
+      end
+
+      # [from, to, ltail] of every edge line
+      def edges_of(dot)
+        dot.scan(/^\s*(\S+) -> (\S+?)(?: \[(.*)\])?;$/).map do |from, to, attrs|
+          [from, to, attrs.to_s[/ltail=([^,\s]+)/, 1]]
+        end
+      end
+
+      def emitted_clusters(dot)
+        dot.scan(/^\s*subgraph (\S+) \{/).flatten
+      end
+
+      def emitted_nodes(dot)
+        dot.scan(/^\s*(\w+) \[/).flatten
+      end
+
+      it 'draws the edge from the nearest earlier stage with jobs across an empty middle stage' do
+        dot = dag_for(<<~YAML)
+          stages: [build, test, deploy]
+          compile:
+            stage: build
+            script: [make]
+          ship:
+            stage: deploy
+            script: [ship]
+        YAML
+
+        expect(emitted_clusters(dot)).to eq(%w[cluster_build cluster_deploy])
+        expect(edges_of(dot)).to eq([['__stage_anchor_build', 'ship', 'cluster_build']])
+      end
+
+      it 'draws no implicit edge when every earlier stage is empty' do
+        # proj1: default stages, a single job in 'test'
+        dot = dag_for(<<~YAML)
+          only_test:
+            script: [run]
+        YAML
+
+        expect(emitted_clusters(dot)).to eq(%w[cluster_test])
+        expect(edges_of(dot)).to eq([])
+      end
+
+      # Randomised layouts (seeded, so a failure reproduces): any mix of
+      # empty and populated stages, and jobs with and without needs.
+      it 'never references a cluster or anchor that is not emitted, and links each needs-less job to the nearest populated earlier stage' do
+        random = Random.new(27)
+        40.times do |case_index|
+          stages = Array.new(random.rand(1..6)) { |i| "s#{i}" }
+          jobs = {}
+          stages.each do |stage|
+            random.rand(0..2).times { |j| jobs["j_#{stage}_#{j}"] = stage }
+          end
+          next if jobs.empty?
+
+          yaml = { 'stages' => stages }
+          jobs.each do |name, stage|
+            job = { 'stage' => stage, 'script' => ['true'] }
+            job['needs'] = [] if random.rand(4).zero?
+            yaml[name] = job
+          end
+          dot = dag_for(YAML.dump(yaml))
+          clusters = emitted_clusters(dot)
+          nodes = emitted_nodes(dot)
+          populated = stages.select { |stage| jobs.value?(stage) }
+
+          expected = yaml.except('stages').filter_map do |name, job|
+            next if job.key?('needs')
+
+            earlier = populated.take_while { |stage| stage != job['stage'] }.last
+            ["__stage_anchor_#{earlier}", name, "cluster_#{earlier}"] if earlier
+          end
+
+          context_text = "case #{case_index}: #{yaml.inspect}"
+          expect(edges_of(dot)).to match_array(expected), context_text
+          edges_of(dot).each do |from, _to, ltail|
+            expect(nodes).to include(from), context_text
+            expect(clusters).to include(ltail), context_text if ltail
+          end
+        end
+      end
+    end
   end
 
   describe 'private methods' do

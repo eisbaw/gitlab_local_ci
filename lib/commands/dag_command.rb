@@ -316,6 +316,10 @@ class DagCommand
     edges = []
     stages = pipeline[:stages]
     jobs = pipeline[:jobs]
+    # Same set generate_dot emits clusters (and anchors) for. Upstream skips
+    # empty stages when ordering, so the implicit edge must too; an edge
+    # from an empty stage would name a cluster that is never emitted.
+    populated_stages = group_jobs_by_stage(pipeline).keys
 
     jobs.each_value do |job|
       if job[:has_explicit_needs]
@@ -326,25 +330,35 @@ class DagCommand
       else
         # Job has no explicit needs - add implicit stage dependency
         # Instead of drawing edges from all previous jobs, draw a single edge
-        # from the immediate previous stage cluster (using compound graph ltail)
-        job_stage_index = stages.index(job[:stage])
-        next unless job_stage_index && job_stage_index > 0
-
-        # Get immediate previous stage
-        immediate_previous_stage = stages[job_stage_index - 1]
+        # from the nearest earlier stage cluster that has jobs (using
+        # compound graph ltail)
+        previous_stage = nearest_populated_stage_before(job[:stage], stages, populated_stages)
+        next unless previous_stage
 
         # Create stage-level edge using invisible anchor and ltail attribute
         # This makes the edge appear to come from the entire stage cluster
         edges << {
-          from: "__stage_anchor_#{sanitize_id(immediate_previous_stage)}",
+          from: "__stage_anchor_#{sanitize_id(previous_stage)}",
           to: job[:name],
-          ltail: "cluster_#{sanitize_id(immediate_previous_stage)}",
+          ltail: "cluster_#{sanitize_id(previous_stage)}",
           style: 'bold'
         }
       end
     end
 
     edges
+  end
+
+  # @param stage [String] the job's stage
+  # @param stages [Array<String>] pipeline stages in order
+  # @param populated_stages [Array<String>] stages that have at least one job
+  # @return [String, nil] the last stage before +stage+ that has jobs; nil
+  #   when +stage+ is unknown or every earlier stage is empty
+  def nearest_populated_stage_before(stage, stages, populated_stages)
+    stage_index = stages.index(stage)
+    return nil unless stage_index
+
+    stages.take(stage_index).reverse.find { |earlier| populated_stages.include?(earlier) }
   end
 
   # Assign colors to edges based on source node
