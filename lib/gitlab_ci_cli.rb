@@ -356,8 +356,7 @@ module GitlabCiCli
       dot_output = command.execute
       puts dot_output
       EXIT_SUCCESS
-    rescue DagCommand::FileNotFoundError,
-           DagCommand::InvalidConfigError,
+    rescue DagCommand::InvalidConfigError,
            DagCommand::CircularDependencyError => e
       $stderr.puts "Error: #{e.message}"
       EXIT_COMMAND_FAILED

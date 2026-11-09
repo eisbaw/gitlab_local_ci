@@ -15,8 +15,7 @@
 # limitations under the License.
 
 require 'yaml'
-require 'json'
-require_relative '../include_processor'
+require_relative '../pipeline_builder'
 
 # DagCommand generates Graphviz DOT format visualizations of GitLab CI pipeline DAG
 #
@@ -33,20 +32,21 @@ class DagCommand
   # Error raised when circular dependencies detected in DAG
   class CircularDependencyError < StandardError; end
 
-  # Error raised when invalid YAML configuration
+  # Error raised when the config cannot be resolved (PipelineBuilder errors:
+  # missing file, invalid YAML, include or extends failure)
   class InvalidConfigError < StandardError; end
-
-  # Error raised when configuration file not found
-  class FileNotFoundError < StandardError; end
 
   # Initialize with options hash
   #
   # @param options [Hash] Command options
   # @option options [String] :entry Path to .gitlab-ci.yml (default: ./.gitlab-ci.yml)
-  # @option options [String] :gitlab_dir Path to GitLab submodule (future use)
+  # @option options [String] :gitlab_dir Path to GitLab submodule (include:template)
+  # @option options [String] :project, :pipeline, :variables see PipelineBuilder::Context
   def initialize(options = {})
     @entry = options[:entry] || './.gitlab-ci.yml'
-    @gitlab_dir = options[:gitlab_dir] || './gitlab'
+    @context = PipelineBuilder::Context.from_options(
+      options.merge(entry: @entry, gitlab_dir: options[:gitlab_dir] || './gitlab')
+    )
   end
 
   # Execute the DAG command - main entry point
@@ -55,76 +55,18 @@ class DagCommand
   # This is the orchestration method that composes simpler functions
   #
   # @return [String] Graphviz DOT format output
-  # @raise [FileNotFoundError] if config file doesn't exist
-  # @raise [InvalidConfigError] if YAML is malformed
+  # @raise [InvalidConfigError] if the config cannot be resolved
   # @raise [CircularDependencyError] if pipeline has circular dependencies
   def execute
-    config_content = read_config_file(@entry)
-    config = parse_yaml(config_content)
-    config = process_includes(config)
-    pipeline = build_pipeline_structure(config)
+    result = PipelineBuilder.resolve_config(@entry, @context)
+    raise InvalidConfigError, result.errors.join("\n") unless result.ok?
+
+    pipeline = build_pipeline_structure(result.stages, result.jobs)
     validate_dag(pipeline)
     generate_dot(pipeline)
   end
 
   private
-
-  # Read configuration file from filesystem
-  #
-  # @param file_path [String] Path to config file
-  # @return [String] File contents
-  # @raise [FileNotFoundError] if file doesn't exist
-  def read_config_file(file_path)
-    File.read(file_path)
-  rescue Errno::ENOENT
-    raise FileNotFoundError, "Configuration file not found: #{file_path}"
-  rescue Errno::EACCES => e
-    raise FileNotFoundError, "Cannot read configuration file: #{file_path} - #{e.message}"
-  end
-
-  # Parse YAML configuration
-  #
-  # @param content [String] YAML content
-  # @return [Hash] Parsed configuration
-  # @raise [InvalidConfigError] if YAML is malformed
-  def parse_yaml(content)
-    YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
-  rescue Psych::SyntaxError => e
-    raise InvalidConfigError, "Invalid YAML syntax: #{e.message}"
-  rescue StandardError => e
-    raise InvalidConfigError, "Failed to parse YAML: #{e.message}"
-  end
-
-  # Process include directives in the configuration
-  #
-  # @param config [Hash] Parsed YAML configuration
-  # @return [Hash] Merged configuration with includes resolved
-  # @raise [InvalidConfigError] if include processing fails
-  def process_includes(config)
-    return config unless config['include']
-
-    # Get project path from entry file directory
-    project_path = File.dirname(File.expand_path(@entry))
-
-    # Get GitLab templates path if GitLab submodule exists
-    gitlab_templates_path = nil
-    if Dir.exist?(@gitlab_dir)
-      gitlab_templates_path = File.join(@gitlab_dir, 'lib', 'gitlab', 'ci', 'templates')
-    end
-
-    # Create include processor
-    processor = IncludeProcessor.new(
-      project_path: project_path,
-      gitlab_templates_path: gitlab_templates_path
-    )
-
-    # Process includes
-    processor.process_includes(config)
-  rescue IncludeDepthExceededError => e
-    raise InvalidConfigError, "Include depth exceeded: #{e.depth} > #{e.max_depth}"
-  rescue StandardError => e
-    raise InvalidConfigError, "Error processing includes: #{e.message}"
-  end
 
   # Build internal pipeline structure from parsed config
   #
@@ -144,33 +86,12 @@ class DagCommand
   #   }
   # }
   #
-  # @param config [Hash] Parsed YAML configuration
+  # @param stages [Array<String>] Pipeline stages
+  # @param job_configs [Hash] Job name => resolved job config (from PipelineBuilder)
   # @return [Hash] Structured pipeline representation
-  def build_pipeline_structure(config)
-    # Extract stages (default to standard GitLab stages if not specified)
-    stages = config['stages'] || %w[build test deploy]
-
-    # Build job map - filter out non-job keys (stages, variables, etc.)
-    jobs = {}
-    config.each do |key, value|
-      next if reserved_key?(key)
-      next unless value.is_a?(Hash)
-
-      jobs[key] = build_job_structure(key, value, stages)
-    end
-
+  def build_pipeline_structure(stages, job_configs)
+    jobs = job_configs.to_h { |name, config| [name, build_job_structure(name, config, stages)] }
     { stages: stages, jobs: jobs }
-  end
-
-  # Check if a key is a reserved GitLab CI keyword (not a job name)
-  #
-  # @param key [String] Configuration key
-  # @return [Boolean] true if reserved keyword
-  def reserved_key?(key)
-    %w[
-      stages variables include default workflow
-      before_script after_script cache
-    ].include?(key)
   end
 
   # Build structured representation of a single job

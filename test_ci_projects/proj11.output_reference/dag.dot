@@ -11,7 +11,8 @@ digraph pipeline {
 
     __stage_anchor_build [style=invis, width=0, height=0];
 
-    _build_template [label=".build-template", tooltip="---\nstage: build\nbefore_script:\n- echo \"Preparing build environment...\"\nartifacts:\n  paths:\n  - build/\n  expire_in: 1 hour\n"];
+    build_app [label="build-app", tooltip="---\nstage: build\nbefore_script:\n- echo \"Preparing build environment...\"\nartifacts:\n  paths:\n  - build/\n  expire_in: 1 hour\nscript:\n- echo \"Building application with overrides...\"\n- echo \"Build type: ${BUILD_TYPE}\"\n- mkdir -p build\n- echo \"app-v${VERSION}-optimized\" > build/app.txt\n- echo \"Build completed with custom configuration\"\nvariables:\n  BUILD_TYPE: optimized\nafter_script:\n- echo \"Custom post-build step\"\n- ls -la build/\n"];
+    build_docker [label="build-docker", tooltip="---\nstage: build\nbefore_script:\n- echo \"Preparing build environment...\"\nartifacts:\n  paths:\n  - build/\n  expire_in: 1 hour\nscript:\n- echo \"Building Docker image...\"\n- mkdir -p build\n- echo \"docker-image:latest\" > build/docker.txt\n- echo \"Docker build completed\"\nonly:\n- main\n- develop\n"];
   }
 
   subgraph cluster_test {
@@ -21,14 +22,9 @@ digraph pipeline {
 
     __stage_anchor_test [style=invis, width=0, height=0];
 
-    build_app [label="build-app", tooltip="---\nextends: \".build-template\"\nscript:\n- echo \"Building application with overrides...\"\n- echo \"Build type: ${BUILD_TYPE}\"\n- mkdir -p build\n- echo \"app-v${VERSION}-optimized\" > build/app.txt\n- echo \"Build completed with custom configuration\"\nvariables:\n  BUILD_TYPE: optimized\nafter_script:\n- echo \"Custom post-build step\"\n- ls -la build/\n"];
-    build_docker [label="build-docker", tooltip="---\nextends: \".build-template\"\nscript:\n- echo \"Building Docker image...\"\n- mkdir -p build\n- echo \"docker-image:latest\" > build/docker.txt\n- echo \"Docker build completed\"\nonly:\n- main\n- develop\n"];
-    _test_template [label=".test-template", tooltip="---\nstage: test\nbefore_script:\n- echo \"Setting up test environment...\"\n"];
-    unit_tests [label="unit-tests", tooltip="---\nextends: \".test-template\"\nscript:\n- echo \"Running unit tests...\"\n- echo \"Test suite: Unit Tests\"\n- echo \"Tests passed: 150/150\"\n- echo \"Coverage: 85%\"\ndependencies:\n- build-app\n"];
-    integration_tests [label="integration-tests", tooltip="---\nextends: \".test-template\"\nscript:\n- echo \"Running integration tests (with override)...\"\n- echo \"Test suite: Integration Tests (Extended)\"\n- echo \"Running additional smoke tests...\"\n- echo \"Tests passed: 50/50\"\n- echo \"All integration tests passed\"\ndependencies:\n- build-app\nallow_failure: true\n"];
-    security_scan [label="security-scan", tooltip="---\nextends: \".test-template\"\nscript:\n- echo \"Running security scan...\"\n- echo \"Scanning for vulnerabilities...\"\n- echo \"No critical vulnerabilities found\"\nallow_failure: true\n"];
-    deploy_staging [label="deploy-staging", tooltip="---\nextends: \".deploy-template\"\nscript:\n- echo \"Deploying to staging environment...\"\n- echo \"Target: staging.example.com\"\n- echo \"Deployment completed\"\nenvironment:\n  name: staging\n  url: https://staging.example.com\nonly:\n- develop\n"];
-    deploy_production [label="deploy-production", tooltip="---\nextends: \".deploy-template\"\nscript:\n- echo \"Deploying to production environment (verified)...\"\n- echo \"Target: www.example.com\"\n- echo \"Running pre-deployment health checks...\"\n- echo \"Production deployment completed successfully\"\nenvironment:\n  name: production\n  url: https://www.example.com\nonly:\n- main\nwhen: manual\nbefore_script:\n- echo \"Preparing production deployment with extra checks...\"\n- echo \"Verifying all tests passed...\"\n- echo \"Checking deployment prerequisites...\"\nafter_script:\n- echo \"Running post-deployment verification...\"\n- echo \"Sending deployment notification...\"\n"];
+    unit_tests [label="unit-tests", tooltip="---\nstage: test\nbefore_script:\n- echo \"Setting up test environment...\"\nscript:\n- echo \"Running unit tests...\"\n- echo \"Test suite: Unit Tests\"\n- echo \"Tests passed: 150/150\"\n- echo \"Coverage: 85%\"\ndependencies:\n- build-app\n"];
+    integration_tests [label="integration-tests", tooltip="---\nstage: test\nbefore_script:\n- echo \"Setting up test environment...\"\nscript:\n- echo \"Running integration tests (with override)...\"\n- echo \"Test suite: Integration Tests (Extended)\"\n- echo \"Running additional smoke tests...\"\n- echo \"Tests passed: 50/50\"\n- echo \"All integration tests passed\"\ndependencies:\n- build-app\nallow_failure: true\n"];
+    security_scan [label="security-scan", tooltip="---\nstage: test\nbefore_script:\n- echo \"Setting up test environment...\"\nscript:\n- echo \"Running security scan...\"\n- echo \"Scanning for vulnerabilities...\"\n- echo \"No critical vulnerabilities found\"\nallow_failure: true\n"];
     code_quality [label="code-quality", tooltip="---\nstage: test\nscript:\n- echo \"Running code quality checks...\"\n- echo \"Analyzing code style...\"\n- echo \"Checking for code smells...\"\n- echo \"Quality score: A+\"\ndependencies:\n- build-app\nallow_failure: true\n"];
   }
 
@@ -39,19 +35,16 @@ digraph pipeline {
 
     __stage_anchor_deploy [style=invis, width=0, height=0];
 
-    _deploy_template [label=".deploy-template", tooltip="---\nstage: deploy\nbefore_script:\n- echo \"Preparing deployment...\"\nwhen: manual\nonly:\n- main\n- develop\n"];
+    deploy_staging [label="deploy-staging", tooltip="---\nstage: deploy\nbefore_script:\n- echo \"Preparing deployment...\"\nwhen: manual\nonly:\n- develop\nscript:\n- echo \"Deploying to staging environment...\"\n- echo \"Target: staging.example.com\"\n- echo \"Deployment completed\"\nenvironment:\n  name: staging\n  url: https://staging.example.com\n"];
+    deploy_production [label="deploy-production", tooltip="---\nstage: deploy\nbefore_script:\n- echo \"Preparing production deployment with extra checks...\"\n- echo \"Verifying all tests passed...\"\n- echo \"Checking deployment prerequisites...\"\nwhen: manual\nonly:\n- main\nscript:\n- echo \"Deploying to production environment (verified)...\"\n- echo \"Target: www.example.com\"\n- echo \"Running pre-deployment health checks...\"\n- echo \"Production deployment completed successfully\"\nenvironment:\n  name: production\n  url: https://www.example.com\nafter_script:\n- echo \"Running post-deployment verification...\"\n- echo \"Sending deployment notification...\"\n"];
     rollback_production [label="rollback-production", tooltip="---\nstage: deploy\nscript:\n- echo \"Rolling back production deployment...\"\n- echo \"Restoring previous version...\"\n- echo \"Rollback completed\"\nenvironment:\n  name: production\n  action: rollback\nwhen: manual\nonly:\n- main\n"];
   }
 
-  __stage_anchor_build -> build_app [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> build_docker [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _test_template [ltail=cluster_build, style=bold, color="#E41A1C"];
   __stage_anchor_build -> unit_tests [ltail=cluster_build, style=bold, color="#E41A1C"];
   __stage_anchor_build -> integration_tests [ltail=cluster_build, style=bold, color="#E41A1C"];
   __stage_anchor_build -> security_scan [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_test -> _deploy_template [ltail=cluster_test, style=bold, color="#377EB8"];
-  __stage_anchor_build -> deploy_staging [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> deploy_production [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> deploy_staging [ltail=cluster_test, style=bold, color="#377EB8"];
+  __stage_anchor_test -> deploy_production [ltail=cluster_test, style=bold, color="#377EB8"];
   __stage_anchor_test -> rollback_production [ltail=cluster_test, style=bold, color="#377EB8"];
   __stage_anchor_build -> code_quality [ltail=cluster_build, style=bold, color="#E41A1C"];
 }

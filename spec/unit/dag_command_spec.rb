@@ -154,9 +154,10 @@ RSpec.describe DagCommand do
 
         command = DagCommand.new(entry: config_file.path)
 
+        # Same message lint and dry-run print (PipelineBuilder.load_yaml)
         expect { command.execute }.to raise_error(
           DagCommand::InvalidConfigError,
-          /Invalid YAML syntax/
+          /YAML syntax error/
         )
 
         config_file.unlink
@@ -164,12 +165,12 @@ RSpec.describe DagCommand do
     end
 
     context 'with missing configuration file' do
-      it 'raises FileNotFoundError' do
+      it 'raises InvalidConfigError naming the file' do
         command = DagCommand.new(entry: '/nonexistent/path/config.yml')
 
         expect { command.execute }.to raise_error(
-          DagCommand::FileNotFoundError,
-          /Configuration file not found/
+          DagCommand::InvalidConfigError,
+          %r{File not found: /nonexistent/path/config.yml}
         )
       end
     end
@@ -360,21 +361,6 @@ RSpec.describe DagCommand do
       it 'escapes backslashes in labels' do
         # Ruby string literal: single backslash becomes escaped
         expect(command.send(:escape_label, 'job\name')).to eq('job\\name')
-      end
-    end
-
-    describe '#reserved_key?' do
-      it 'returns true for GitLab CI reserved keywords' do
-        expect(command.send(:reserved_key?, 'stages')).to be true
-        expect(command.send(:reserved_key?, 'variables')).to be true
-        expect(command.send(:reserved_key?, 'include')).to be true
-        expect(command.send(:reserved_key?, 'default')).to be true
-        expect(command.send(:reserved_key?, 'workflow')).to be true
-      end
-
-      it 'returns false for job names' do
-        expect(command.send(:reserved_key?, 'build-job')).to be false
-        expect(command.send(:reserved_key?, 'test-job')).to be false
       end
     end
   end

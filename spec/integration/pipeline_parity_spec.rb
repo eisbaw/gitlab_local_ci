@@ -92,6 +92,7 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
     it 'see predefined CI_PIPELINE_SOURCE in every command (push pipeline includes the file)' do
       expected = %w[base incjob]
       expect(lint_jobs.sort).to eq(expected)
+      expect(dag_jobs.sort).to eq(expected)
       expect(dry_run_jobs.sort).to eq(expected)
       expect(export_just_jobs.sort).to eq(expected)
     end
@@ -100,8 +101,48 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
       expected = %w[base]
       args = ['--pipeline', 'merge_request']
       expect(lint_jobs(*args).sort).to eq(expected)
+      expect(dag_jobs(*args).sort).to eq(expected)
       expect(dry_run_jobs(*args).sort).to eq(expected)
       expect(export_just_jobs(*args).sort).to eq(expected)
+    end
+  end
+
+  context 'dag' do
+    it 'resolves extends: stage and needs inherited from a template shape the graph' do
+      write('.gitlab-ci.yml', <<~YAML)
+        stages: [build, test, deploy]
+        .t:
+          stage: deploy
+          needs: [a]
+        a:
+          stage: build
+          script: [echo]
+        x:
+          stage: build
+          script: [echo]
+        job:
+          extends: .t
+          script: [echo]
+      YAML
+      dot, = cli('dag')
+      deploy_cluster = dot[/subgraph cluster_deploy \{.*?\n  \}/m]
+      expect(deploy_cluster).to include('label="job"')
+      expect(dot).to match(/^\s+a -> job/)
+    end
+
+    it 'draws neither hidden templates nor top-level globals as jobs' do
+      write('.gitlab-ci.yml', <<~YAML)
+        image: {name: alpine}
+        services: [{name: postgres}]
+        cache: {paths: [vendor]}
+        default: {tags: [x]}
+        .tmpl:
+          script: [echo]
+          stage: test
+        job:
+          extends: .tmpl
+      YAML
+      expect(dag_jobs).to eq(%w[job])
     end
   end
 

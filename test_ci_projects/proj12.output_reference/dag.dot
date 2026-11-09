@@ -11,7 +11,6 @@ digraph pipeline {
 
     __stage_anchor_build [style=invis, width=0, height=0];
 
-    _build_job_base [label=".build_job_base", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: alpine:latest\ntags:\n- docker\nbefore_script:\n- - apk add --no-cache git curl bash\n  - echo \"Dependencies installed\"\n- - export PATH=\"$PATH:/usr/local/bin\"\n  - echo \"Environment configured\"\nartifacts:\n  expire_in: 1 week\n  paths:\n  - build/\n  - dist/\nstage: build\nvariables:\n  BUILD_ENV: 'true'\n"];
     build_app [label="build:app", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: alpine:latest\ntags:\n- docker\nbefore_script:\n- - apk add --no-cache git curl bash\n  - echo \"Dependencies installed\"\n- - export PATH=\"$PATH:/usr/local/bin\"\n  - echo \"Environment configured\"\nartifacts:\n  expire_in: 1 week\n  paths:\n  - build/\n  - dist/\nstage: build\nvariables:\n  BUILD_ENV: 'true'\nscript:\n- echo \"Building application...\"\n- mkdir -p build\n- echo \"app build\" > build/app.txt\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n- if: $CI_COMMIT_BRANCH == \"main\" || $CI_COMMIT_BRANCH == \"master\"\n- if: \"$CI_COMMIT_TAG\"\n"];
     build_library [label="build:library", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: alpine:latest\ntags:\n- docker\nbefore_script:\n- - apk add --no-cache git curl bash\n  - echo \"Dependencies installed\"\n- - export PATH=\"$PATH:/usr/local/bin\"\n  - echo \"Environment configured\"\nartifacts:\n  expire_in: 1 week\n  paths:\n  - build/\n  - dist/\nstage: build\nvariables:\n  BUILD_TYPE: library\nscript:\n- echo \"Building library...\"\n- mkdir -p build\n- echo \"lib build\" > build/lib.txt\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n- if: $CI_COMMIT_BRANCH == \"main\" || $CI_COMMIT_BRANCH == \"master\"\n- if: \"$CI_COMMIT_TAG\"\n"];
   }
@@ -23,18 +22,8 @@ digraph pipeline {
 
     __stage_anchor_test [style=invis, width=0, height=0];
 
-    _base_config [label=".base_config", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\n"];
-    _docker_config [label=".docker_config", tooltip="---\nimage: alpine:latest\ntags:\n- docker\n"];
-    _cache_config [label=".cache_config", tooltip="---\ncache:\n  key: \"${CI_COMMIT_REF_SLUG}\"\n  paths:\n  - \".cache/\"\n  - vendor/\n"];
-    _artifacts_config [label=".artifacts_config", tooltip="---\nartifacts:\n  expire_in: 1 week\n  paths:\n  - build/\n  - dist/\n"];
-    _base_job [label=".base_job", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: alpine:latest\ntags:\n- docker\nbefore_script:\n- - apk add --no-cache git curl bash\n  - echo \"Dependencies installed\"\n- - export PATH=\"$PATH:/usr/local/bin\"\n  - echo \"Environment configured\"\n"];
-    _test_job_base [label=".test_job_base", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: alpine:latest\ntags:\n- docker\nbefore_script:\n- - apk add --no-cache git curl bash\n  - echo \"Dependencies installed\"\n- - export PATH=\"$PATH:/usr/local/bin\"\n  - echo \"Environment configured\"\ncache:\n  key: \"${CI_COMMIT_REF_SLUG}\"\n  paths:\n  - \".cache/\"\n  - vendor/\nstage: test\nvariables:\n  TEST_ENV: 'true'\n"];
-    _on_merge_request [label=".on_merge_request", tooltip="---\nif: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n"];
-    _on_main_branch [label=".on_main_branch", tooltip="---\nif: $CI_COMMIT_BRANCH == \"main\" || $CI_COMMIT_BRANCH == \"master\"\n"];
-    _rule_set_standard [label=".rule_set_standard", tooltip="---\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n- if: $CI_COMMIT_BRANCH == \"main\" || $CI_COMMIT_BRANCH == \"master\"\n- if: \"$CI_COMMIT_TAG\"\n"];
     test_unit [label="test:unit", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: alpine:latest\ntags:\n- docker\nbefore_script:\n- - apk add --no-cache git curl bash\n  - echo \"Dependencies installed\"\n- - export PATH=\"$PATH:/usr/local/bin\"\n  - echo \"Environment configured\"\ncache:\n  key: \"${CI_COMMIT_REF_SLUG}\"\n  paths:\n  - \".cache/\"\n  - vendor/\nstage: test\nvariables:\n  TEST_ENV: 'true'\nscript:\n- echo \"Running unit tests...\"\n- echo \"All unit tests passed\"\ncoverage: \"/Coverage: \\\\d+\\\\.\\\\d+%/\"\n"];
     security_scan [label="security:scan", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: aquasec/trivy:latest\nstage: test\nscript:\n- echo \"Running security scan...\"\n- echo \"Security scan completed\"\nallow_failure: true\n"];
-    _complex_matrix [label=".complex_matrix", tooltip="---\nparallel:\n  matrix:\n  - PLATFORM:\n    - linux\n    - macos\n    - windows\n    VERSION:\n    - '3.9'\n    - '3.10'\n    - '3.11'\n"];
     test_matrix [label="test:matrix", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: alpine:latest\ntags:\n- docker\nbefore_script:\n- - apk add --no-cache git curl bash\n  - echo \"Dependencies installed\"\n- - export PATH=\"$PATH:/usr/local/bin\"\n  - echo \"Environment configured\"\ncache:\n  key: \"${CI_COMMIT_REF_SLUG}\"\n  paths:\n  - \".cache/\"\n  - vendor/\nstage: test\nvariables:\n  TEST_ENV: 'true'\nparallel:\n  matrix:\n  - PLATFORM:\n    - linux\n    - macos\n    - windows\n    VERSION:\n    - '3.9'\n    - '3.10'\n    - '3.11'\nscript:\n- echo \"Testing on ${PLATFORM} with version ${VERSION}\"\n- echo \"Matrix test completed\"\n"];
   }
 
@@ -60,21 +49,11 @@ digraph pipeline {
     deploy_production [label="deploy:production", tooltip="---\nretry: 2\ntimeout: 30m\ninterruptible: true\nimage: alpine:latest\ntags:\n- docker\nbefore_script:\n- - apk add --no-cache git curl bash\n  - echo \"Dependencies installed\"\n- - export PATH=\"$PATH:/usr/local/bin\"\n  - echo \"Environment configured\"\nstage: deploy\nscript:\n- echo \"Deploying to production...\"\n- echo \"Production deployment complete\"\nenvironment:\n  name: production\n  url: https://production.example.com\nwhen: manual\nonly:\n- tags\ndependencies:\n- build:app\n- build:library\n"];
   }
 
-  __stage_anchor_build -> _base_config [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _docker_config [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _cache_config [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _artifacts_config [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _base_job [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _test_job_base [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _on_merge_request [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _on_main_branch [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _rule_set_standard [ltail=cluster_build, style=bold, color="#E41A1C"];
   __stage_anchor_build -> test_unit [ltail=cluster_build, style=bold, color="#E41A1C"];
   __stage_anchor_test -> test_integration [ltail=cluster_test, style=bold, color="#4DAF4A"];
   __stage_anchor_test -> test_e2e [ltail=cluster_test, style=bold, color="#4DAF4A"];
   __stage_anchor_integration -> deploy_staging [ltail=cluster_integration, style=bold, color="#377EB8"];
   __stage_anchor_integration -> deploy_production [ltail=cluster_integration, style=bold, color="#377EB8"];
   __stage_anchor_build -> security_scan [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> _complex_matrix [ltail=cluster_build, style=bold, color="#E41A1C"];
   __stage_anchor_build -> test_matrix [ltail=cluster_build, style=bold, color="#E41A1C"];
 }
