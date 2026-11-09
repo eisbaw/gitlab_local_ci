@@ -17,7 +17,6 @@
     ".on_merge_request",
     ".on_main_branch",
     ".rule_set_standard",
-    ".complex_matrix",
     "build:app",
     "build:library",
     "test:unit",
@@ -26,6 +25,7 @@
     "deploy:staging",
     "deploy:production",
     "security:scan",
+    ".complex_matrix",
     "test:matrix"
   ],
   "errors": [

@@ -23,7 +23,7 @@ require_relative 'predefined_variables'
 #
 #   load YAML              load_yaml
 #   includes               process_includes   (include:rules see predefined + CLI vars)
-#   extends                ExtendsResolver    (TASK-31: hidden roots, key order)
+#   extends                ExtendsResolver    (TASK-31: hidden roots, error texts)
 #   !reference             -                  (TASK-8: after extends, before split)
 #   default:/inherit:      -                  (TASK-9: on the split jobs, before rules)
 #   workflow:rules         apply_workflow_rules

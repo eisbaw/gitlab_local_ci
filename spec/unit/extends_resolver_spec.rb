@@ -159,6 +159,29 @@ RSpec.describe ExtendsResolver do
     end
   end
 
+  describe 'key order' do
+    # Upstream Extendable::Entry#extend! writes each merged entry back in
+    # place; lint's job list and dry-run dispatch order depend on it.
+    it 'keeps every top-level key at its position' do
+      result = resolve(<<~YAML)
+        first:
+          script: [echo]
+        .tpl:
+          stage: build
+        stages: [build, test]
+        child:
+          extends: .tpl
+          script: [echo]
+        cache:
+          paths: [x]
+        last:
+          script: [echo]
+      YAML
+      expect(result.keys).to eq(%w[first .tpl stages child cache last])
+      expect(result['child']).to eq('stage' => 'build', 'script' => ['echo'])
+    end
+  end
+
   describe 'via lint' do
     it 'reports too-deep extends nesting as a lint error' do
       Dir.mktmpdir do |dir|

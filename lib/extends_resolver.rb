@@ -55,9 +55,10 @@ class ExtendsResolver
       resolved_jobs[job_name] = resolve_job_extends(job_name, job_config, jobs, templates, [])
     end
 
-    # Jobs move after globals/templates here; upstream keeps positions
-    # (TASK-31).
-    config.reject { |key, _| jobs.key?(key) }.merge(resolved_jobs)
+    # Every key keeps its position (upstream writes the merged entry back
+    # in place: Extendable::Entry#extend!). Order is observable: lint's
+    # job list, dag node order, dry-run dispatch order.
+    config.to_h { |key, value| [key, resolved_jobs.fetch(key, value)] }
   end
 
   private
