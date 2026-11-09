@@ -22,42 +22,29 @@ Ensure you have Nix installed on your system. Installation instructions: https:/
 
 1. Fork and clone the repository:
    ```bash
-   git clone https://github.com/your-username/gitlab_ci_cli.git
-   cd gitlab_ci_cli
+   git clone https://github.com/<you>/gitlab_local_ci.git
+   cd gitlab_local_ci
    ```
 
-2. Enter the Nix shell environment (provides all dependencies):
+2. Enter the dev shell (provides Ruby 3.3, Graphviz, just):
    ```bash
-   nix-shell
+   nix develop
    ```
 
-3. Initialize the GitLab submodule:
+3. Initialize the GitLab submodule and install the gems:
    ```bash
-   git submodule update --init
+   just setup
    ```
 
-4. Install Ruby dependencies:
-   ```bash
-   bundle install
-   ```
-
-5. Verify the setup:
+4. Verify the setup:
    ```bash
    just test
+   just e2e
    ```
 
 ### Development Environment
 
-The project uses Nix for reproducible dependency management. All required dependencies are defined in `shell.nix`:
-
-- Ruby 3.3+
-- Bundler
-- Git
-- Graphviz
-- Just command runner
-- GNU Make
-
-When you enter `nix-shell`, these dependencies become available in your environment.
+The project uses Nix for reproducible dependency management. The dev shell is defined in `flake.nix` (`nix develop`; `shell.nix` remains for `nix-shell`) and provides Ruby 3.3, Git, Graphviz and just. See [docs/development.md](docs/development.md) for the gates.
 
 ### Justfile Commands
 
@@ -65,7 +52,6 @@ The project includes a `justfile` with helpful development commands:
 
 ```bash
 just help              # List all available commands
-just shell             # Enter nix-shell
 just setup             # Initialize submodule and install dependencies
 just test              # Run all tests
 just test-file FILE    # Run specific test file
@@ -96,31 +82,22 @@ spec/
 
 ### Running Tests
 
-Run all tests:
+Run all tests (not `bundle exec rspec`: see the comment on the `test` recipe in the justfile):
 ```bash
-bundle exec rspec
-# or
 just test
 ```
 
 Run specific test file:
 ```bash
-bundle exec rspec spec/unit/mock_server_spec.rb
-# or
 just test-file spec/unit/mock_server_spec.rb
 ```
 
 Run integration tests only:
 ```bash
-bundle exec rspec spec/integration/
-# or
 just test-integration
 ```
 
-Run tests with coverage:
-```bash
-bundle exec rspec --format documentation
-```
+Coverage is measured on every `just test` run and must not drop below the ratchet in `spec/spec_helper.rb`. Golden outputs of `test_ci_projects/` are checked by `just e2e`; after an intended change run `just e2e-update` and review the diff.
 
 ### Writing Tests
 

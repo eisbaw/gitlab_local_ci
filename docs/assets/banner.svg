@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 220" role="img" aria-labelledby="t d">
+  <title id="t">gitlab_ci_cli</title>
+  <desc id="d">gitlab_ci_cli: check, draw, simulate and run your .gitlab-ci.yml locally, without a GitLab server. A .gitlab-ci.yml flows into lint, dag, dry-run and run.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#fc6d26"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="958" height="218" rx="18" fill="#171321" stroke="#3a2f52" stroke-width="2"/>
+  <text x="44" y="92" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="44" font-weight="700" fill="#ffffff">gitlab_ci_cli</text>
+  <text x="44" y="132" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="20" fill="#d6d1e3">your .gitlab-ci.yml, checked and run locally</text>
+  <text x="44" y="162" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="16" fill="#a79fbd">no GitLab server, no runner install, no push-and-wait</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15">
+    <rect x="520" y="86" width="150" height="44" rx="8" fill="#2b2240" stroke="#fc6d26" stroke-width="2"/>
+    <text x="595" y="113" text-anchor="middle" fill="#ffffff">.gitlab-ci.yml</text>
+    <path d="M670,108 C700,108 700,48 730,48" fill="none" stroke="#fc6d26" stroke-width="2" marker-end="url(#a)"/>
+    <path d="M670,108 C700,108 700,90 730,90" fill="none" stroke="#fc6d26" stroke-width="2" marker-end="url(#a)"/>
+    <path d="M670,108 C700,108 700,132 730,132" fill="none" stroke="#fc6d26" stroke-width="2" marker-end="url(#a)"/>
+    <path d="M670,108 C700,108 700,174 730,174" fill="none" stroke="#fc6d26" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="732" y="30" width="186" height="36" rx="8" fill="#2b2240" stroke="#6e49cb" stroke-width="2"/>
+    <text x="825" y="53" text-anchor="middle" fill="#ffffff">lint</text>
+    <rect x="732" y="72" width="186" height="36" rx="8" fill="#2b2240" stroke="#6e49cb" stroke-width="2"/>
+    <text x="825" y="95" text-anchor="middle" fill="#ffffff">dag</text>
+    <rect x="732" y="114" width="186" height="36" rx="8" fill="#2b2240" stroke="#6e49cb" stroke-width="2"/>
+    <text x="825" y="137" text-anchor="middle" fill="#ffffff">dry-run</text>
+    <rect x="732" y="156" width="186" height="36" rx="8" fill="#2b2240" stroke="#6e49cb" stroke-width="2"/>
+    <text x="825" y="179" text-anchor="middle" fill="#ffffff">run · export-just</text>
+  </g>
+</svg>

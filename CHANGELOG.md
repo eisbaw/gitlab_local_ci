@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (breaking)
+- `export-just --shell` was removed: it was accepted but never read.
+  Recipes are shebang recipes run by `bash`; drop the flag from scripts
+  that pass it (it is now `Unknown flag: --shell`).
+- `export-just` recipe names for colliding job names changed. Before, the
+  first job (config order) kept the bare name and later ones got `-2`,
+  `-3`, ...; reordering jobs silently changed which job a name ran. Now
+  every job of a collision set gets `_<6 hex digits of SHA-256 of the job
+  name>` (`a b` -> `a_b_c8687a`) and none keeps the bare name. Regenerate
+  exported justfiles and update callers that used `-2`-style names; run
+  `just --list` to see the new ones. Non-colliding names are unchanged.
+- `--pipeline` takes upstream source names (`merge_request_event`, `web`,
+  ...); `merge_request` and `manual` remain as aliases.
+- `lint` no longer lists or counts hidden (`.name`) templates as jobs.
+
+### Changed
+- One pipeline builder for every command, following GitLab v19.5.3
+  (`gitlab/` submodule): includes (main file wins, later include wins),
+  `extends` (child arrays replace), `!reference`, `default:`/`inherit:`,
+  `parallel`/`parallel:matrix`, `.pre`/`.post`, stage ordering in dry-run,
+  predefined variables per pipeline type (unset, not empty), and rules.
+- `run` gives a job GitLab's environment, a separate `after_script` shell
+  with `CI_JOB_STATUS`, `pipefail` and the job's exit code; `export-just`
+  writes one shebang recipe per job doing the same.
+- A dry-run that cannot finish exits 1 and names the reason per job.
+
+### Security
+- `export-just`: a newline in a job name, stage or tag could add recipes or
+  assignments to the generated justfile, and an assignment ran when any
+  recipe was invoked. Config text is now escaped wherever it lands outside
+  the quoted recipe body.
+- `CI_PROJECT_PATH` could contain part of a password from a malformed
+  `origin` URL; such URLs now fall back to the directory name.
+
+### Earlier unreleased work
+
 ### Added
 - Fail-fast validation with enhanced error context for pipeline configuration issues
 - Error context improvements providing clearer diagnostic information
@@ -73,11 +109,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Job state transition handling
 
 ### Security
-- **CRITICAL**: Fixed shell injection vulnerability in `ChildPipelineHandler` (CVE pending)
+- **CRITICAL**: Fixed shell injection vulnerability in `ChildPipelineHandler` 
   - Impact: Arbitrary command execution via crafted child pipeline arguments
   - Mitigation: Switched from backtick to safe `Open3.capture2e` with argument array
   - All child pipeline arguments now passed directly without shell interpolation
-- **CRITICAL**: Fixed SSRF vulnerability in `IncludeProcessor` (CVE pending)
+- **CRITICAL**: Fixed SSRF vulnerability in `IncludeProcessor` 
   - Impact: Access to internal network services via malicious remote includes
   - Mitigation: Comprehensive URL validation and private IP blocking
   - Added domain allowlist support via `GITLAB_CI_ALLOWED_DOMAINS` environment variable
@@ -209,10 +245,10 @@ This project follows MPED architectural principles:
 
 ## Links
 
-- [Homepage](https://github.com/yourusername/gitlab_ci_local)
+- [Homepage](https://github.com/eisbaw/gitlab_local_ci)
 - [Documentation](./README.md)
 - [Contributing Guidelines](./CONTRIBUTING.md)
-- [Issue Tracker](https://github.com/yourusername/gitlab_ci_local/issues)
+- [Issue Tracker](https://github.com/eisbaw/gitlab_local_ci/issues)
 - [License](./LICENSE)
 
 ---
@@ -231,9 +267,5 @@ Security fixes are released as PATCH versions and noted in the Security section.
 
 ## Security Disclosures
 
-To report security vulnerabilities, please email security@yourproject.com (do not open public issues).
+See [SECURITY.md](SECURITY.md) for how to report a vulnerability. Security fixes are listed in the Security section of each release.
 
-Security fixes are documented in the Security section of each release and given CVE identifiers when applicable.
-
-[Unreleased]: https://github.com/your-org/gitlab_ci_cli/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/your-org/gitlab_ci_cli/releases/tag/v0.1.0

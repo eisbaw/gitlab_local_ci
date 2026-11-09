@@ -1,0 +1,33 @@
+stages: [build, test, deploy]
+
+variables:
+  APP: demo
+
+.unit:
+  stage: test
+  script:
+    - echo "testing $APP on $OS"
+
+build:
+  stage: build
+  script:
+    - echo "building $APP"
+
+test:
+  extends: .unit
+  parallel:
+    matrix:
+      - OS: [linux, macos]
+
+lint-docs:
+  stage: test
+  needs: []
+  script:
+    - echo "docs ok"
+
+deploy:
+  stage: deploy
+  script:
+    - echo "deploying $APP from $CI_COMMIT_BRANCH"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

@@ -193,7 +193,7 @@ RSpec.describe 'export-just', type: :integration do
     # Seeded random job names, stages, tags, environment names and variable
     # values made of the characters that end or open just syntax. Job names
     # start with a unique "j<i>z" so they never collide (collisions have
-    # their own spec) and the expected recipe names follow from the README
+    # their own spec) and the expected recipe names follow from docs/usage.md
     # rule alone.
     it 'writes exactly one recipe per job and runs nothing at --list/--evaluate, for random hostile text' do
       seed = Integer(ENV.fetch('EXPORT_JUST_SEED', '20261110'))
@@ -232,7 +232,7 @@ RSpec.describe 'export-just', type: :integration do
     end
   end
 
-  # The suffix is part of the recipe-name format (README): pinned here as
+  # The suffix is part of the recipe-name format (docs/usage.md): pinned here as
   # literals, the first 6 hex digits of SHA-256 of each job name.
   it 'gives every member of a recipe-name collision a suffix from its own job name' do
     justfile = export("'a b': {script: [echo 1]}\n'a/b': {script: [echo 2]}\n'a:b': {script: [echo 3]}\n" \

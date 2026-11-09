@@ -13,13 +13,13 @@ setup:
     git submodule update --init
     bundle install
 
-# Run tests
 # NOT `bundle exec rspec`: that exports BUNDLE_GEMFILE which propagates via
 # Open3 into the CLI subprocess in spec/integration/lint_spec.rb, causing
 # double-activation of bundler and "already initialized constant" warnings
 # on stderr — which fail the `expect(stderr).to be_empty` assertions.
 # `.gems/` is on GEM_PATH via shell.nix shellHook, so plain `rspec` resolves
 # the gem set without bundler env-var injection.
+# Run tests (rspec, with the coverage ratchet)
 test:
     rspec
 
