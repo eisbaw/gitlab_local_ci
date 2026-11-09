@@ -33,7 +33,7 @@ digraph pipeline {
 
     __stage_anchor_deploy [style=invis, width=0, height=0];
 
-    deploy_staging [label="deploy_staging", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to staging environment\"\n- echo \"Deployment completed to: $DEPLOY_ENV\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: manual\nenvironment:\n  name: staging\nwhen: manual\n"];
+    deploy_staging [label="deploy_staging", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to staging environment\"\n- 'echo \"Deployment completed to: $DEPLOY_ENV\"'\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: manual\nenvironment:\n  name: staging\nwhen: manual\n"];
     deploy_production [label="deploy_production", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to production\"\n- echo \"Production deployment completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n- if: \"$CI_COMMIT_TAG\"\n  when: on_success\nenvironment:\n  name: production\nwhen: manual\n"];
     notify_success [label="notify_success", tooltip="---\nstage: deploy\nscript:\n- echo \"All tests passed, sending success notification\"\n- echo \"Notification sent to team\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: on_success\nwhen: on_success\n"];
   }

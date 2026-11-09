@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 stages:
   - build
   - test
@@ -32,7 +34,7 @@ child1_integration:
   stage: test
   script:
     - echo "Child1 Integration Tests"
-    - echo "Environment: ${ENVIRONMENT}"
+    - 'echo "Environment: ${ENVIRONMENT}"'
     - '[ "${ENVIRONMENT}" = "development" ] && echo "Running dev integration tests"'
   rules:
     - if: '$ENVIRONMENT == "development"'

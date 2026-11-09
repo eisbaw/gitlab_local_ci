@@ -357,5 +357,19 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
         expect(stderr.lines.grep(/\.missing/).size).to eq(1), "#{command} stderr: #{stderr}"
       end
     end
+
+    # TASK-38: unquoted `- echo "a: b"` is a YAML mapping. Every command
+    # rejects it with upstream's Entry::Commands text instead of calling it
+    # valid (lint) or crashing on Hash#gsub (export-just).
+    it 'reject a script entry that is not a string, with upstream wording' do
+      write('.gitlab-ci.yml', "build:\n  script:\n    - echo \"Coverage: 85%\"\n")
+      message = 'jobs:build:script config should be a string or a nested array of strings up to 10 levels deep'
+      [['lint'], ['dag'], ['dry-run', '--runners', runners_dir], ['export-just'], %w[run build]].each do |command, *extra|
+        stdout, stderr, status = cli(command, *extra)
+        expect(status).not_to eq(0), "#{command} exited 0"
+        expect((stdout + stderr).lines.grep(/#{Regexp.escape(message)}/).size).to eq(1), "#{command}: #{stdout}#{stderr}"
+        expect(stderr).not_to match(/undefined method|NoMethodError/)
+      end
+    end
   end
 end

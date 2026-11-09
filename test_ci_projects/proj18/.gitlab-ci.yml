@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 stages:
   - build
   - deploy_staging
@@ -34,7 +36,7 @@ deploy_staging_app:
     - echo "Resource group 'staging/deployment' ensures only one staging deploy at a time"
     - sleep 2
     - echo "Application deployed to staging"
-    - echo "Environment URL: https://staging.example.com"
+    - 'echo "Environment URL: https://staging.example.com"'
   needs:
     - build
 
@@ -68,7 +70,7 @@ deploy_production_app:
     - echo "Resource group 'production/deployment' ensures safe production deploys"
     - sleep 3
     - echo "Application deployed to production"
-    - echo "Environment URL: https://production.example.com"
+    - 'echo "Environment URL: https://production.example.com"'
   needs:
     - deploy_staging_app
   when: manual

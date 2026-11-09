@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 # Test project for extends keyword functionality
 # Demonstrates:
 # - Hidden job templates (starting with .)
@@ -136,7 +138,7 @@ test_integration:
   extends: .test_template
   script:
     - echo "Running integration tests"
-    - echo "Coverage: 85.5%"
+    - 'echo "Coverage: 85.5%"'
   coverage: '/Coverage:\s+(\d+\.\d+%)/'
   dependencies:
     - build_complex
@@ -194,7 +196,7 @@ deploy_canary:
     url: https://canary.example.com
   script:
     - echo "Deploying canary release"
-    - echo "Canary percentage: $CANARY_PERCENTAGE%"
+    - 'echo "Canary percentage: $CANARY_PERCENTAGE%"'
   when: manual
   allow_failure: true
 

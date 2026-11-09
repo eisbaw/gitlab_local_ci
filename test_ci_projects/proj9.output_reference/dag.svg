@@ -91,7 +91,7 @@
 <!-- build_dynamic_cache -->
 <g id="node4" class="node">
 <title>build_dynamic_cache</title>
-<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;cache:&#10; &#160;key: &quot;${CI_COMMIT_REF_SLUG}&#45;build&quot;&#10; &#160;paths:&#10; &#160;&#45; dist/&#10; &#160;&#45; node_modules/&#10; &#160;policy: push&#10;script:&#10;&#45; echo &quot;Using dynamic cache key with branch name&quot;&#10;&#45; echo &quot;Branch: $CI_COMMIT_REF_SLUG&quot;&#10;&#45; mkdir &#45;p dist node_modules&#10;&#45; echo &quot;distribution&quot; &gt; dist/bundle.js&#10;&#45; echo &quot;dependencies&quot; &gt; node_modules/.cache&#10;">
+<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;cache:&#10; &#160;key: &quot;${CI_COMMIT_REF_SLUG}&#45;build&quot;&#10; &#160;paths:&#10; &#160;&#45; dist/&#10; &#160;&#45; node_modules/&#10; &#160;policy: push&#10;script:&#10;&#45; echo &quot;Using dynamic cache key with branch name&quot;&#10;&#45; &#39;echo &quot;Branch: $CI_COMMIT_REF_SLUG&quot;&#39;&#10;&#45; mkdir &#45;p dist node_modules&#10;&#45; echo &quot;distribution&quot; &gt; dist/bundle.js&#10;&#45; echo &quot;dependencies&quot; &gt; node_modules/.cache&#10;">
 <polygon fill="lightblue" stroke="black" points="180.12,-383 18.62,-383 18.62,-347 180.12,-347 180.12,-383"/>
 <text text-anchor="middle" x="99.38" y="-360.32" font-family="Times,serif" font-size="14.00">build:dynamic&#45;cache</text>
 </a>

@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 # Main GitLab CI configuration demonstrating include directives
 # This file includes other YAML files and shows job overriding
 
@@ -35,7 +37,7 @@ build-app:
   script:
     # Override the script from build.yml
     - echo "Building application with overrides..."
-    - echo "Build type: ${BUILD_TYPE}"
+    - 'echo "Build type: ${BUILD_TYPE}"'
     - mkdir -p build
     - echo "app-v${VERSION}-optimized" > build/app.txt
     - echo "Build completed with custom configuration"
@@ -50,9 +52,9 @@ integration-tests:
   script:
     # Keep most of original but add extra steps
     - echo "Running integration tests (with override)..."
-    - echo "Test suite: Integration Tests (Extended)"
+    - 'echo "Test suite: Integration Tests (Extended)"'
     - echo "Running additional smoke tests..."
-    - echo "Tests passed: 50/50"
+    - 'echo "Tests passed: 50/50"'
     - echo "All integration tests passed"
 
 # Add a completely new job not in included files
@@ -62,7 +64,7 @@ code-quality:
     - echo "Running code quality checks..."
     - echo "Analyzing code style..."
     - echo "Checking for code smells..."
-    - echo "Quality score: A+"
+    - 'echo "Quality score: A+"'
   dependencies:
     - build-app
   allow_failure: true
@@ -75,7 +77,7 @@ deploy-production:
     - echo "Checking deployment prerequisites..."
   script:
     - echo "Deploying to production environment (verified)..."
-    - echo "Target: www.example.com"
+    - 'echo "Target: www.example.com"'
     - echo "Running pre-deployment health checks..."
     - echo "Production deployment completed successfully"
   after_script:
@@ -87,8 +89,8 @@ verify-includes:
   stage: .pre
   script:
     - echo "Verifying CI configuration includes..."
-    - echo "Main config: .gitlab-ci.yml"
-    - echo "Included: .gitlab/ci/build.yml"
-    - echo "Included: .gitlab/ci/test.yml"
-    - echo "Included: .gitlab/ci/deploy.yml"
+    - 'echo "Main config: .gitlab-ci.yml"'
+    - 'echo "Included: .gitlab/ci/build.yml"'
+    - 'echo "Included: .gitlab/ci/test.yml"'
+    - 'echo "Included: .gitlab/ci/deploy.yml"'
     - echo "All includes loaded successfully"

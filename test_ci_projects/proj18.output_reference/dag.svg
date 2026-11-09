@@ -42,7 +42,7 @@
 <!-- deploy_staging_app -->
 <g id="node4" class="node">
 <title>deploy_staging_app</title>
-<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy_staging&#10;resource_group: staging/deployment&#10;environment:&#10; &#160;name: staging&#10; &#160;url: https://staging.example.com&#10; &#160;auto_stop_in: 1 day&#10; &#160;on_stop: stop_staging&#10;script:&#10;&#45; echo &quot;Deploying to staging environment&quot;&#10;&#45; echo &quot;Resource group &#39;staging/deployment&#39; ensures only one staging deploy at a time&quot;&#10;&#45; sleep 2&#10;&#45; echo &quot;Application deployed to staging&quot;&#10;&#45; echo &quot;Environment URL: https://staging.example.com&quot;&#10;needs:&#10;&#45; build&#10;">
+<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy_staging&#10;resource_group: staging/deployment&#10;environment:&#10; &#160;name: staging&#10; &#160;url: https://staging.example.com&#10; &#160;auto_stop_in: 1 day&#10; &#160;on_stop: stop_staging&#10;script:&#10;&#45; echo &quot;Deploying to staging environment&quot;&#10;&#45; echo &quot;Resource group &#39;staging/deployment&#39; ensures only one staging deploy at a time&quot;&#10;&#45; sleep 2&#10;&#45; echo &quot;Application deployed to staging&quot;&#10;&#45; &#39;echo &quot;Environment URL: https://staging.example.com&quot;&#39;&#10;needs:&#10;&#45; build&#10;">
 <polygon fill="lightblue" stroke="black" points="523.88,-328 367.62,-328 367.62,-292 523.88,-292 523.88,-328"/>
 <text text-anchor="middle" x="445.75" y="-305.32" font-family="Times,serif" font-size="14.00">deploy_staging_app</text>
 </a>
@@ -88,7 +88,7 @@
 <!-- deploy_production_app -->
 <g id="node7" class="node">
 <title>deploy_production_app</title>
-<g id="a_node7"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy_production&#10;resource_group: production/deployment&#10;environment:&#10; &#160;name: production&#10; &#160;url: https://production.example.com&#10; &#160;auto_stop_in: 30 days&#10; &#160;on_stop: stop_production&#10;script:&#10;&#45; echo &quot;Deploying to production environment&quot;&#10;&#45; echo &quot;Resource group &#39;production/deployment&#39; ensures safe production deploys&quot;&#10;&#45; sleep 3&#10;&#45; echo &quot;Application deployed to production&quot;&#10;&#45; echo &quot;Environment URL: https://production.example.com&quot;&#10;needs:&#10;&#45; deploy_staging_app&#10;when: manual&#10;only:&#10;&#45; master&#10;&#45; main&#10;">
+<g id="a_node7"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy_production&#10;resource_group: production/deployment&#10;environment:&#10; &#160;name: production&#10; &#160;url: https://production.example.com&#10; &#160;auto_stop_in: 30 days&#10; &#160;on_stop: stop_production&#10;script:&#10;&#45; echo &quot;Deploying to production environment&quot;&#10;&#45; echo &quot;Resource group &#39;production/deployment&#39; ensures safe production deploys&quot;&#10;&#45; sleep 3&#10;&#45; echo &quot;Application deployed to production&quot;&#10;&#45; &#39;echo &quot;Environment URL: https://production.example.com&quot;&#39;&#10;needs:&#10;&#45; deploy_staging_app&#10;when: manual&#10;only:&#10;&#45; master&#10;&#45; main&#10;">
 <polygon fill="lightblue" stroke="black" points="929.88,-333 749.62,-333 749.62,-297 929.88,-297 929.88,-333"/>
 <text text-anchor="middle" x="839.75" y="-310.32" font-family="Times,serif" font-size="14.00">deploy_production_app</text>
 </a>

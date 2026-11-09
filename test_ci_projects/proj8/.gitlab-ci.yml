@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 stages:
   - build
   - test
@@ -20,7 +22,7 @@ build_main:
 build_feature:
   stage: build
   script:
-    - echo "Building feature branch: $CI_COMMIT_BRANCH"
+    - 'echo "Building feature branch: $CI_COMMIT_BRANCH"'
     - echo "Feature build completed"
   rules:
     - if: $CI_COMMIT_BRANCH != "main"
@@ -30,9 +32,9 @@ test_mr:
   stage: test
   script:
     - echo "Running tests for merge request"
-    - echo "MR pipeline ID: $CI_MERGE_REQUEST_IID"
-    - echo "Source branch: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
-    - echo "Target branch: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - 'echo "MR pipeline ID: $CI_MERGE_REQUEST_IID"'
+    - 'echo "Source branch: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"'
+    - 'echo "Target branch: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME"'
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
@@ -80,7 +82,7 @@ deploy_staging:
   stage: deploy
   script:
     - echo "Deploying to staging environment"
-    - echo "Deployment completed to: $DEPLOY_ENV"
+    - 'echo "Deployment completed to: $DEPLOY_ENV"'
   rules:
     - if: $CI_COMMIT_BRANCH
       when: manual
@@ -151,7 +153,7 @@ security_scan:
 release:
   stage: deploy
   script:
-    - echo "Creating release for tag: $CI_COMMIT_TAG"
+    - 'echo "Creating release for tag: $CI_COMMIT_TAG"'
     - echo "Release artifacts generated"
   rules:
     - if: $CI_COMMIT_TAG
@@ -180,7 +182,7 @@ nightly_build:
 deploy_custom:
   stage: deploy
   script:
-    - echo "Deploying to custom environment: $CUSTOM_ENV"
+    - 'echo "Deploying to custom environment: $CUSTOM_ENV"'
   rules:
     - if: $CUSTOM_ENV != null
       when: manual

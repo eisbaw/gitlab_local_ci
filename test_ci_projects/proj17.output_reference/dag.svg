@@ -112,7 +112,7 @@
 <!-- performance_test -->
 <g id="node8" class="node">
 <title>performance_test</title>
-<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;parallel:&#10; &#160;matrix:&#10; &#160;&#45; RUBY_VERSION:&#10; &#160;&#160;&#160;&#45; &#39;3.0&#39;&#10; &#160;&#160;&#160;&#45; &#39;3.1&#39;&#10; &#160;&#160;&#160;&#45; &#39;3.2&#39;&#10; &#160;&#160;&#160;CONCURRENCY:&#10; &#160;&#160;&#160;&#45; 1&#10; &#160;&#160;&#160;&#45; 10&#10; &#160;&#160;&#160;&#45; 100&#10; &#160;&#160;&#160;PAYLOAD_SIZE:&#10; &#160;&#160;&#160;&#45; small&#10; &#160;&#160;&#160;&#45; medium&#10; &#160;&#160;&#160;&#45; large&#10;script:&#10;&#45; echo &quot;Performance test: Ruby ${RUBY_VERSION}, Concurrency ${CONCURRENCY}, Payload&#10; &#160;&#160;&#160;${PAYLOAD_SIZE}&quot;&#10;&#45; bundle exec ruby scripts/performance_test.rb &#45;&#45;concurrency=${CONCURRENCY} &#45;&#45;payload=${PAYLOAD_SIZE}&#10;">
+<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;parallel:&#10; &#160;matrix:&#10; &#160;&#45; RUBY_VERSION:&#10; &#160;&#160;&#160;&#45; &#39;3.0&#39;&#10; &#160;&#160;&#160;&#45; &#39;3.1&#39;&#10; &#160;&#160;&#160;&#45; &#39;3.2&#39;&#10; &#160;&#160;&#160;CONCURRENCY:&#10; &#160;&#160;&#160;&#45; 1&#10; &#160;&#160;&#160;&#45; 10&#10; &#160;&#160;&#160;&#45; 100&#10; &#160;&#160;&#160;PAYLOAD_SIZE:&#10; &#160;&#160;&#160;&#45; small&#10; &#160;&#160;&#160;&#45; medium&#10; &#160;&#160;&#160;&#45; large&#10;script:&#10;&#45; &#39;echo &quot;Performance test: Ruby ${RUBY_VERSION}, Concurrency ${CONCURRENCY}, Payload&#10; &#160;${PAYLOAD_SIZE}&quot;&#39;&#10;&#45; bundle exec ruby scripts/performance_test.rb &#45;&#45;concurrency=${CONCURRENCY} &#45;&#45;payload=${PAYLOAD_SIZE}&#10;">
 <polygon fill="lightblue" stroke="black" points="164.75,-545 25.75,-545 25.75,-509 164.75,-509 164.75,-545"/>
 <text text-anchor="middle" x="95.25" y="-522.33" font-family="Times,serif" font-size="14.00">performance:test</text>
 </a>
@@ -121,7 +121,7 @@
 <!-- test_microservices -->
 <g id="node9" class="node">
 <title>test_microservices</title>
-<g id="a_node9"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;parallel:&#10; &#160;matrix:&#10; &#160;&#45; SERVICE:&#10; &#160;&#160;&#160;&#45; api&#10; &#160;&#160;&#160;&#45; auth&#10; &#160;&#160;&#160;&#45; notifications&#10; &#160;&#160;&#160;&#45; billing&#10; &#160;&#160;&#160;TEST_SUITE:&#10; &#160;&#160;&#160;&#45; unit&#10; &#160;&#160;&#160;&#45; integration&#10; &#160;&#160;&#160;&#45; contract&#10;script:&#10;&#45; echo &quot;Testing ${SERVICE} service: ${TEST_SUITE} tests&quot;&#10;&#45; cd services/${SERVICE}&#10;&#45; bundle exec rspec spec/${TEST_SUITE}&#10;">
+<g id="a_node9"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;parallel:&#10; &#160;matrix:&#10; &#160;&#45; SERVICE:&#10; &#160;&#160;&#160;&#45; api&#10; &#160;&#160;&#160;&#45; auth&#10; &#160;&#160;&#160;&#45; notifications&#10; &#160;&#160;&#160;&#45; billing&#10; &#160;&#160;&#160;TEST_SUITE:&#10; &#160;&#160;&#160;&#45; unit&#10; &#160;&#160;&#160;&#45; integration&#10; &#160;&#160;&#160;&#45; contract&#10;script:&#10;&#45; &#39;echo &quot;Testing ${SERVICE} service: ${TEST_SUITE} tests&quot;&#39;&#10;&#45; cd services/${SERVICE}&#10;&#45; bundle exec rspec spec/${TEST_SUITE}&#10;">
 <polygon fill="lightblue" stroke="black" points="168.88,-599 21.62,-599 21.62,-563 168.88,-563 168.88,-599"/>
 <text text-anchor="middle" x="95.25" y="-576.33" font-family="Times,serif" font-size="14.00">test:microservices</text>
 </a>

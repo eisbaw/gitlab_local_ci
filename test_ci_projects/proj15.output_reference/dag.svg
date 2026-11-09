@@ -43,7 +43,7 @@
 <!-- unit_tests -->
 <g id="node2" class="node">
 <title>unit_tests</title>
-<g id="a_node2"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;image: ruby:3.0&#10;script:&#10;&#45; echo &quot;Running unit tests with coverage...&quot;&#10;&#45; bundle install&#10;&#45; bundle exec rspec &#45;&#45;format RspecJunitFormatter &#45;&#45;out rspec.xml&#10;&#45; echo &quot;Coverage: 85.5%&quot;&#10;coverage: &quot;/Coverage: \d+\.\d+%/&quot;&#10;artifacts:&#10; &#160;reports:&#10; &#160;&#160;&#160;junit: rspec.xml&#10; &#160;&#160;&#160;coverage_report:&#10; &#160;&#160;&#160;&#160;&#160;coverage_format: cobertura&#10; &#160;&#160;&#160;&#160;&#160;path: coverage/coverage.xml&#10; &#160;paths:&#10; &#160;&#45; coverage/&#10; &#160;expire_in: 30 days&#10;">
+<g id="a_node2"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;image: ruby:3.0&#10;script:&#10;&#45; echo &quot;Running unit tests with coverage...&quot;&#10;&#45; bundle install&#10;&#45; bundle exec rspec &#45;&#45;format RspecJunitFormatter &#45;&#45;out rspec.xml&#10;&#45; &#39;echo &quot;Coverage: 85.5%&quot;&#39;&#10;coverage: &quot;/Coverage: \d+\.\d+%/&quot;&#10;artifacts:&#10; &#160;reports:&#10; &#160;&#160;&#160;junit: rspec.xml&#10; &#160;&#160;&#160;coverage_report:&#10; &#160;&#160;&#160;&#160;&#160;coverage_format: cobertura&#10; &#160;&#160;&#160;&#160;&#160;path: coverage/coverage.xml&#10; &#160;paths:&#10; &#160;&#45; coverage/&#10; &#160;expire_in: 30 days&#10;">
 <polygon fill="lightblue" stroke="black" points="137.38,-194 53.12,-194 53.12,-158 137.38,-158 137.38,-194"/>
 <text text-anchor="middle" x="95.25" y="-171.32" font-family="Times,serif" font-size="14.00">unit&#45;tests</text>
 </a>
@@ -52,7 +52,7 @@
 <!-- integration_tests -->
 <g id="node3" class="node">
 <title>integration_tests</title>
-<g id="a_node3"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;image: python:3.9&#10;script:&#10;&#45; echo &quot;Running integration tests...&quot;&#10;&#45; pip install pytest pytest&#45;cov&#10;&#45; pytest &#45;&#45;cov=src &#45;&#45;cov&#45;report=xml:coverage.xml &#45;&#45;cov&#45;report=term&#10;&#45; echo &quot;Total coverage: 92.3 percent&quot;&#10;coverage: &quot;/Total coverage: (\d+\.\d+)/&quot;&#10;artifacts:&#10; &#160;reports:&#10; &#160;&#160;&#160;junit: test&#45;results.xml&#10; &#160;&#160;&#160;cobertura: coverage.xml&#10; &#160;expire_in: 1 week&#10;">
+<g id="a_node3"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;image: python:3.9&#10;script:&#10;&#45; echo &quot;Running integration tests...&quot;&#10;&#45; pip install pytest pytest&#45;cov&#10;&#45; pytest &#45;&#45;cov=src &#45;&#45;cov&#45;report=xml:coverage.xml &#45;&#45;cov&#45;report=term&#10;&#45; &#39;echo &quot;Total coverage: 92.3 percent&quot;&#39;&#10;coverage: &quot;/Total coverage: (\d+\.\d+)/&quot;&#10;artifacts:&#10; &#160;reports:&#10; &#160;&#160;&#160;junit: test&#45;results.xml&#10; &#160;&#160;&#160;cobertura: coverage.xml&#10; &#160;expire_in: 1 week&#10;">
 <polygon fill="lightblue" stroke="black" points="162.88,-248 27.62,-248 27.62,-212 162.88,-212 162.88,-248"/>
 <text text-anchor="middle" x="95.25" y="-225.32" font-family="Times,serif" font-size="14.00">integration&#45;tests</text>
 </a>
@@ -61,7 +61,7 @@
 <!-- coverage_formats -->
 <g id="node4" class="node">
 <title>coverage_formats</title>
-<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;image: alpine:latest&#10;script:&#10;&#45; echo &quot;Testing various coverage formats...&quot;&#10;&#45; echo &quot;Line coverage: 78.9%&quot;&#10;&#45; echo &quot;Branch coverage: 65.4%&quot;&#10;&#45; echo &quot;Function coverage: 91.2%&quot;&#10;coverage: &quot;/Line coverage: (\d+\.\d+)%/&quot;&#10;">
+<g id="a_node4"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;image: alpine:latest&#10;script:&#10;&#45; echo &quot;Testing various coverage formats...&quot;&#10;&#45; &#39;echo &quot;Line coverage: 78.9%&quot;&#39;&#10;&#45; &#39;echo &quot;Branch coverage: 65.4%&quot;&#39;&#10;&#45; &#39;echo &quot;Function coverage: 91.2%&quot;&#39;&#10;coverage: &quot;/Line coverage: (\d+\.\d+)%/&quot;&#10;">
 <polygon fill="lightblue" stroke="black" points="165.5,-302 25,-302 25,-266 165.5,-266 165.5,-302"/>
 <text text-anchor="middle" x="95.25" y="-279.32" font-family="Times,serif" font-size="14.00">coverage&#45;formats</text>
 </a>
@@ -79,7 +79,7 @@
 <!-- go_tests -->
 <g id="node6" class="node">
 <title>go_tests</title>
-<g id="a_node6"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;image: golang:1.19&#10;script:&#10;&#45; echo &quot;Running Go tests with coverage...&quot;&#10;&#45; go test &#45;v &#45;coverprofile=coverage.out ./...&#10;&#45; go tool cover &#45;func=coverage.out&#10;&#45; echo &quot;total: (statements) 94.5%&quot;&#10;coverage: &quot;/total:.*\(statements\)\s+(\d+\.\d+)%/&quot;&#10;artifacts:&#10; &#160;reports:&#10; &#160;&#160;&#160;junit: report.xml&#10; &#160;&#160;&#160;cobertura: coverage.xml&#10;">
+<g id="a_node6"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;image: golang:1.19&#10;script:&#10;&#45; echo &quot;Running Go tests with coverage...&quot;&#10;&#45; go test &#45;v &#45;coverprofile=coverage.out ./...&#10;&#45; go tool cover &#45;func=coverage.out&#10;&#45; &#39;echo &quot;total: (statements) 94.5%&quot;&#39;&#10;coverage: &quot;/total:.*\(statements\)\s+(\d+\.\d+)%/&quot;&#10;artifacts:&#10; &#160;reports:&#10; &#160;&#160;&#160;junit: report.xml&#10; &#160;&#160;&#160;cobertura: coverage.xml&#10;">
 <polygon fill="lightblue" stroke="black" points="131.75,-410 58.75,-410 58.75,-374 131.75,-374 131.75,-410"/>
 <text text-anchor="middle" x="95.25" y="-387.32" font-family="Times,serif" font-size="14.00">go&#45;tests</text>
 </a>

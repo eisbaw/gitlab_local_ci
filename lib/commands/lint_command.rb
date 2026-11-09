@@ -207,10 +207,8 @@ module Commands
     # @param script [Object] Script configuration
     # @param errors [Array<String>] Error accumulator
     def validate_script(job_name, script, errors)
-      # Script can be array or string
-      unless script.is_a?(Array) || script.is_a?(String)
-        errors << "Job '#{job_name}' has invalid script format (must be string or array)"
-      end
+      # Element types are checked once for every command, in
+      # PipelineBuilder.commands_errors (upstream Entry::Commands).
 
       # If array, check it's not empty
       if script.is_a?(Array) && script.empty?

@@ -88,7 +88,7 @@
 <!-- deploy_staging -->
 <g id="node8" class="node">
 <title>deploy_staging</title>
-<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;script:&#10;&#45; echo &quot;Deploying to staging environment&quot;&#10;&#45; echo &quot;Deployment completed to: $DEPLOY_ENV&quot;&#10;rules:&#10;&#45; if: &quot;$CI_COMMIT_BRANCH&quot;&#10; &#160;when: manual&#10;environment:&#10; &#160;name: staging&#10;when: manual&#10;">
+<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;script:&#10;&#45; echo &quot;Deploying to staging environment&quot;&#10;&#45; &#39;echo &quot;Deployment completed to: $DEPLOY_ENV&quot;&#39;&#10;rules:&#10;&#45; if: &quot;$CI_COMMIT_BRANCH&quot;&#10; &#160;when: manual&#10;environment:&#10; &#160;name: staging&#10;when: manual&#10;">
 <polygon fill="lightblue" stroke="black" points="779.88,-172 656.62,-172 656.62,-136 779.88,-136 779.88,-172"/>
 <text text-anchor="middle" x="718.25" y="-149.32" font-family="Times,serif" font-size="14.00">deploy_staging</text>
 </a>

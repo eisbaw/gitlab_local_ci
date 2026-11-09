@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 # Deploy stage jobs
 .deploy-template:
   stage: deploy
@@ -12,7 +14,7 @@ deploy-staging:
   extends: .deploy-template
   script:
     - echo "Deploying to staging environment..."
-    - echo "Target: staging.example.com"
+    - 'echo "Target: staging.example.com"'
     - echo "Deployment completed"
   environment:
     name: staging
@@ -24,7 +26,7 @@ deploy-production:
   extends: .deploy-template
   script:
     - echo "Deploying to production environment..."
-    - echo "Target: www.example.com"
+    - 'echo "Target: www.example.com"'
     - echo "Production deployment completed"
   environment:
     name: production

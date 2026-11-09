@@ -144,6 +144,10 @@ module PipelineBuilder
       return failure(e.message)
     end
 
+    # Before flatten_lists: flattening would hide the nesting depth.
+    commands_errors = commands_errors(config)
+    return Result.new(errors: commands_errors) unless commands_errors.empty?
+
     config = flatten_lists(config)
     begin
       Result.new(config: config, job_definitions: compose_jobs(config), errors: [])
@@ -229,6 +233,52 @@ module PipelineBuilder
     raise LoadError, 'Configuration must be a YAML hash/dictionary' unless config.is_a?(Hash)
 
     config
+  end
+
+  # Upstream Entry::Commands: StringOrNestedArrayOfStringsValidator with
+  # max_level 10 (the outer list counts as a level).
+  COMMANDS_NESTING_LEVEL_MAX = 10
+  COMMANDS_KEYS = %w[before_script script after_script].freeze
+
+  # Entry::Commands errors for every script list upstream validates: root
+  # and default: before_script/after_script, and script/before_script/
+  # after_script of every visible job (hidden ones are Entry::Hidden, not
+  # validated). A key set to null counts as unspecified. E.g. an unquoted
+  # `- echo "a: b"` is a YAML mapping, not a string. Text as upstream lint
+  # prints it: "<location> config <message>", downcased (Validator#messages).
+  #
+  # @param config [Hash] resolved config, lists not yet flattened
+  # @return [Array<String>] empty when valid
+  def commands_errors(config)
+    entries = [[nil, config.slice('before_script', 'after_script')]]
+    entries << ['default', config['default']] if config['default'].is_a?(Hash)
+    config.each do |key, value|
+      next unless CiKeywords.job_entry?(key, value) && !CiKeywords.hidden?(key)
+
+      entries << ["jobs:#{key}", value]
+    end
+
+    entries.flat_map do |prefix, entry|
+      COMMANDS_KEYS.filter_map do |key|
+        next unless entry.key?(key)
+
+        value = entry[key]
+        next if value.nil? || string_or_nested_array_of_strings?(value, COMMANDS_NESTING_LEVEL_MAX)
+
+        location = [prefix, key].compact.join(':')
+        message = "#{location} config should be a string or a nested array of strings " \
+                  "up to #{COMMANDS_NESTING_LEVEL_MAX} levels deep"
+        message.downcase
+      end
+    end
+  end
+
+  # Upstream validate_string || validate_nested_array(value, levels).
+  def string_or_nested_array_of_strings?(value, levels)
+    return true if value.is_a?(String)
+    return false if levels <= 0 || !value.is_a?(Array)
+
+    value.all? { |item| string_or_nested_array_of_strings?(item, levels - 1) }
   end
 
   # Upstream entry values flatten nested lists completely: Entry::Commands

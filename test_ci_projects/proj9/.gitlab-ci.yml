@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 ---
 # Test project for cache configuration and key generation
 # Tests: global cache, job-specific overrides, static/dynamic keys, policies
@@ -50,7 +52,7 @@ build:dynamic-cache:
     policy: push
   script:
     - echo "Using dynamic cache key with branch name"
-    - echo "Branch: $CI_COMMIT_REF_SLUG"
+    - 'echo "Branch: $CI_COMMIT_REF_SLUG"'
     - mkdir -p dist node_modules
     - echo "distribution" > dist/bundle.js
     - echo "dependencies" > node_modules/.cache

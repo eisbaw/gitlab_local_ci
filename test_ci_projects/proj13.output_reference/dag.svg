@@ -43,7 +43,7 @@
 <!-- test_integration -->
 <g id="node8" class="node">
 <title>test_integration</title>
-<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;image: alpine:latest&#10;tags:&#10;&#45; docker&#10;&#45; test&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10;before_script:&#10;&#45; echo &quot;Test template before_script&quot;&#10;&#45; apk add &#45;&#45;no&#45;cache python3 py3&#45;pip&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running integration tests&quot;&#10;&#45; echo &quot;Coverage: 85.5%&quot;&#10;coverage: &quot;/Coverage:\s+(\d+\.\d+%)/&quot;&#10;dependencies:&#10;&#45; build_complex&#10;">
+<g id="a_node8"><a xlink:title="&#45;&#45;&#45;&#10;image: alpine:latest&#10;tags:&#10;&#45; docker&#10;&#45; test&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10;before_script:&#10;&#45; echo &quot;Test template before_script&quot;&#10;&#45; apk add &#45;&#45;no&#45;cache python3 py3&#45;pip&#10;stage: test&#10;script:&#10;&#45; echo &quot;Running integration tests&quot;&#10;&#45; &#39;echo &quot;Coverage: 85.5%&quot;&#39;&#10;coverage: &quot;/Coverage:\s+(\d+\.\d+%)/&quot;&#10;dependencies:&#10;&#45; build_complex&#10;">
 <polygon fill="lightblue" stroke="black" points="471,-253 341,-253 341,-217 471,-217 471,-253"/>
 <text text-anchor="middle" x="406" y="-230.32" font-family="Times,serif" font-size="14.00">test_integration</text>
 </a>
@@ -155,7 +155,7 @@
 <!-- deploy_canary -->
 <g id="node14" class="node">
 <title>deploy_canary</title>
-<g id="a_node14"><a xlink:title="&#45;&#45;&#45;&#10;image: alpine:latest&#10;tags:&#10;&#45; docker&#10;&#45; deploy&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10;before_script:&#10;&#45; echo &quot;Deploy template before_script&quot;&#10;&#45; apk add &#45;&#45;no&#45;cache openssh&#45;client&#10;stage: deploy&#10;only:&#10;&#45; main&#10;&#45; master&#10;environment:&#10; &#160;name: production&#45;canary&#10; &#160;url: https://canary.example.com&#10;variables:&#10; &#160;DEPLOY_STRATEGY: canary&#10; &#160;CANARY_PERCENTAGE: &#39;10&#39;&#10;script:&#10;&#45; echo &quot;Deploying canary release&quot;&#10;&#45; echo &quot;Canary percentage: $CANARY_PERCENTAGE%&quot;&#10;when: manual&#10;allow_failure: true&#10;">
+<g id="a_node14"><a xlink:title="&#45;&#45;&#45;&#10;image: alpine:latest&#10;tags:&#10;&#45; docker&#10;&#45; deploy&#10;retry:&#10; &#160;max: 2&#10; &#160;when:&#10; &#160;&#45; runner_system_failure&#10;before_script:&#10;&#45; echo &quot;Deploy template before_script&quot;&#10;&#45; apk add &#45;&#45;no&#45;cache openssh&#45;client&#10;stage: deploy&#10;only:&#10;&#45; main&#10;&#45; master&#10;environment:&#10; &#160;name: production&#45;canary&#10; &#160;url: https://canary.example.com&#10;variables:&#10; &#160;DEPLOY_STRATEGY: canary&#10; &#160;CANARY_PERCENTAGE: &#39;10&#39;&#10;script:&#10;&#45; echo &quot;Deploying canary release&quot;&#10;&#45; &#39;echo &quot;Canary percentage: $CANARY_PERCENTAGE%&quot;&#39;&#10;when: manual&#10;allow_failure: true&#10;">
 <polygon fill="lightblue" stroke="black" points="777.25,-204 659.25,-204 659.25,-168 777.25,-168 777.25,-204"/>
 <text text-anchor="middle" x="718.25" y="-181.32" font-family="Times,serif" font-size="14.00">deploy_canary</text>
 </a>

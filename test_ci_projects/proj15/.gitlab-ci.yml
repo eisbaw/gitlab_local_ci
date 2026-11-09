@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 stages:
   - test
   - security
@@ -11,7 +13,7 @@ unit-tests:
     - echo "Running unit tests with coverage..."
     - bundle install
     - bundle exec rspec --format RspecJunitFormatter --out rspec.xml
-    - echo "Coverage: 85.5%"
+    - 'echo "Coverage: 85.5%"'
   coverage: '/Coverage: \d+\.\d+%/'
   artifacts:
     reports:
@@ -31,7 +33,7 @@ integration-tests:
     - echo "Running integration tests..."
     - pip install pytest pytest-cov
     - pytest --cov=src --cov-report=xml:coverage.xml --cov-report=term
-    - echo "Total coverage: 92.3 percent"
+    - 'echo "Total coverage: 92.3 percent"'
   coverage: '/Total coverage: (\d+\.\d+)/'
   artifacts:
     reports:
@@ -70,9 +72,9 @@ coverage-formats:
   image: alpine:latest
   script:
     - echo "Testing various coverage formats..."
-    - echo "Line coverage: 78.9%"
-    - echo "Branch coverage: 65.4%"
-    - echo "Function coverage: 91.2%"
+    - 'echo "Line coverage: 78.9%"'
+    - 'echo "Branch coverage: 65.4%"'
+    - 'echo "Function coverage: 91.2%"'
   coverage: '/Line coverage: (\d+\.\d+)%/'
 
 # Combined reports job
@@ -106,7 +108,7 @@ go-tests:
     - echo "Running Go tests with coverage..."
     - go test -v -coverprofile=coverage.out ./...
     - go tool cover -func=coverage.out
-    - echo "total: (statements) 94.5%"
+    - 'echo "total: (statements) 94.5%"'
   coverage: '/total:.*\(statements\)\s+(\d+\.\d+)%/'
   artifacts:
     reports:

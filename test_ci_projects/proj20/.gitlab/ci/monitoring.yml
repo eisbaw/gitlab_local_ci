@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 # Child pipeline for monitoring setup after production deployment
 # Triggered from main pipeline
 
@@ -13,7 +15,7 @@ setup:prometheus:
   image: alpine:latest
   script:
     - echo "Setting up Prometheus for deployment ${DEPLOYMENT_ID}"
-    - echo "Environment: ${ENVIRONMENT}"
+    - 'echo "Environment: ${ENVIRONMENT}"'
     - echo "Configuring scrape targets for all services"
     - echo "Prometheus setup completed"
 

@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 # Test stage jobs
 .test-template:
   stage: test
@@ -8,9 +10,9 @@ unit-tests:
   extends: .test-template
   script:
     - echo "Running unit tests..."
-    - echo "Test suite: Unit Tests"
-    - echo "Tests passed: 150/150"
-    - echo "Coverage: 85%"
+    - 'echo "Test suite: Unit Tests"'
+    - 'echo "Tests passed: 150/150"'
+    - 'echo "Coverage: 85%"'
   dependencies:
     - build-app
 
@@ -18,8 +20,8 @@ integration-tests:
   extends: .test-template
   script:
     - echo "Running integration tests..."
-    - echo "Test suite: Integration Tests"
-    - echo "Tests passed: 45/45"
+    - 'echo "Test suite: Integration Tests"'
+    - 'echo "Tests passed: 45/45"'
     - echo "All integration tests passed"
   dependencies:
     - build-app

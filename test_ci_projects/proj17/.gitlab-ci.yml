@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 stages:
   - test
   - build
@@ -104,7 +106,7 @@ performance:test:
         CONCURRENCY: [1, 10, 100]
         PAYLOAD_SIZE: ['small', 'medium', 'large']
   script:
-    - echo "Performance test: Ruby ${RUBY_VERSION}, Concurrency ${CONCURRENCY}, Payload ${PAYLOAD_SIZE}"
+    - 'echo "Performance test: Ruby ${RUBY_VERSION}, Concurrency ${CONCURRENCY}, Payload ${PAYLOAD_SIZE}"'
     - bundle exec ruby scripts/performance_test.rb --concurrency=${CONCURRENCY} --payload=${PAYLOAD_SIZE}
 
 # Job with parallel: N for data processing
@@ -123,6 +125,6 @@ test:microservices:
       - SERVICE: ['api', 'auth', 'notifications', 'billing']
         TEST_SUITE: ['unit', 'integration', 'contract']
   script:
-    - echo "Testing ${SERVICE} service: ${TEST_SUITE} tests"
+    - 'echo "Testing ${SERVICE} service: ${TEST_SUITE} tests"'
     - cd services/${SERVICE}
     - bundle exec rspec spec/${TEST_SUITE}

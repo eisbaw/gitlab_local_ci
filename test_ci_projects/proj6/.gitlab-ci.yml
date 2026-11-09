@@ -1,3 +1,5 @@
+# Script lines containing ': ' are single-quoted: unquoted, YAML reads them as
+# mappings, which upstream rejects as script entries (TASK-38).
 stages:
   - build
   - test
@@ -27,7 +29,7 @@ build:assets:
   script:
     - echo "Compiling assets"
     - mkdir -p dist/css dist/js
-    - echo "body { color: blue; }" > dist/css/style.css
+    - 'echo "body { color: blue; }" > dist/css/style.css'
     - echo "console.log('hello');" > dist/js/app.js
   artifacts:
     paths:
@@ -84,7 +86,7 @@ test:coverage:
         </packages>
       </coverage>
       EOF
-    - echo "Total coverage: 85%" > coverage/summary.txt
+    - 'echo "Total coverage: 85%" > coverage/summary.txt'
   artifacts:
     reports:
       coverage_report:
@@ -145,10 +147,10 @@ deploy:staging:
     - build:assets
   script:
     - echo "Deploying to staging"
-    - echo "Application binary: $(cat build/bin/app)"
-    - echo "CSS files: $(ls dist/css/)"
-    - echo "JS files: $(ls dist/js/)"
-    - echo "Deployed version: $(cat build/version.txt)"
+    - 'echo "Application binary: $(cat build/bin/app)"'
+    - 'echo "CSS files: $(ls dist/css/)"'
+    - 'echo "JS files: $(ls dist/js/)"'
+    - 'echo "Deployed version: $(cat build/version.txt)"'
   environment:
     name: staging
   artifacts:
@@ -165,7 +167,7 @@ deploy:docs:
     - echo "Deploying documentation"
     - mkdir -p docs
     - echo "# API Documentation" > docs/README.md
-    - echo "Version: $BUILD_VERSION" >> docs/README.md
+    - 'echo "Version: $BUILD_VERSION" >> docs/README.md'
   artifacts:
     paths:
       - docs/
@@ -179,8 +181,8 @@ test:debug:
   script:
     - echo "Running debug tests"
     - mkdir -p debug-logs
-    - echo "Debug output: $(date)" > debug-logs/debug.log
-    - echo "Memory usage: 128MB" > debug-logs/memory.log
+    - 'echo "Debug output: $(date)" > debug-logs/debug.log'
+    - 'echo "Memory usage: 128MB" > debug-logs/memory.log'
   artifacts:
     paths:
       - debug-logs/

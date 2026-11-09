@@ -48,7 +48,7 @@
 <!-- test_coverage -->
 <g id="node7" class="node">
 <title>test_coverage</title>
-<g id="a_node7"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;dependencies:&#10;&#45; build:app&#10;script:&#10;&#45; echo &quot;Generating coverage report&quot;&#10;&#45; mkdir &#45;p coverage&#10;&#45; |&#10; &#160;cat &gt; coverage/cobertura.xml &lt;&lt; EOF&#10; &#160;&lt;?xml version=&quot;1.0&quot;?&gt;&#10; &#160;&lt;coverage line&#45;rate=&quot;0.85&quot; branch&#45;rate=&quot;0.80&quot; version=&quot;1.0&quot;&gt;&#10; &#160;&#160;&#160;&lt;packages&gt;&#10; &#160;&#160;&#160;&#160;&#160;&lt;package name=&quot;main&quot; line&#45;rate=&quot;0.85&quot; branch&#45;rate=&quot;0.80&quot;&gt;&#10; &#160;&#160;&#160;&#160;&#160;&#160;&#160;&lt;classes&gt;&#10; &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&lt;class name=&quot;App&quot; line&#45;rate=&quot;0.90&quot; branch&#45;rate=&quot;0.85&quot;/&gt;&#10; &#160;&#160;&#160;&#160;&#160;&#160;&#160;&lt;/classes&gt;&#10; &#160;&#160;&#160;&#160;&#160;&lt;/package&gt;&#10; &#160;&#160;&#160;&lt;/packages&gt;&#10; &#160;&lt;/coverage&gt;&#10; &#160;EOF&#10;&#45; echo &quot;Total coverage: 85%&quot; &gt; coverage/summary.txt&#10;artifacts:&#10; &#160;reports:&#10; &#160;&#160;&#160;coverage_report:&#10; &#160;&#160;&#160;&#160;&#160;coverage_format: cobertura&#10; &#160;&#160;&#160;&#160;&#160;path: coverage/cobertura.xml&#10; &#160;paths:&#10; &#160;&#45; coverage/&#10; &#160;expire_in: 1 month&#10;">
+<g id="a_node7"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;dependencies:&#10;&#45; build:app&#10;script:&#10;&#45; echo &quot;Generating coverage report&quot;&#10;&#45; mkdir &#45;p coverage&#10;&#45; |&#10; &#160;cat &gt; coverage/cobertura.xml &lt;&lt; EOF&#10; &#160;&lt;?xml version=&quot;1.0&quot;?&gt;&#10; &#160;&lt;coverage line&#45;rate=&quot;0.85&quot; branch&#45;rate=&quot;0.80&quot; version=&quot;1.0&quot;&gt;&#10; &#160;&#160;&#160;&lt;packages&gt;&#10; &#160;&#160;&#160;&#160;&#160;&lt;package name=&quot;main&quot; line&#45;rate=&quot;0.85&quot; branch&#45;rate=&quot;0.80&quot;&gt;&#10; &#160;&#160;&#160;&#160;&#160;&#160;&#160;&lt;classes&gt;&#10; &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&lt;class name=&quot;App&quot; line&#45;rate=&quot;0.90&quot; branch&#45;rate=&quot;0.85&quot;/&gt;&#10; &#160;&#160;&#160;&#160;&#160;&#160;&#160;&lt;/classes&gt;&#10; &#160;&#160;&#160;&#160;&#160;&lt;/package&gt;&#10; &#160;&#160;&#160;&lt;/packages&gt;&#10; &#160;&lt;/coverage&gt;&#10; &#160;EOF&#10;&#45; &#39;echo &quot;Total coverage: 85%&quot; &gt; coverage/summary.txt&#39;&#10;artifacts:&#10; &#160;reports:&#10; &#160;&#160;&#160;coverage_report:&#10; &#160;&#160;&#160;&#160;&#160;coverage_format: cobertura&#10; &#160;&#160;&#160;&#160;&#160;path: coverage/cobertura.xml&#10; &#160;paths:&#10; &#160;&#45; coverage/&#10; &#160;expire_in: 1 month&#10;">
 <polygon fill="lightblue" stroke="black" points="462.38,-275 349.62,-275 349.62,-239 462.38,-239 462.38,-275"/>
 <text text-anchor="middle" x="406" y="-252.32" font-family="Times,serif" font-size="14.00">test:coverage</text>
 </a>
@@ -78,7 +78,7 @@
 <!-- test_debug -->
 <g id="node9" class="node">
 <title>test_debug</title>
-<g id="a_node9"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;dependencies:&#10;&#45; build:app&#10;script:&#10;&#45; echo &quot;Running debug tests&quot;&#10;&#45; mkdir &#45;p debug&#45;logs&#10;&#45; echo &quot;Debug output: $(date)&quot; &gt; debug&#45;logs/debug.log&#10;&#45; echo &quot;Memory usage: 128MB&quot; &gt; debug&#45;logs/memory.log&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; debug&#45;logs/&#10; &#160;expire_in: 3 days&#10; &#160;when: on_failure&#10; &#160;name: debug&#45;logs&#45;$CI_JOB_ID&#10;">
+<g id="a_node9"><a xlink:title="&#45;&#45;&#45;&#10;stage: test&#10;dependencies:&#10;&#45; build:app&#10;script:&#10;&#45; echo &quot;Running debug tests&quot;&#10;&#45; mkdir &#45;p debug&#45;logs&#10;&#45; &#39;echo &quot;Debug output: $(date)&quot; &gt; debug&#45;logs/debug.log&#39;&#10;&#45; &#39;echo &quot;Memory usage: 128MB&quot; &gt; debug&#45;logs/memory.log&#39;&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; debug&#45;logs/&#10; &#160;expire_in: 3 days&#10; &#160;when: on_failure&#10; &#160;name: debug&#45;logs&#45;$CI_JOB_ID&#10;">
 <polygon fill="lightblue" stroke="black" points="452.25,-383 359.75,-383 359.75,-347 452.25,-347 452.25,-383"/>
 <text text-anchor="middle" x="406" y="-360.32" font-family="Times,serif" font-size="14.00">test:debug</text>
 </a>
@@ -102,7 +102,7 @@
 <!-- build_assets -->
 <g id="node3" class="node">
 <title>build_assets</title>
-<g id="a_node3"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;script:&#10;&#45; echo &quot;Compiling assets&quot;&#10;&#45; mkdir &#45;p dist/css dist/js&#10;&#45; echo &quot;body { color: blue; }&quot; &gt; dist/css/style.css&#10;&#45; echo &quot;console.log(&#39;hello&#39;);&quot; &gt; dist/js/app.js&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; dist/&#10; &#160;expire_in: 2 days&#10; &#160;name: assets&#45;$CI_JOB_NAME&#45;$CI_COMMIT_SHORT_SHA&#10;">
+<g id="a_node3"><a xlink:title="&#45;&#45;&#45;&#10;stage: build&#10;script:&#10;&#45; echo &quot;Compiling assets&quot;&#10;&#45; mkdir &#45;p dist/css dist/js&#10;&#45; &#39;echo &quot;body { color: blue; }&quot; &gt; dist/css/style.css&#39;&#10;&#45; echo &quot;console.log(&#39;hello&#39;);&quot; &gt; dist/js/app.js&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; dist/&#10; &#160;expire_in: 2 days&#10; &#160;name: assets&#45;$CI_JOB_NAME&#45;$CI_COMMIT_SHORT_SHA&#10;">
 <polygon fill="lightblue" stroke="black" points="150.12,-405 48.62,-405 48.62,-369 150.12,-369 150.12,-405"/>
 <text text-anchor="middle" x="99.38" y="-382.32" font-family="Times,serif" font-size="14.00">build:assets</text>
 </a>
@@ -137,7 +137,7 @@
 <!-- deploy_staging -->
 <g id="node13" class="node">
 <title>deploy_staging</title>
-<g id="a_node13"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;dependencies:&#10;&#45; build:app&#10;&#45; build:assets&#10;script:&#10;&#45; echo &quot;Deploying to staging&quot;&#10;&#45; echo &quot;Application binary: $(cat build/bin/app)&quot;&#10;&#45; echo &quot;CSS files: $(ls dist/css/)&quot;&#10;&#45; echo &quot;JS files: $(ls dist/js/)&quot;&#10;&#45; echo &quot;Deployed version: $(cat build/version.txt)&quot;&#10;environment:&#10; &#160;name: staging&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; build/version.txt&#10; &#160;expire_in: 6 months&#10; &#160;name: deployment&#45;info&#10;">
+<g id="a_node13"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;dependencies:&#10;&#45; build:app&#10;&#45; build:assets&#10;script:&#10;&#45; echo &quot;Deploying to staging&quot;&#10;&#45; &#39;echo &quot;Application binary: $(cat build/bin/app)&quot;&#39;&#10;&#45; &#39;echo &quot;CSS files: $(ls dist/css/)&quot;&#39;&#10;&#45; &#39;echo &quot;JS files: $(ls dist/js/)&quot;&#39;&#10;&#45; &#39;echo &quot;Deployed version: $(cat build/version.txt)&quot;&#39;&#10;environment:&#10; &#160;name: staging&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; build/version.txt&#10; &#160;expire_in: 6 months&#10; &#160;name: deployment&#45;info&#10;">
 <polygon fill="lightblue" stroke="black" points="1098.5,-96 977.5,-96 977.5,-60 1098.5,-60 1098.5,-96"/>
 <text text-anchor="middle" x="1038" y="-73.33" font-family="Times,serif" font-size="14.00">deploy:staging</text>
 </a>
@@ -152,7 +152,7 @@
 <!-- deploy_docs -->
 <g id="node14" class="node">
 <title>deploy_docs</title>
-<g id="a_node14"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;dependencies: []&#10;script:&#10;&#45; echo &quot;Deploying documentation&quot;&#10;&#45; mkdir &#45;p docs&#10;&#45; echo &quot;# API Documentation&quot; &gt; docs/README.md&#10;&#45; echo &quot;Version: $BUILD_VERSION&quot; &gt;&gt; docs/README.md&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; docs/&#10; &#160;expire_in: never&#10;">
+<g id="a_node14"><a xlink:title="&#45;&#45;&#45;&#10;stage: deploy&#10;dependencies: []&#10;script:&#10;&#45; echo &quot;Deploying documentation&quot;&#10;&#45; mkdir &#45;p docs&#10;&#45; echo &quot;# API Documentation&quot; &gt; docs/README.md&#10;&#45; &#39;echo &quot;Version: $BUILD_VERSION&quot; &gt;&gt; docs/README.md&#39;&#10;artifacts:&#10; &#160;paths:&#10; &#160;&#45; docs/&#10; &#160;expire_in: never&#10;">
 <polygon fill="lightblue" stroke="black" points="1088,-150 988,-150 988,-114 1088,-114 1088,-150"/>
 <text text-anchor="middle" x="1038" y="-127.33" font-family="Times,serif" font-size="14.00">deploy:docs</text>
 </a>
