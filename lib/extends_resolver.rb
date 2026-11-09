@@ -15,6 +15,7 @@
 # limitations under the License.
 
 require_relative 'config_merge'
+require_relative 'ci_keywords'
 
 # Resolves 'extends' directives in GitLab CI configuration
 #
@@ -39,11 +40,11 @@ class ExtendsResolver
     templates = {}
 
     config.each do |key, value|
-      next unless value.is_a?(Hash)
+      next unless CiKeywords.job_entry?(key, value)
 
-      if key.start_with?('.')
+      if CiKeywords.hidden?(key)
         templates[key] = value
-      elsif !%w[stages variables workflow include default].include?(key)
+      else
         jobs[key] = value
       end
     end
@@ -54,9 +55,9 @@ class ExtendsResolver
       resolved_jobs[job_name] = resolve_job_extends(job_name, job_config, jobs, templates, [])
     end
 
-    # Build result with resolved jobs
-    result = config.reject { |key, value| value.is_a?(Hash) && !key.start_with?('.') && !%w[stages variables workflow include default].include?(key) }
-    result.merge(resolved_jobs)
+    # Jobs move after globals/templates here; upstream keeps positions
+    # (TASK-31).
+    config.reject { |key, _| jobs.key?(key) }.merge(resolved_jobs)
   end
 
   private

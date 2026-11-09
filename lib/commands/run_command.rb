@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require_relative '../include_processor'
 require_relative '../extends_resolver'
+require_relative '../pipeline_builder'
 require 'yaml'
 require 'open3'
 
@@ -124,7 +124,7 @@ module GitlabCiCli
         @config = expand_variables(@config, @options[:variables])
 
         # Extract all jobs
-        @all_jobs = extract_jobs(@config)
+        @all_jobs = PipelineBuilder.job_definitions(@config)
       end
 
       # Process include directives in the configuration
@@ -134,18 +134,12 @@ module GitlabCiCli
       def process_includes(config)
         return config unless config['include']
 
-        project_path = File.dirname(File.expand_path(@options[:entry]))
-        gitlab_templates_path = nil
-        if Dir.exist?(@options[:gitlab_dir])
-          gitlab_templates_path = File.join(@options[:gitlab_dir], 'lib', 'gitlab', 'ci', 'templates')
-        end
-
-        processor = IncludeProcessor.new(
-          project_path: project_path,
-          gitlab_templates_path: gitlab_templates_path
+        PipelineBuilder.process_includes(
+          config,
+          project_dir: File.dirname(File.expand_path(@options[:entry])),
+          gitlab_dir: @options[:gitlab_dir],
+          variables: {}
         )
-
-        processor.process_includes(config)
       rescue StandardError => e
         log_error("Error processing includes: #{e.message}")
         raise
@@ -185,24 +179,6 @@ module GitlabCiCli
         else
           obj
         end
-      end
-
-      # Extract jobs from configuration
-      #
-      # @param config [Hash] Parsed configuration
-      # @return [Hash] Job name => job config
-      def extract_jobs(config)
-        reserved_keywords = %w[stages variables include default workflow before_script after_script cache image services]
-        jobs = {}
-
-        config.each do |key, value|
-          next if reserved_keywords.include?(key)
-          next unless value.is_a?(Hash)
-          # Include template jobs for reference, but don't execute them
-          jobs[key] = value
-        end
-
-        jobs
       end
 
       # Resolve job dependencies using topological sort

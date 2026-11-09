@@ -15,8 +15,8 @@
 # limitations under the License.
 
 require 'yaml'
-require_relative '../include_processor'
 require_relative '../extends_resolver'
+require_relative '../pipeline_builder'
 
 module Commands
   # LintCommand validates GitLab CI YAML configuration using standalone validation
@@ -32,12 +32,6 @@ module Commands
   # - Composable: returns data structure that formatters can transform
   # - Fundamentals first: implements validation logic directly
   class LintCommand
-    # GitLab CI reserved keywords (not job names)
-    RESERVED_KEYWORDS = %w[
-      stages variables include default workflow
-      before_script after_script cache image services
-    ].freeze
-
     # Valid job keywords according to GitLab CI schema
     VALID_JOB_KEYWORDS = %w[
       script stage needs dependencies artifacts cache image services
@@ -194,26 +188,12 @@ module Commands
     def process_includes(config)
       return config unless config['include']
 
-      # Get project path from entry file directory
-      project_path = File.dirname(File.expand_path(@entry_path))
-
-      # Get GitLab templates path if GitLab submodule exists
-      gitlab_templates_path = nil
-      if Dir.exist?(@gitlab_dir)
-        gitlab_templates_path = File.join(@gitlab_dir, 'lib', 'gitlab', 'ci', 'templates')
-      end
-
-      # Create include processor
-      # Pass CLI/trigger variables (not top-level defaults) — matches
-      # GitLab's documented include-rules variable scope.
-      processor = IncludeProcessor.new(
-        project_path: project_path,
-        gitlab_templates_path: gitlab_templates_path,
+      PipelineBuilder.process_includes(
+        config,
+        project_dir: File.dirname(File.expand_path(@entry_path)),
+        gitlab_dir: @gitlab_dir,
         variables: @variables || {}
       )
-
-      # Process includes
-      processor.process_includes(config)
     rescue IncludeDepthExceededError => e
       Result.new(
         valid: false,
@@ -264,7 +244,7 @@ module Commands
       stages = config['stages'] || %w[build test deploy]
 
       # Collect all jobs
-      jobs = extract_jobs(config)
+      jobs = PipelineBuilder.job_definitions(config)
 
       # Validate there's at least one job
       if jobs.empty?
@@ -301,29 +281,6 @@ module Commands
       end
     end
 
-    # Extract jobs from configuration
-    #
-    # Jobs are top-level keys that are not reserved keywords
-    # and are hash values (not strings or arrays)
-    #
-    # @param config [Hash] Parsed configuration
-    # @return [Hash] Job name => job config
-    def extract_jobs(config)
-      jobs = {}
-
-      config.each do |key, value|
-        # Skip reserved keywords
-        next if RESERVED_KEYWORDS.include?(key)
-
-        # Skip non-hash values
-        next unless value.is_a?(Hash)
-
-        jobs[key] = value
-      end
-
-      jobs
-    end
-
     # Validate a single job configuration
     #
     # @param job_name [String] Name of the job
@@ -333,11 +290,6 @@ module Commands
     # @param errors [Array<String>] Accumulator for error messages
     # @param warnings [Array<String>] Accumulator for warning messages
     def validate_job(job_name, job_config, stages, all_job_names, errors, warnings)
-      # Check if job name is reserved keyword
-      if RESERVED_KEYWORDS.include?(job_name)
-        errors << "Job '#{job_name}' uses reserved keyword as name"
-      end
-
       # Check for invalid job keywords
       job_config.each_key do |key|
         unless VALID_JOB_KEYWORDS.include?(key)

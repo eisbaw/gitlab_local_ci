@@ -18,8 +18,8 @@ require_relative '../mock_server'
 require_relative '../runner_fleet'
 require_relative '../mock_runner'
 require_relative '../mock_job'
-require_relative '../include_processor'
 require_relative '../extends_resolver'
+require_relative '../pipeline_builder'
 require_relative '../predefined_variables'
 require 'yaml'
 
@@ -190,16 +190,6 @@ module GitlabCiCli
       def process_includes(config)
         return config unless config['include']
 
-        # Get project path from entry file directory
-        project_path = File.dirname(File.expand_path(@options[:entry]))
-
-        # Get GitLab templates path if GitLab submodule exists
-        gitlab_templates_path = nil
-        if Dir.exist?(@options[:gitlab_dir])
-          gitlab_templates_path = File.join(@options[:gitlab_dir], 'lib', 'gitlab', 'ci', 'templates')
-        end
-
-        # Create include processor.
         # Include rules see (in this precedence order):
         #   - predefined CI_* vars (CI_PIPELINE_SOURCE etc.)
         #   - CLI/trigger variables (--variables, overlay last)
@@ -210,14 +200,12 @@ module GitlabCiCli
           pipeline_source: @options[:pipeline] || 'push'
         )
         include_vars = predefined.merge((@options[:variables] || {}).transform_keys(&:to_s))
-        processor = IncludeProcessor.new(
-          project_path: project_path,
-          gitlab_templates_path: gitlab_templates_path,
+        PipelineBuilder.process_includes(
+          config,
+          project_dir: File.dirname(File.expand_path(@options[:entry])),
+          gitlab_dir: @options[:gitlab_dir],
           variables: include_vars
         )
-
-        # Process includes
-        processor.process_includes(config)
       rescue IncludeDepthExceededError => e
         log_error("Include depth exceeded: #{e.depth} > #{e.max_depth}")
         raise
