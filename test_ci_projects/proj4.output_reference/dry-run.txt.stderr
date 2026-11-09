@@ -1,0 +1,7 @@
+Warning: [T+6s] Job 'integration:smoke' waiting (no eligible runner)
+Warning: [T+7s] Job 'integration:smoke' waiting (no eligible runner)
+Warning: [T+8s] Job 'integration:smoke' waiting (no eligible runner)
+Warning: [T+9s] Job 'integration:smoke' waiting (no eligible runner)
+Warning: [T+10s] Job 'integration:smoke' waiting (no eligible runner)
+Warning: [T+11s] Job 'integration:smoke' waiting (no eligible runner)
+# total_lines=6

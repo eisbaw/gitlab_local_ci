@@ -7,7 +7,7 @@ Practical checklist for releasing new versions of gitlab_ci_cli. Copy this check
 ### Code Quality
 - [ ] All tests pass: `just test`
 - [ ] Integration tests pass: `just test-integration`
-- [ ] All 20 test projects pass: `just test-all-projects`
+- [ ] All test projects match their goldens: `just e2e`
 - [ ] No failing or skipped tests (review output carefully)
 - [ ] Code coverage meets or exceeds baseline (review RSpec output)
 - [ ] No security vulnerabilities in dependencies (if any gems added)

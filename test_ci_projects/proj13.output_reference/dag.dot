@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
     label="build";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_build [style=invis, width=0, height=0];
 
     _build_template [label=".build_template", tooltip="---\nextends: \".base\"\nstage: build\ntags:\n- docker\n- build\nbefore_script:\n- echo \"Build template before_script\"\n- apk add --no-cache build-base git\nscript:\n- echo \"Default build script\"\nartifacts:\n  paths:\n  - build/\n  expire_in: 1 hour\n"];
   }
@@ -15,6 +18,8 @@ digraph pipeline {
     label="test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
 
     _base [label=".base", tooltip="---\nimage: alpine:latest\ntags:\n- docker\nretry:\n  max: 2\n  when:\n  - runner_system_failure\nbefore_script:\n- echo \"Base before_script\"\n- apk add --no-cache curl\n"];
     _test_template [label=".test_template", tooltip="---\nextends: \".base\"\nstage: test\ntags:\n- docker\n- test\nbefore_script:\n- echo \"Test template before_script\"\n- apk add --no-cache python3 py3-pip\nscript:\n- echo \"Default test script\"\ncoverage: \"/TOTAL.*\\\\s+(\\\\d+%)$/\"\n"];
@@ -37,36 +42,24 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     _deploy_template [label=".deploy_template", tooltip="---\nextends: \".base\"\nstage: deploy\ntags:\n- docker\n- deploy\nbefore_script:\n- echo \"Deploy template before_script\"\n- apk add --no-cache openssh-client\nonly:\n- main\n- master\nenvironment:\n  name: production\n  url: https://example.com\n"];
   }
 
-  _build_template -> _base;
-  _build_template -> _test_template;
-  _base -> _deploy_template;
-  _build_template -> _deploy_template;
-  _test_template -> _deploy_template;
-  _advanced_build -> _deploy_template;
-  build_simple -> _deploy_template;
-  build_complex -> _deploy_template;
-  build_advanced -> _deploy_template;
-  test_unit -> _deploy_template;
-  test_integration -> _deploy_template;
-  test_e2e -> _deploy_template;
-  deploy_staging -> _deploy_template;
-  deploy_production -> _deploy_template;
-  deploy_canary -> _deploy_template;
-  build_no_retry -> _deploy_template;
-  test_security -> _deploy_template;
-  _build_template -> _advanced_build;
-  _build_template -> build_simple;
-  _build_template -> build_complex;
-  _build_template -> build_advanced;
-  _build_template -> test_unit;
-  _build_template -> test_integration;
-  _build_template -> test_e2e;
-  _build_template -> deploy_staging;
-  _build_template -> deploy_production;
-  _build_template -> deploy_canary;
-  _build_template -> build_no_retry;
-  _build_template -> test_security;
+  __stage_anchor_build -> _base [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> _test_template [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> _deploy_template [ltail=cluster_test, style=bold, color="#377EB8"];
+  __stage_anchor_build -> _advanced_build [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> build_simple [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> build_complex [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> build_advanced [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_unit [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_integration [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_e2e [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> deploy_staging [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> deploy_production [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> deploy_canary [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> build_no_retry [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_security [ltail=cluster_build, style=bold, color="#E41A1C"];
 }

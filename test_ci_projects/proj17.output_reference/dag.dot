@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
     label="test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
 
     test_matrix [label="test:matrix", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - RUBY_VERSION:\n    - '2.7'\n    - '3.0'\n    - '3.1'\n    - '3.2'\n    OS:\n    - ubuntu\n    - alpine\nscript:\n- echo \"Testing on Ruby ${RUBY_VERSION} with ${OS}\"\n- ruby --version\n- bundle install\n- bundle exec rspec\n"];
     integration_test [label="integration:test", tooltip="---\nstage: test\nparallel:\n  matrix:\n  - RUBY_VERSION:\n    - '3.0'\n    - '3.1'\n    - '3.2'\n    DATABASE:\n    - postgresql\n    - mysql\n  - RUBY_VERSION: '2.7'\n    DATABASE: sqlite\nscript:\n- echo \"Integration tests with Ruby ${RUBY_VERSION} and ${DATABASE}\"\n- bundle exec rake db:test:prepare\n- bundle exec rspec spec/integration\n"];
@@ -23,6 +26,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_build [style=invis, width=0, height=0];
+
     build_multiarch [label="build:multiarch", tooltip="---\nstage: build\nparallel:\n  matrix:\n  - PLATFORM:\n    - linux/amd64\n    - linux/arm64\n    - linux/arm/v7\n    BUILD_TYPE:\n    - release\n    - debug\nscript:\n- echo \"Building for ${PLATFORM} (${BUILD_TYPE})\"\n- docker buildx build --platform=${PLATFORM} --build-arg BUILD_TYPE=${BUILD_TYPE}\n  -t myapp:${CI_COMMIT_SHA}-${PLATFORM//\\//-}-${BUILD_TYPE} .\n"];
     process_data [label="process:data", tooltip="---\nstage: build\nparallel: 8\nscript:\n- echo \"Processing data shard ${CI_NODE_INDEX}/${CI_NODE_TOTAL}\"\n- \"./scripts/process_shard.sh ${CI_NODE_INDEX} ${CI_NODE_TOTAL}\"\n"];
   }
@@ -32,33 +37,12 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     deploy_cloud [label="deploy:cloud", tooltip="---\nstage: deploy\nparallel:\n  matrix:\n  - PROVIDER:\n    - aws\n    - gcp\n    - azure\n    REGION:\n    - us-east-1\n    - us-west-2\n    - eu-central-1\n    ENVIRONMENT:\n    - staging\n    - production\nscript:\n- echo \"Deploying to ${PROVIDER} ${REGION} (${ENVIRONMENT})\"\n- \"./scripts/deploy.sh --provider=${PROVIDER} --region=${REGION} --env=${ENVIRONMENT}\"\nwhen: manual\nonly:\n- main\n"];
   }
 
-  test_matrix -> build_multiarch;
-  integration_test -> build_multiarch;
-  unit_test_parallel -> build_multiarch;
-  e2e_test -> build_multiarch;
-  stress_test -> build_multiarch;
-  lint_files -> build_multiarch;
-  performance_test -> build_multiarch;
-  test_microservices -> build_multiarch;
-  test_matrix -> deploy_cloud;
-  integration_test -> deploy_cloud;
-  unit_test_parallel -> deploy_cloud;
-  e2e_test -> deploy_cloud;
-  build_multiarch -> deploy_cloud;
-  stress_test -> deploy_cloud;
-  lint_files -> deploy_cloud;
-  performance_test -> deploy_cloud;
-  process_data -> deploy_cloud;
-  test_microservices -> deploy_cloud;
-  test_matrix -> process_data;
-  integration_test -> process_data;
-  unit_test_parallel -> process_data;
-  e2e_test -> process_data;
-  stress_test -> process_data;
-  lint_files -> process_data;
-  performance_test -> process_data;
-  test_microservices -> process_data;
+  __stage_anchor_test -> build_multiarch [ltail=cluster_test, style=bold, color="#377EB8"];
+  __stage_anchor_build -> deploy_cloud [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> process_data [ltail=cluster_test, style=bold, color="#377EB8"];
 }

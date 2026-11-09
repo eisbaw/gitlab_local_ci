@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
     label="build";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_build [style=invis, width=0, height=0];
 
     build [label="build", tooltip="---\nstage: build\nscript:\n- echo \"Building application version ${DEPLOY_VERSION}\"\n- echo \"Build artifacts created\"\n- mkdir -p dist\n- echo \"app-${DEPLOY_VERSION}\" > dist/app.tar.gz\nartifacts:\n  paths:\n  - dist/\n  expire_in: 1 hour\n"];
   }
@@ -16,6 +19,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy_staging [style=invis, width=0, height=0];
+
     deploy_staging_app [label="deploy_staging_app", tooltip="---\nstage: deploy_staging\nresource_group: staging/deployment\nenvironment:\n  name: staging\n  url: https://staging.example.com\n  auto_stop_in: 1 day\n  on_stop: stop_staging\nscript:\n- echo \"Deploying to staging environment\"\n- echo \"Resource group 'staging/deployment' ensures only one staging deploy at a time\"\n- sleep 2\n- echo \"Application deployed to staging\"\n- echo \"Environment URL: https://staging.example.com\"\nneeds:\n- build\n"];
     deploy_staging_database [label="deploy_staging_database", tooltip="---\nstage: deploy_staging\nresource_group: staging/deployment\nenvironment:\n  name: staging\n  url: https://staging.example.com\n  auto_stop_in: 1 day\nscript:\n- echo \"Deploying database migrations to staging\"\n- echo \"Waiting for staging/deployment resource group lock\"\n- sleep 2\n- echo \"Database migrations applied to staging\"\nneeds:\n- build\nwhen: manual\n"];
   }
@@ -24,6 +29,8 @@ digraph pipeline {
     label="deploy_production";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_deploy_production [style=invis, width=0, height=0];
 
     deploy_production_app [label="deploy_production_app", tooltip="---\nstage: deploy_production\nresource_group: production/deployment\nenvironment:\n  name: production\n  url: https://production.example.com\n  auto_stop_in: 30 days\n  on_stop: stop_production\nscript:\n- echo \"Deploying to production environment\"\n- echo \"Resource group 'production/deployment' ensures safe production deploys\"\n- sleep 3\n- echo \"Application deployed to production\"\n- echo \"Environment URL: https://production.example.com\"\nneeds:\n- deploy_staging_app\nwhen: manual\nonly:\n- master\n- main\n"];
     deploy_production_database [label="deploy_production_database", tooltip="---\nstage: deploy_production\nresource_group: production/deployment\nenvironment:\n  name: production\n  url: https://production.example.com\n  auto_stop_in: 30 days\nscript:\n- echo \"Deploying database migrations to production\"\n- echo \"Waiting for production/deployment resource group lock\"\n- sleep 3\n- echo \"Database migrations applied to production\"\nneeds:\n- deploy_staging_database\n- deploy_production_app\nwhen: manual\nonly:\n- master\n- main\n"];
@@ -36,31 +43,19 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_cleanup [style=invis, width=0, height=0];
+
     stop_staging [label="stop_staging", tooltip="---\nstage: cleanup\nresource_group: staging/deployment\nenvironment:\n  name: staging\n  action: stop\nscript:\n- echo \"Stopping staging environment\"\n- echo \"Cleaning up staging resources\"\n- sleep 1\n- echo \"Staging environment stopped\"\nwhen: manual\n"];
     stop_production [label="stop_production", tooltip="---\nstage: cleanup\nresource_group: production/deployment\nenvironment:\n  name: production\n  action: stop\nscript:\n- echo \"Stopping production environment\"\n- echo \"Cleaning up production resources\"\n- sleep 2\n- echo \"Production environment stopped\"\nwhen: manual\nonly:\n- master\n- main\n"];
   }
 
-  build -> deploy_staging_app;
-  build -> deploy_staging_database;
-  deploy_staging_app -> deploy_production_app;
-  deploy_staging_database -> deploy_production_database;
-  deploy_production_app -> deploy_production_database;
-  build -> deploy_production_hotfix;
-  deploy_staging_app -> deploy_production_hotfix;
-  deploy_staging_database -> deploy_production_hotfix;
-  build -> stop_staging;
-  deploy_staging_app -> stop_staging;
-  deploy_staging_database -> stop_staging;
-  deploy_production_app -> stop_staging;
-  deploy_production_database -> stop_staging;
-  deploy_production_hotfix -> stop_staging;
-  deploy_monitoring -> stop_staging;
-  build -> stop_production;
-  deploy_staging_app -> stop_production;
-  deploy_staging_database -> stop_production;
-  deploy_production_app -> stop_production;
-  deploy_production_database -> stop_production;
-  deploy_production_hotfix -> stop_production;
-  deploy_monitoring -> stop_production;
-  deploy_production_app -> deploy_monitoring;
+  build -> deploy_staging_app [color="#4DAF4A"];
+  build -> deploy_staging_database [color="#4DAF4A"];
+  deploy_staging_app -> deploy_production_app [color="#FF7F00"];
+  deploy_staging_database -> deploy_production_database [color="#FFFF33"];
+  deploy_production_app -> deploy_production_database [color="#984EA3"];
+  __stage_anchor_deploy_staging -> deploy_production_hotfix [ltail=cluster_deploy_staging, style=bold, color="#377EB8"];
+  __stage_anchor_deploy_production -> stop_staging [ltail=cluster_deploy_production, style=bold, color="#E41A1C"];
+  __stage_anchor_deploy_production -> stop_production [ltail=cluster_deploy_production, style=bold, color="#E41A1C"];
+  deploy_production_app -> deploy_monitoring [color="#984EA3"];
 }

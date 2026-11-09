@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_vars_test {
     label="vars_test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_vars_test [style=invis, width=0, height=0];
 
     test_variables [label="test_variables", tooltip="---\nstage: vars_test\nvariables:\n  JOB_VAR: job_specific_value\n  COMBINED_VAR: \"${GLOBAL_VAR}_${JOB_VAR}\"\nscript:\n- echo \"=== Testing Variable Expansion ===\"\n- echo \"Global variable GLOBAL_VAR = ${GLOBAL_VAR}\"\n- echo \"Job-specific variable JOB_VAR = ${JOB_VAR}\"\n- echo \"Combined variable COMBINED_VAR = ${COMBINED_VAR}\"\n- echo \"\"\n- echo \"=== Testing Predefined GitLab CI Variables ===\"\n- echo \"CI_COMMIT_SHA = ${CI_COMMIT_SHA}\"\n- echo \"CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}\"\n- echo \"CI_COMMIT_REF_NAME = ${CI_COMMIT_REF_NAME}\"\n- echo \"CI_COMMIT_BRANCH = ${CI_COMMIT_BRANCH}\"\n- echo \"CI_PROJECT_NAME = ${CI_PROJECT_NAME}\"\n- echo \"CI_PROJECT_PATH = ${CI_PROJECT_PATH}\"\n- echo \"CI_PROJECT_DIR = ${CI_PROJECT_DIR}\"\n- echo \"CI_PIPELINE_ID = ${CI_PIPELINE_ID}\"\n- echo \"CI_JOB_ID = ${CI_JOB_ID}\"\n- echo \"CI_JOB_NAME = ${CI_JOB_NAME}\"\n- echo \"CI_JOB_STAGE = ${CI_JOB_STAGE}\"\n- echo \"CI_RUNNER_ID = ${CI_RUNNER_ID}\"\n- echo \"CI_SERVER_HOST = ${CI_SERVER_HOST}\"\n- echo \"CI_SERVER_VERSION = ${CI_SERVER_VERSION}\"\n- echo \"GITLAB_USER_LOGIN = ${GITLAB_USER_LOGIN}\"\n- echo \"GITLAB_USER_EMAIL = ${GITLAB_USER_EMAIL}\"\n"];
     variable_manipulation [label="variable_manipulation", tooltip="---\nstage: vars_test\nvariables:\n  ORIGINAL_VAR: hello_world\n  UPPERCASE_TEST: UPPERCASE\n  LOWERCASE_TEST: lowercase\n  PATH_VAR: \"/home/user/project\"\n  URL_VAR: https://example.com/path\n  NESTED_VAR_1: \"${GLOBAL_VAR}\"\n  NESTED_VAR_2: \"${NESTED_VAR_1}_nested\"\n  COMPLEX_VAR: \"${CI_PROJECT_NAME}-${BUILD_VERSION}-${CI_COMMIT_SHORT_SHA}-${NESTED_VAR_2}\"\nscript:\n- echo \"=== Testing Complex Variable Expansion ===\"\n- echo \"Original variable ORIGINAL_VAR = ${ORIGINAL_VAR}\"\n- echo \"Uppercase test UPPERCASE_TEST = ${UPPERCASE_TEST}\"\n- echo \"Lowercase test LOWERCASE_TEST = ${LOWERCASE_TEST}\"\n- echo \"Path variable PATH_VAR = ${PATH_VAR}\"\n- echo \"URL variable URL_VAR = ${URL_VAR}\"\n- echo \"\"\n- echo \"=== Testing Nested Variable Expansion ===\"\n- echo \"NESTED_VAR_1 = ${NESTED_VAR_1}\"\n- echo \"NESTED_VAR_2 = ${NESTED_VAR_2}\"\n- echo \"COMPLEX_VAR = ${COMPLEX_VAR}\"\n- echo \"\"\n- echo \"=== Testing Variables in Commands ===\"\n- export COMPUTED_VAR=\"${CI_PROJECT_NAME}_${CI_COMMIT_SHORT_SHA}\"\n- echo \"Computed variable COMPUTED_VAR = ${COMPUTED_VAR}\"\n- echo \"${COMPUTED_VAR}\" > /tmp/computed_var.txt\n- cat /tmp/computed_var.txt\n- rm /tmp/computed_var.txt\n"];
@@ -19,6 +22,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_build [style=invis, width=0, height=0];
+
     build_app [label="build_app", tooltip="---\nstage: build\nvariables:\n  BUILD_TARGET: production\n  BUILD_FLAGS: \"-O2 -Wall\"\n  OUTPUT_DIR: build/${BUILD_VERSION}\n  ARTIFACT_NAME: \"${CI_PROJECT_NAME}-${BUILD_VERSION}-${CI_COMMIT_SHORT_SHA}\"\nscript:\n- echo \"=== Building Application ===\"\n- echo \"Build version ${BUILD_VERSION}\"\n- echo \"Build target ${BUILD_TARGET}\"\n- echo \"Build flags ${BUILD_FLAGS}\"\n- echo \"Output directory ${OUTPUT_DIR}\"\n- echo \"Artifact name ${ARTIFACT_NAME}\"\n- echo \"Docker image will be ${DOCKER_IMAGE}:${BUILD_VERSION}\"\n- echo \"\"\n- echo \"Creating build directory...\"\n- mkdir -p \"${OUTPUT_DIR}\"\n- echo \"Build completed at $(date)\" > \"${OUTPUT_DIR}/build-info.txt\"\n- echo \"Commit ${CI_COMMIT_SHA}\" >> \"${OUTPUT_DIR}/build-info.txt\"\n- echo \"Branch ${CI_COMMIT_REF_NAME}\" >> \"${OUTPUT_DIR}/build-info.txt\"\nartifacts:\n  paths:\n  - build/\n  expire_in: 1 hour\n"];
   }
 
@@ -26,6 +31,8 @@ digraph pipeline {
     label="test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
 
     unit_tests [label="unit_tests", tooltip="---\nstage: test\nvariables:\n  TEST_ENV: unit\n  TEST_TIMEOUT: \"${TIMEOUT_SECONDS}\"\n  TEST_LOG_LEVEL: debug\n  TEST_RESULTS_DIR: test-results/${CI_JOB_NAME}\n  COVERAGE_TARGET: '80'\nscript:\n- echo \"=== Running Unit Tests ===\"\n- echo \"Test environment ${TEST_ENV}\"\n- echo \"Test timeout ${TEST_TIMEOUT} seconds\"\n- echo \"Log level ${TEST_LOG_LEVEL}\"\n- echo \"Results directory ${TEST_RESULTS_DIR}\"\n- echo \"Coverage target ${COVERAGE_TARGET}%\"\n- echo \"\"\n- echo \"Running tests for commit ${CI_COMMIT_SHORT_SHA}\"\n- echo \"Pipeline ID ${CI_PIPELINE_ID}\"\n- echo \"Job ID ${CI_JOB_ID}\"\n- mkdir -p \"${TEST_RESULTS_DIR}\"\n- echo \"Test passed\" > \"${TEST_RESULTS_DIR}/results.txt\"\nartifacts:\n  paths:\n  - test-results/\n  expire_in: 1 day\nneeds:\n- build_app\n"];
     integration_tests [label="integration_tests", tooltip="---\nstage: test\nvariables:\n  TEST_ENV: integration\n  TEST_DATABASE_URL: postgres://localhost/${CI_PROJECT_NAME}_test\n  TEST_REDIS_URL: redis://localhost:6379/1\n  API_BASE_URL: http://localhost:3000/api\n  RETRY_COUNT: \"${MAX_RETRIES}\"\nscript:\n- echo \"=== Running Integration Tests ===\"\n- echo \"Test environment ${TEST_ENV}\"\n- echo \"Database URL ${TEST_DATABASE_URL}\"\n- echo \"Redis URL ${TEST_REDIS_URL}\"\n- echo \"API base URL ${API_BASE_URL}\"\n- echo \"Max retries ${RETRY_COUNT}\"\n- echo \"\"\n- echo \"Testing integration for ${CI_PROJECT_NAME}\"\n- echo \"Branch ${CI_COMMIT_BRANCH}\"\n- echo \"Commit ${CI_COMMIT_SHA}\"\nneeds:\n- build_app\n"];
@@ -36,16 +43,15 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     deploy_staging [label="deploy_staging", tooltip="---\nstage: deploy\nvariables:\n  DEPLOY_ENV: \"${DEPLOYMENT_ENV}\"\n  DEPLOY_HOST: staging.example.com\n  DEPLOY_USER: deployer\n  DEPLOY_PATH: \"/var/www/${APP_NAME}\"\n  DOCKER_TAG: \"${BUILD_VERSION}-${CI_COMMIT_SHORT_SHA}\"\n  DEPLOY_IMAGE: \"${DOCKER_IMAGE}:${DOCKER_TAG}\"\n  CONFIG_FILE: \"${CONFIG_PATH}/config.yml\"\nscript:\n- echo \"=== Deploying to Staging ===\"\n- echo \"Environment ${DEPLOY_ENV}\"\n- echo \"Host ${DEPLOY_HOST}\"\n- echo \"User ${DEPLOY_USER}\"\n- echo \"Deploy path ${DEPLOY_PATH}\"\n- echo \"Docker image ${DEPLOY_IMAGE}\"\n- echo \"Config file ${CONFIG_FILE}\"\n- echo \"\"\n- echo \"Deploying ${CI_PROJECT_NAME} version ${BUILD_VERSION}\"\n- echo \"From commit ${CI_COMMIT_SHA}\"\n- echo \"On branch ${CI_COMMIT_REF_NAME}\"\n- echo \"Pipeline ${CI_PIPELINE_ID}\"\n- echo \"Triggered by ${GITLAB_USER_LOGIN}\"\n- echo \"\"\n- echo \"Deployment steps:\"\n- echo \"1. Pull image ${DEPLOY_IMAGE}\"\n- echo \"2. Stop current containers\"\n- echo \"3. Start new containers\"\n- echo \"4. Run health checks\"\n- echo \"\"\n- echo \"Deployment completed successfully\"\nenvironment:\n  name: staging\n  url: https://staging.example.com\nneeds:\n- build_app\n- unit_tests\n- integration_tests\nonly:\n- main\n- master\n"];
   }
 
-  test_variables -> build_app;
-  variable_manipulation -> build_app;
-  env_specific_vars -> build_app;
-  test_precedence -> build_app;
-  build_app -> unit_tests;
-  build_app -> integration_tests;
-  build_app -> deploy_staging;
-  unit_tests -> deploy_staging;
-  integration_tests -> deploy_staging;
+  __stage_anchor_vars_test -> build_app [ltail=cluster_vars_test, style=bold, color="#E41A1C"];
+  build_app -> unit_tests [color="#377EB8"];
+  build_app -> integration_tests [color="#377EB8"];
+  build_app -> deploy_staging [color="#377EB8"];
+  unit_tests -> deploy_staging [color="#984EA3"];
+  integration_tests -> deploy_staging [color="#4DAF4A"];
 }

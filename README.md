@@ -267,8 +267,8 @@ just test-proj1   # Minimal config
 just test-proj4   # Needs/DAG
 just test-proj19  # Complex 21-job DAG
 
-# Test all projects
-just test-all-projects
+# Diff all projects against their golden outputs
+just e2e
 ```
 
 See `test_ci_projects/TESTING.md` for details.

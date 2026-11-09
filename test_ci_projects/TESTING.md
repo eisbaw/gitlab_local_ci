@@ -24,14 +24,25 @@ just dag           # Run only DAG generation
 just dry-run       # Run only dry-run simulation
 ```
 
-### Test All Projects
+### Test All Projects (e2e golden gate)
 
-From the root directory:
+From the root directory, inside the dev shell:
 ```bash
-just test-all-projects
+just e2e          # snapshot every project, diff against projN.output_reference/
+just e2e-update   # rewrite the goldens after an intended behaviour change
 ```
 
-This will run all tests (lint, dag, dry-run) for all 20 projects sequentially.
+`just e2e` runs lint (text/json/junit), dag and dry-run for every project,
+records stdout, stderr (`<file>.stderr`, only when non-empty, capped at 50
+lines plus `# total_lines=N`) and the exit code of each, and fails on any
+difference from the committed `projN.output_reference/`. Non-zero exit codes are expected data (proj10 is
+invalid YAML, so its lint exit code is 1). `metadata.txt` and `dag.svg` are
+not compared.
+
+When a behaviour fix lands, run `just e2e-update`, review
+`git diff test_ci_projects/`, and explain each golden change in the commit
+message. Never regenerate blindly: a golden may pin a known bug, and the diff
+is where its fix becomes visible.
 
 ## Available Root Recipes
 
@@ -59,7 +70,8 @@ All recipes added to the root justfile:
 | `test-proj18` | Test project 18 - Resource Groups |
 | `test-proj19` | Test project 19 - Complex DAG |
 | `test-proj20` | Test project 20 - Kitchen Sink |
-| `test-all-projects` | Test all 20 projects sequentially |
+| `e2e` | Diff all projects against their golden outputs |
+| `e2e-update` | Regenerate the golden outputs |
 
 ## Project-Level Recipes
 
@@ -252,7 +264,7 @@ test_proj1:
 
 test_all:
   script:
-    - just test-all-projects
+    - just e2e
 ```
 
 ## Automation
@@ -281,7 +293,7 @@ Typical workflow when developing a feature:
 2. **Test with simple project**: `just test-proj1`
 3. **Test with feature-specific project**: `just test-proj4` (for DAG)
 4. **Test comprehensive project**: `just test-proj20`
-5. **Run full test suite**: `just test-all-projects`
+5. **Run full test suite**: `just e2e`
 
 ## Performance Benchmarking
 
@@ -292,7 +304,7 @@ Use the test projects for performance testing:
 time just test-proj1
 
 # Time all projects
-time just test-all-projects
+time just e2e
 
 # Profile specific command
 time just test-proj20  # Most complex
@@ -306,7 +318,7 @@ When adding new test projects:
 2. Add `.gitlab-ci.yml` with test configuration
 3. Copy justfile from existing project and update project number
 4. Add `test-proj21` recipe to root justfile
-5. Update `test-all-projects` loop to include 21
+5. Run `just e2e-update` to create `proj21.output_reference/`, review it, commit it
 6. Update documentation
 
 ## Summary

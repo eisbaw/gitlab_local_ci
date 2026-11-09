@@ -1,6 +1,7 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
@@ -8,7 +9,10 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_test [style=invis, width=0, height=0];
+
     test [label="test", tooltip="---\nscript:\n- echo \"Hello World\"\n"];
   }
 
+  __stage_anchor_build -> test [ltail=cluster_build, style=bold, color="#E41A1C"];
 }

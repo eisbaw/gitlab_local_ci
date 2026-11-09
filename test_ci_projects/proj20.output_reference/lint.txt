@@ -1,6 +1,3 @@
-GitLab CI configuration is invalid
-Errors:
-  - Job 'package:frontend' must have 'script', 'trigger', or 'pages' defined
-  - Job 'package:backend' must have 'script', 'trigger', or 'pages' defined
-  - Job 'package:api' must have 'script', 'trigger', or 'pages' defined
-  - Job 'package:workers' must have 'script', 'trigger', or 'pages' defined
+GitLab CI configuration is valid
+Stages: prebuild, build, test, security, quality, package, deploy_dev, integration, deploy_stage, performance, deploy_prod, cleanup
+Jobs: 63

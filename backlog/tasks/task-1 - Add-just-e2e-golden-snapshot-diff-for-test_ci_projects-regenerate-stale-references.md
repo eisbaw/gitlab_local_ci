@@ -3,9 +3,11 @@ id: TASK-1
 title: >-
   Add just e2e: golden-snapshot diff for test_ci_projects; regenerate stale
   references
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-11-09T17:52:00Z'
+updated_date: '2026-11-09T18:31:00Z'
 labels:
   - audit
   - testing
@@ -23,9 +25,33 @@ No e2e gate exists (CLAUDE.md requires `just e2e` before commits). test_ci_proje
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 just e2e regenerates lint (text/json/junit), dag and exit codes for every test_ci_projects/projN into a temp dir and diffs against projN.output_reference; non-zero exit on any diff
-- [ ] #2 Expected exit codes (e.g. proj10 lint=1) are honoured, not treated as failures
-- [ ] #3 A recipe regenerates references; every reference change in this task is reviewed and explained in the commit message (no blind regeneration)
-- [ ] #4 Output is deterministic (verify proj12 hidden-job ordering is stable across runs)
-- [ ] #5 Metadata timestamps excluded from the diff
+- [x] #1 just e2e regenerates lint (text/json/junit), dag and exit codes for every test_ci_projects/projN into a temp dir and diffs against projN.output_reference; non-zero exit on any diff
+- [x] #2 Expected exit codes (e.g. proj10 lint=1) are honoured, not treated as failures
+- [x] #3 A recipe regenerates references; every reference change in this task is reviewed and explained in the commit message (no blind regeneration)
+- [x] #4 Output is deterministic (verify proj12 hidden-job ordering is stable across runs)
+- [x] #5 Metadata timestamps excluded from the diff
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Make generate_output_references.sh the single generator: OUT_ROOT arg, ./bin CLI, glob projects, record exit codes, drop timestamp.
+2. just e2e: generate into mktemp, diff -ru vs goldens (exclude metadata.txt, dag.svg), also diff the project set. just e2e-update: regenerate in place. Replace always-failing test-all-projects.
+3. Remove env noise from goldens at source (rexml activation).
+4. Regenerate, review each diff against upstream semantics, note goldens that pin open bugs.
+5. Gate: e2e 3x, bite proofs, rspec.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Generator rewritten; e2e/e2e-update recipes added; test-all-projects replaced (it could not express expected failures). Found and fixed at source: nixpkgs ruby_3_3 prints 'Ignoring debug/racc/rbs ... extensions are not built' on any bare require of an unactivated bundled gem; only lint --format junit hit it (rexml), so every junit golden would have pinned env noise. Added dry-run (stdout only) to goldens: gives TASK-7 a diff surface; stderr excluded because proj13 stuck pipeline emits 7 MB of per-tick warnings (TASK-28). Filed TASK-27 (dag phantom anchor from empty stage), TASK-28, TASK-29.
+
+Review round (mped-architect + qa-test-runner) changed the golden layout before commit: stdout and stderr are now captured separately (stderr to <file>.stderr, only if non-empty, capped at 50 lines + '# total_lines=N'), json/junit exit codes are recorded, ambient CI_*/GITLAB_* env vars are unset, and dry-run gets a pinned git context (--variables CI_COMMIT_BRANCH=main ... CI_COMMIT_SHA=0...0). Without that pin, dry-run reads branch/tag/SHA from the checkout, and proj8/12/16/20 differed on a feature branch, a detached HEAD or a tagged commit. Verified 0 diffs in all three states in a scratch git copy. e2e-update now generates into a temp dir and swaps each golden dir wholesale, so a SIGINT cannot leave half-written goldens and stale files cannot linger. Gate: e2e green 3x (19.7/21.8/22.6 s). It fails on: a formatter change, a golden exit-code edit, a project without a golden, a stray golden file, and a stderr-only message change. rspec: 540 examples, 0 failures (exit 2 from the SimpleCov minimum, TASK-2). Filed TASK-30 (nix ruby gem-scan warnings, class fix).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added just e2e (golden diff of lint text/json/junit, dag, dry-run: stdout, stderr and exit code per command for every test_ci_projects/projN) and just e2e-update. Both use the single generator generate_output_references.sh. They replace the always-failing test-all-projects. Stale goldens were regenerated, and each change was reviewed against upstream semantics (see the commit message). Some goldens deliberately pin open bugs: TASK-4, 5, 7, 17, 27, 28. Follow-ups filed: TASK-27, 28, 29, 30. Forward notes added to TASK-5/6/7.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,0 +1,10 @@
+Pipeline #1 created with 1 job(s)
+
+[T+0s] Job 'test' → Runner 'runner_001'
+[T+5s] Job 'test' completed
+
+Simulation completed at T+6s
+
+Pipeline status: success
+Job summary:
+  completed: 1

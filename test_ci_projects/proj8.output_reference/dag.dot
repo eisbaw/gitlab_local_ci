@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
     label="build";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_build [style=invis, width=0, height=0];
 
     build_main [label="build_main", tooltip="---\nstage: build\nscript:\n- echo \"Building on main branch\"\n- echo \"Build artifacts created\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
     build_feature [label="build_feature", tooltip="---\nstage: build\nscript:\n- echo \"Building feature branch: $CI_COMMIT_BRANCH\"\n- echo \"Feature build completed\"\nrules:\n- if: $CI_COMMIT_BRANCH != \"main\"\n"];
@@ -17,6 +20,8 @@ digraph pipeline {
     label="test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
 
     test_mr [label="test_mr", tooltip="---\nstage: test\nscript:\n- echo \"Running tests for merge request\"\n- echo \"MR pipeline ID: $CI_MERGE_REQUEST_IID\"\n- echo \"Source branch: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME\"\n- echo \"Target branch: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n"];
     test_comprehensive [label="test_comprehensive", tooltip="---\nstage: test\nscript:\n- echo \"Running comprehensive tests\"\n- echo \"Test suite completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n"];
@@ -33,6 +38,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     deploy_staging [label="deploy_staging", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to staging environment\"\n- echo \"Deployment completed to: $DEPLOY_ENV\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: manual\nenvironment:\n  name: staging\n"];
     deploy_production [label="deploy_production", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying to production\"\n- echo \"Production deployment completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n- if: \"$CI_COMMIT_TAG\"\n  when: on_success\nenvironment:\n  name: production\n"];
     notify_success [label="notify_success", tooltip="---\nstage: deploy\nscript:\n- echo \"All tests passed, sending success notification\"\n- echo \"Notification sent to team\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: on_success\n"];
@@ -45,119 +52,25 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_cleanup [style=invis, width=0, height=0];
+
     notify_failure [label="notify_failure", tooltip="---\nstage: cleanup\nscript:\n- echo \"Pipeline failed, sending failure notification\"\n- echo \"Failure details sent to team\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: on_failure\n"];
     cleanup_always [label="cleanup_always", tooltip="---\nstage: cleanup\nscript:\n- echo \"Performing cleanup operations\"\n- echo \"Temporary files removed\"\n- echo \"Resources released\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: always\n"];
   }
 
-  build_main -> test_mr;
-  build_feature -> test_mr;
-  nightly_build -> test_mr;
-  build_main -> test_comprehensive;
-  build_feature -> test_comprehensive;
-  nightly_build -> test_comprehensive;
-  build_main -> test_backend;
-  build_feature -> test_backend;
-  nightly_build -> test_backend;
-  build_main -> test_frontend;
-  build_feature -> test_frontend;
-  nightly_build -> test_frontend;
-  build_main -> deploy_staging;
-  build_feature -> deploy_staging;
-  test_mr -> deploy_staging;
-  test_comprehensive -> deploy_staging;
-  test_backend -> deploy_staging;
-  test_frontend -> deploy_staging;
-  security_scan -> deploy_staging;
-  experimental_test -> deploy_staging;
-  nightly_build -> deploy_staging;
-  integration_test -> deploy_staging;
-  skip_on_draft -> deploy_staging;
-  build_main -> deploy_production;
-  build_feature -> deploy_production;
-  test_mr -> deploy_production;
-  test_comprehensive -> deploy_production;
-  test_backend -> deploy_production;
-  test_frontend -> deploy_production;
-  security_scan -> deploy_production;
-  experimental_test -> deploy_production;
-  nightly_build -> deploy_production;
-  integration_test -> deploy_production;
-  skip_on_draft -> deploy_production;
-  build_main -> notify_success;
-  build_feature -> notify_success;
-  test_mr -> notify_success;
-  test_comprehensive -> notify_success;
-  test_backend -> notify_success;
-  test_frontend -> notify_success;
-  security_scan -> notify_success;
-  experimental_test -> notify_success;
-  nightly_build -> notify_success;
-  integration_test -> notify_success;
-  skip_on_draft -> notify_success;
-  build_main -> notify_failure;
-  build_feature -> notify_failure;
-  test_mr -> notify_failure;
-  test_comprehensive -> notify_failure;
-  test_backend -> notify_failure;
-  test_frontend -> notify_failure;
-  deploy_staging -> notify_failure;
-  deploy_production -> notify_failure;
-  notify_success -> notify_failure;
-  security_scan -> notify_failure;
-  release -> notify_failure;
-  experimental_test -> notify_failure;
-  nightly_build -> notify_failure;
-  deploy_custom -> notify_failure;
-  integration_test -> notify_failure;
-  skip_on_draft -> notify_failure;
-  build_main -> cleanup_always;
-  build_feature -> cleanup_always;
-  test_mr -> cleanup_always;
-  test_comprehensive -> cleanup_always;
-  test_backend -> cleanup_always;
-  test_frontend -> cleanup_always;
-  deploy_staging -> cleanup_always;
-  deploy_production -> cleanup_always;
-  notify_success -> cleanup_always;
-  security_scan -> cleanup_always;
-  release -> cleanup_always;
-  experimental_test -> cleanup_always;
-  nightly_build -> cleanup_always;
-  deploy_custom -> cleanup_always;
-  integration_test -> cleanup_always;
-  skip_on_draft -> cleanup_always;
-  build_main -> security_scan;
-  build_feature -> security_scan;
-  nightly_build -> security_scan;
-  build_main -> release;
-  build_feature -> release;
-  test_mr -> release;
-  test_comprehensive -> release;
-  test_backend -> release;
-  test_frontend -> release;
-  security_scan -> release;
-  experimental_test -> release;
-  nightly_build -> release;
-  integration_test -> release;
-  skip_on_draft -> release;
-  build_main -> experimental_test;
-  build_feature -> experimental_test;
-  nightly_build -> experimental_test;
-  build_main -> deploy_custom;
-  build_feature -> deploy_custom;
-  test_mr -> deploy_custom;
-  test_comprehensive -> deploy_custom;
-  test_backend -> deploy_custom;
-  test_frontend -> deploy_custom;
-  security_scan -> deploy_custom;
-  experimental_test -> deploy_custom;
-  nightly_build -> deploy_custom;
-  integration_test -> deploy_custom;
-  skip_on_draft -> deploy_custom;
-  build_main -> integration_test;
-  build_feature -> integration_test;
-  nightly_build -> integration_test;
-  build_main -> skip_on_draft;
-  build_feature -> skip_on_draft;
-  nightly_build -> skip_on_draft;
+  __stage_anchor_build -> test_mr [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_comprehensive [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_backend [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_frontend [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> deploy_staging [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_test -> deploy_production [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_test -> notify_success [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_deploy -> notify_failure [ltail=cluster_deploy, style=bold, color="#377EB8"];
+  __stage_anchor_deploy -> cleanup_always [ltail=cluster_deploy, style=bold, color="#377EB8"];
+  __stage_anchor_build -> security_scan [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> release [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_build -> experimental_test [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> deploy_custom [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_build -> integration_test [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> skip_on_draft [ltail=cluster_build, style=bold, color="#E41A1C"];
 }

@@ -1,0 +1,22 @@
+Pipeline #1 created with 7 job(s)
+
+[T+0s] Job 'unit-tests' → Runner 'runner_001'
+[T+0s] Job 'integration-tests' → Runner 'runner_001'
+[T+0s] Job 'code-quality' → Runner 'runner_001'
+[T+0s] Job 'sast' → Runner 'runner_001'
+[T+5s] Job 'unit-tests' completed
+[T+5s] Job 'integration-tests' completed
+[T+5s] Job 'code-quality' completed
+[T+5s] Job 'sast' completed
+[T+6s] Job 'coverage-formats' → Runner 'runner_001'
+[T+6s] Job 'full-test-suite' → Runner 'runner_001'
+[T+6s] Job 'go-tests' → Runner 'runner_001'
+[T+11s] Job 'coverage-formats' completed
+[T+11s] Job 'full-test-suite' completed
+[T+11s] Job 'go-tests' completed
+
+Simulation completed at T+12s
+
+Pipeline status: success
+Job summary:
+  completed: 7

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:53:00Z'
-updated_date: '2026-11-09T17:54:00Z'
+updated_date: '2026-11-09T18:08:00Z'
 labels:
   - audit
   - config
@@ -30,3 +30,9 @@ Repro: .base: {tags: [a], before_script: [echo base]}; t: {extends: .base, tags:
 - [ ] #2 Nesting deeper than 10 is a lint error
 - [ ] #3 Specs for the repro and multi-level/multi-parent extends order
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Forward-carried from TASK-1: just e2e diffs CLI output for test_ci_projects against projN.output_reference/. As of TASK-1 no golden visibly encodes the array-concatenation bug (dag does not resolve extends, see TASK-4; lint/dry-run output does not print merged scripts/tags), so expect just e2e to stay green after this fix. Prove the fix with rspec; if any golden does change, run just e2e-update, review git diff test_ci_projects/, and explain each change in the commit message. Never regenerate blindly.
+<!-- SECTION:NOTES:END -->

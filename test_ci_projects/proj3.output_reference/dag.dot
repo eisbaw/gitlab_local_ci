@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_test {
     label="test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
 
     unit_tests [label="unit_tests", tooltip="---\nstage: test\nscript:\n- echo \"Running unit tests...\"\n- sleep 2\n- echo \"Unit tests passed\"\n"];
     integration_tests [label="integration_tests", tooltip="---\nstage: test\nscript:\n- echo \"Running integration tests...\"\n- sleep 3\n- echo \"Integration tests passed\"\n"];
@@ -18,10 +21,10 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     deploy [label="deploy", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying application...\"\n- sleep 2\n- echo \"Deployment complete\"\n"];
   }
 
-  unit_tests -> deploy;
-  integration_tests -> deploy;
-  lint -> deploy;
+  __stage_anchor_test -> deploy [ltail=cluster_test, style=bold, color="#E41A1C"];
 }

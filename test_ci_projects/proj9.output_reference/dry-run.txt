@@ -1,0 +1,28 @@
+Pipeline #1 created with 10 job(s)
+
+[T+0s] Job 'build:default-cache' → Runner 'runner_001'
+[T+0s] Job 'build:static-cache' → Runner 'runner_001'
+[T+0s] Job 'build:dynamic-cache' → Runner 'runner_001'
+[T+0s] Job 'test:multi-cache' → Runner 'runner_001'
+[T+5s] Job 'build:default-cache' completed
+[T+5s] Job 'build:static-cache' completed
+[T+5s] Job 'build:dynamic-cache' completed
+[T+5s] Job 'test:multi-cache' completed
+[T+6s] Job 'test:pull-only' → Runner 'runner_001'
+[T+6s] Job 'build:push-only' → Runner 'runner_001'
+[T+6s] Job 'deploy:complex-cache-key' → Runner 'runner_001'
+[T+6s] Job 'deploy:no-cache' → Runner 'runner_001'
+[T+11s] Job 'test:pull-only' completed
+[T+11s] Job 'build:push-only' completed
+[T+11s] Job 'deploy:complex-cache-key' completed
+[T+11s] Job 'deploy:no-cache' completed
+[T+12s] Job 'build:files-cache' → Runner 'runner_001'
+[T+12s] Job 'test:combined-cache' → Runner 'runner_001'
+[T+17s] Job 'build:files-cache' completed
+[T+17s] Job 'test:combined-cache' completed
+
+Simulation completed at T+18s
+
+Pipeline status: success
+Job summary:
+  completed: 10

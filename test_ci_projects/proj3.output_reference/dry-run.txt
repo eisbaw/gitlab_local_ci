@@ -1,0 +1,16 @@
+Pipeline #1 created with 4 job(s)
+
+[T+0s] Job 'unit_tests' → Runner 'runner_001'
+[T+0s] Job 'integration_tests' → Runner 'runner_001'
+[T+0s] Job 'lint' → Runner 'runner_001'
+[T+0s] Job 'deploy' → Runner 'runner_001'
+[T+5s] Job 'unit_tests' completed
+[T+5s] Job 'integration_tests' completed
+[T+5s] Job 'lint' completed
+[T+5s] Job 'deploy' completed
+
+Simulation completed at T+6s
+
+Pipeline status: success
+Job summary:
+  completed: 4

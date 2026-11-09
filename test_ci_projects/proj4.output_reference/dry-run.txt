@@ -1,0 +1,32 @@
+Pipeline #1 created with 12 job(s)
+
+[T+0s] Job 'build:frontend' → Runner 'runner_001'
+[T+0s] Job 'build:backend' → Runner 'runner_001'
+[T+0s] Job 'build:database' → Runner 'runner_001'
+[T+5s] Job 'build:frontend' completed
+[T+5s] Job 'build:backend' completed
+[T+5s] Job 'build:database' completed
+[T+6s] Job 'test:frontend:unit' → Runner 'runner_001'
+[T+6s] Job 'test:frontend:e2e' → Runner 'runner_001'
+[T+6s] Job 'test:backend:unit' → Runner 'runner_001'
+[T+6s] Job 'test:backend:api' → Runner 'runner_001'
+[T+11s] Job 'test:frontend:unit' completed
+[T+11s] Job 'test:frontend:e2e' completed
+[T+11s] Job 'test:backend:unit' completed
+[T+11s] Job 'test:backend:api' completed
+[T+12s] Job 'integration:smoke' → Runner 'runner_001'
+[T+12s] Job 'integration:full' → Runner 'runner_001'
+[T+17s] Job 'integration:smoke' completed
+[T+17s] Job 'integration:full' completed
+[T+18s] Job 'deploy:staging:frontend' → Runner 'runner_001'
+[T+18s] Job 'deploy:staging:backend' → Runner 'runner_001'
+[T+23s] Job 'deploy:staging:frontend' completed
+[T+23s] Job 'deploy:staging:backend' completed
+[T+24s] Job 'deploy:production' → Runner 'runner_001'
+[T+29s] Job 'deploy:production' completed
+
+Simulation completed at T+30s
+
+Pipeline status: success
+Job summary:
+  completed: 12

@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
     label="build";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_build [style=invis, width=0, height=0];
 
     build_frontend [label="build:frontend", tooltip="---\nstage: build\nscript:\n- echo \"Building frontend...\"\n- sleep 2\n- echo \"Frontend build complete\"\nartifacts:\n  paths:\n  - dist/frontend/\n  expire_in: 1 hour\n"];
     build_backend [label="build:backend", tooltip="---\nstage: build\nscript:\n- echo \"Building backend...\"\n- sleep 2\n- echo \"Backend build complete\"\nartifacts:\n  paths:\n  - dist/backend/\n  expire_in: 1 hour\n"];
@@ -17,6 +20,8 @@ digraph pipeline {
     label="test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
 
     test_frontend_unit [label="test:frontend:unit", tooltip="---\nstage: test\nneeds:\n- build:frontend\nscript:\n- echo \"Running frontend unit tests...\"\n- sleep 2\n- echo \"Frontend tests passed\"\n"];
     test_frontend_e2e [label="test:frontend:e2e", tooltip="---\nstage: test\nneeds:\n- build:frontend\nscript:\n- echo \"Running frontend E2E tests...\"\n- sleep 3\n- echo \"Frontend E2E tests passed\"\n"];
@@ -29,6 +34,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_integration [style=invis, width=0, height=0];
+
     integration_smoke [label="integration:smoke", tooltip="---\nstage: integration\nneeds:\n- build:frontend\n- build:backend\nscript:\n- echo \"Running smoke tests...\"\n- sleep 2\n- echo \"Smoke tests passed\"\n"];
     integration_full [label="integration:full", tooltip="---\nstage: integration\nneeds:\n- test:frontend:unit\n- test:backend:unit\n- test:backend:api\nscript:\n- echo \"Running full integration tests...\"\n- sleep 4\n- echo \"Integration tests passed\"\n"];
   }
@@ -38,28 +45,30 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     deploy_staging_frontend [label="deploy:staging:frontend", tooltip="---\nstage: deploy\nneeds:\n- build:frontend\n- test:frontend:unit\n- integration:smoke\nscript:\n- echo \"Deploying frontend to staging...\"\n- sleep 2\n- echo \"Frontend deployed to staging\"\nenvironment:\n  name: staging/frontend\n"];
     deploy_staging_backend [label="deploy:staging:backend", tooltip="---\nstage: deploy\nneeds:\n- build:backend\n- test:backend:api\n- integration:smoke\nscript:\n- echo \"Deploying backend to staging...\"\n- sleep 2\n- echo \"Backend deployed to staging\"\nenvironment:\n  name: staging/backend\n"];
     deploy_production [label="deploy:production", tooltip="---\nstage: deploy\nneeds:\n- integration:full\n- deploy:staging:frontend\n- deploy:staging:backend\nscript:\n- echo \"Deploying to production...\"\n- sleep 3\n- echo \"Deployed to production\"\nenvironment:\n  name: production\nwhen: manual\n"];
   }
 
-  build_frontend -> test_frontend_unit;
-  build_frontend -> test_frontend_e2e;
-  build_backend -> test_backend_unit;
-  build_backend -> test_backend_api;
-  build_database -> test_backend_api;
-  build_frontend -> integration_smoke;
-  build_backend -> integration_smoke;
-  test_frontend_unit -> integration_full;
-  test_backend_unit -> integration_full;
-  test_backend_api -> integration_full;
-  build_frontend -> deploy_staging_frontend;
-  test_frontend_unit -> deploy_staging_frontend;
-  integration_smoke -> deploy_staging_frontend;
-  build_backend -> deploy_staging_backend;
-  test_backend_api -> deploy_staging_backend;
-  integration_smoke -> deploy_staging_backend;
-  integration_full -> deploy_production;
-  deploy_staging_frontend -> deploy_production;
-  deploy_staging_backend -> deploy_production;
+  build_frontend -> test_frontend_unit [color="#4DAF4A"];
+  build_frontend -> test_frontend_e2e [color="#4DAF4A"];
+  build_backend -> test_backend_unit [color="#E41A1C"];
+  build_backend -> test_backend_api [color="#E41A1C"];
+  build_database -> test_backend_api [color="#377EB8"];
+  build_frontend -> integration_smoke [color="#4DAF4A"];
+  build_backend -> integration_smoke [color="#E41A1C"];
+  test_frontend_unit -> integration_full [color="#FFFFB3"];
+  test_backend_unit -> integration_full [color="#8DD3C7"];
+  test_backend_api -> integration_full [color="#F781BF"];
+  build_frontend -> deploy_staging_frontend [color="#4DAF4A"];
+  test_frontend_unit -> deploy_staging_frontend [color="#FFFFB3"];
+  integration_smoke -> deploy_staging_frontend [color="#A65628"];
+  build_backend -> deploy_staging_backend [color="#E41A1C"];
+  test_backend_api -> deploy_staging_backend [color="#F781BF"];
+  integration_smoke -> deploy_staging_backend [color="#A65628"];
+  integration_full -> deploy_production [color="#FFFF33"];
+  deploy_staging_frontend -> deploy_production [color="#FF7F00"];
+  deploy_staging_backend -> deploy_production [color="#984EA3"];
 }

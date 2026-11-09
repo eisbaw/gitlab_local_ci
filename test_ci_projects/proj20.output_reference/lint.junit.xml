@@ -1,17 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <testsuites>
-  <testsuite name='GitLab CI Lint' tests='1' failures='1' time='0'>
-    <testcase name='yaml_validation' time='0'>
-      <failure message='GitLab CI configuration is invalid'>
-        Job &apos;package:frontend&apos; must have &apos;script&apos;,
-        &apos;trigger&apos;, or &apos;pages&apos; defined Job
-        &apos;package:backend&apos; must have &apos;script&apos;,
-        &apos;trigger&apos;, or &apos;pages&apos; defined Job
-        &apos;package:api&apos; must have &apos;script&apos;,
-        &apos;trigger&apos;, or &apos;pages&apos; defined Job
-        &apos;package:workers&apos; must have &apos;script&apos;,
-        &apos;trigger&apos;, or &apos;pages&apos; defined
-      </failure>
-    </testcase>
+  <testsuite name='GitLab CI Lint' tests='1' failures='0' time='0'>
+    <testcase name='yaml_validation' time='0'/>
   </testsuite>
 </testsuites>

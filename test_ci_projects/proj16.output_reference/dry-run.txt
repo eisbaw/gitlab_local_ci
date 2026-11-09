@@ -1,0 +1,14 @@
+Pipeline #1 created with 3 job(s)
+
+[T+0s] Job 'trigger_child1' → Runner 'runner_001'
+[T+0s] Job 'trigger_child2' → Runner 'runner_001'
+[T+0s] Job 'trigger_child_with_rules' → Runner 'runner_001'
+[T+5s] Job 'trigger_child1' completed
+[T+5s] Job 'trigger_child2' completed
+[T+5s] Job 'trigger_child_with_rules' completed
+
+Simulation completed at T+6s
+
+Pipeline status: success
+Job summary:
+  completed: 3

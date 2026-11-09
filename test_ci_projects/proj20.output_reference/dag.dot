@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_prebuild {
     label="prebuild";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_prebuild [style=invis, width=0, height=0];
 
     validate_yaml [label="validate:yaml", tooltip="---\nstage: prebuild\nimage: alpine:latest\nscript:\n- apk add --no-cache yamllint\n- 'yamllint -d \"{extends: relaxed, rules: {line-length: {max: 120}}}\" .gitlab-ci.yml'\n- echo \"YAML validation passed\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
     validate_dependencies [label="validate:dependencies", tooltip="---\nstage: prebuild\nimage: alpine:latest\nscript:\n- echo \"Checking dependency files...\"\n- test -f package.json || echo \"Warning: package.json not found\"\n- test -f Gemfile || echo \"Warning: Gemfile not found\"\n- test -f requirements.txt || echo \"Warning: requirements.txt not found\"\n- echo \"Dependency validation complete\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n"];
@@ -20,6 +23,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_build [style=invis, width=0, height=0];
+
     build_frontend [label="build:frontend", tooltip="---\nstage: build\nimage: node:20-alpine\ncache:\n  key: node-${CI_COMMIT_REF_SLUG}\n  paths:\n  - node_modules/\n  - \".npm/\"\n  policy: pull-push\nneeds:\n- lint:frontend\nscript:\n- cd services/frontend\n- npm ci\n- npm run build\n- echo \"Frontend build artifacts:\"\n- ls -lah dist/\n- echo \"BUILD_VERSION=${VERSION}\" > ../../build-frontend.env\n- echo \"FRONTEND_BUILD_ID=${CI_JOB_ID}\" >> ../../build-frontend.env\nartifacts:\n  paths:\n  - services/frontend/dist/\n  - services/frontend/package.json\n  - services/frontend/package-lock.json\n  reports:\n    dotenv: build-frontend.env\n  expire_in: 2 hours\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/frontend/**/*\n"];
     build_backend [label="build:backend", tooltip="---\nstage: build\nimage: ruby:3.2-alpine\ncache:\n  key: ruby-${CI_COMMIT_REF_SLUG}\n  paths:\n  - vendor/ruby/\n  - \".bundle/\"\n  policy: pull-push\nneeds:\n- lint:backend\nscript:\n- cd services/backend\n- bundle install --deployment --jobs 4\n- bundle exec rake assets:precompile\n- echo \"Backend build complete\"\n- echo \"BUILD_VERSION=${VERSION}\" > ../../build-backend.env\n- echo \"BACKEND_BUILD_ID=${CI_JOB_ID}\" >> ../../build-backend.env\nartifacts:\n  paths:\n  - services/backend/public/assets/\n  - services/backend/vendor/bundle/\n  - services/backend/Gemfile.lock\n  reports:\n    dotenv: build-backend.env\n  expire_in: 2 hours\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/backend/**/*\n"];
     build_api [label="build:api", tooltip="---\nstage: build\nimage: python:3.11-alpine\ncache:\n  key: python-${CI_COMMIT_REF_SLUG}\n  paths:\n  - \".venv/\"\n  - \".pip-cache/\"\n  policy: pull-push\nneeds:\n- lint:api\nscript:\n- cd services/api\n- python -m venv .venv\n- source .venv/bin/activate\n- pip install --upgrade pip setuptools wheel\n- pip install -r requirements.txt\n- python -m compileall src/\n- echo \"API build complete\"\n- echo \"BUILD_VERSION=${VERSION}\" > ../../build-api.env\n- echo \"API_BUILD_ID=${CI_JOB_ID}\" >> ../../build-api.env\nartifacts:\n  paths:\n  - services/api/.venv/\n  - services/api/requirements.txt\n  reports:\n    dotenv: build-api.env\n  expire_in: 2 hours\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/api/**/*\n"];
@@ -30,6 +35,8 @@ digraph pipeline {
     label="test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
 
     _base_config [label=".base_config", tooltip="---\nretry:\n  max: 2\n  when:\n  - runner_system_failure\n  - stuck_or_timeout_failure\ntimeout: 1h\ninterruptible: true\n"];
     _docker_config [label=".docker_config", tooltip="---\nimage: docker:24-alpine\nservices:\n- docker:24-dind\nvariables:\n  DOCKER_TLS_CERTDIR: \"/certs\"\ntags:\n- docker\n"];
@@ -51,6 +58,11 @@ digraph pipeline {
     package_backend [label="package:backend", tooltip="---\nextends: \".docker_build_job\"\nneeds:\n- build:backend\n- test:backend:unit\nvariables:\n  IMAGE_NAME: \"${DOCKER_IMAGE_BASE}/backend\"\n  SERVICE_PATH: services/backend\nbefore_script:\n- - before_script\n- cd ${SERVICE_PATH}\n- echo \"IMAGE_TAG=${CI_COMMIT_SHA}\" > ../../build.env\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
     package_api [label="package:api", tooltip="---\nextends: \".docker_build_job\"\nneeds:\n- build:api\n- test:api:unit\nvariables:\n  IMAGE_NAME: \"${DOCKER_IMAGE_BASE}/api\"\n  SERVICE_PATH: services/api\nbefore_script:\n- - before_script\n- cd ${SERVICE_PATH}\n- echo \"IMAGE_TAG=${CI_COMMIT_SHA}\" > ../../build.env\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
     package_workers [label="package:workers", tooltip="---\nextends: \".docker_build_job\"\nneeds:\n- build:workers\n- test:workers\nvariables:\n  IMAGE_NAME: \"${DOCKER_IMAGE_BASE}/workers\"\n  SERVICE_PATH: services/workers\nbefore_script:\n- - before_script\n- cd ${SERVICE_PATH}\n- echo \"IMAGE_TAG=${CI_COMMIT_SHA}\" > ../../build.env\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    _frontend_base [label=".frontend_base", tooltip="---\nimage: node:20-alpine\ncache:\n  key: frontend-deps-${CI_COMMIT_REF_SLUG}\n  paths:\n  - services/frontend/node_modules/\n  - services/frontend/.npm/\nbefore_script:\n- cd services/frontend\n- npm ci --cache .npm --prefer-offline\n"];
+    _backend_base [label=".backend_base", tooltip="---\nimage: ruby:3.2-alpine\ncache:\n  key: backend-gems-${CI_COMMIT_REF_SLUG}\n  paths:\n  - services/backend/vendor/bundle/\nbefore_script:\n- cd services/backend\n- bundle config set --local path 'vendor/bundle'\n- bundle install --jobs 4\n"];
+    database_migrations_check [label="database:migrations:check", tooltip="---\nextends: \".backend_base\"\nstage: test\nneeds: []\nservices:\n- name: postgres:15-alpine\n  alias: postgres\nvariables:\n  POSTGRES_DB: migration_test\n  POSTGRES_USER: test_user\n  POSTGRES_PASSWORD: test_pass\n  DATABASE_URL: postgresql://test_user:test_pass@postgres:5432/migration_test\n  RAILS_ENV: test\nbefore_script:\n- - \".backend_base\"\n  - before_script\n- apk add --no-cache postgresql-client\n- until pg_isready -h postgres -U test_user; do sleep 1; done\nscript:\n- bundle exec rake db:create\n- bundle exec rake db:migrate\n- bundle exec rake db:rollback STEP=3\n- bundle exec rake db:migrate\n- echo \"Migration consistency check passed\"\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  changes:\n  - services/backend/db/migrate/**/*\n"];
+    security_container_scan [label="security:container:scan", tooltip="---\nextends: \".security_base\"\nimage: aquasec/trivy:latest\nneeds: []\nparallel:\n  matrix:\n  - IMAGE:\n    - frontend\n    - backend\n    - api\n    - workers\nscript:\n- echo \"Scanning ${IMAGE} container image for vulnerabilities\"\n- trivy image --format json --output ${IMAGE}-scan.json ${DOCKER_IMAGE_BASE}/${IMAGE}:latest\n  || true\nartifacts:\n  paths:\n  - \"*-scan.json\"\nrules:\n- if: $ENABLE_SECURITY_SCANNING == \"true\" && $CI_COMMIT_BRANCH == \"main\"\n"];
+    security_license_check [label="security:license:check", tooltip="---\nextends: \".security_base\"\nimage: licensefinder/license_finder:latest\nneeds: []\nscript:\n- license_finder report --format json > license-report.json || true\n- echo \"License compliance check completed\"\nartifacts:\n  paths:\n  - license-report.json\nrules:\n- if: $CI_PIPELINE_SOURCE == \"schedule\"\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n"];
   }
 
   subgraph cluster_security {
@@ -58,9 +70,14 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_security [style=invis, width=0, height=0];
+
     security_sast [label="security:sast", tooltip="---\nstage: security\nimage: returntocorp/semgrep:latest\nneeds: []\nscript:\n- semgrep --config=auto --json --output=sast-report.json || true\n- echo \"SAST scan completed\"\nartifacts:\n  reports:\n    sast: sast-report.json\n  expire_in: 1 week\nrules:\n- if: $ENABLE_SECURITY_SCANNING == \"true\"\n"];
     security_dependency_scanning [label="security:dependency-scanning", tooltip="---\nstage: security\nimage: aquasec/trivy:latest\nneeds: []\nscript:\n- trivy fs --format json --output dependency-scan.json --severity HIGH,CRITICAL .\n  || true\n- echo \"Dependency scanning completed\"\nartifacts:\n  reports:\n    dependency_scanning: dependency-scan.json\n  expire_in: 1 week\nrules:\n- if: $ENABLE_SECURITY_SCANNING == \"true\"\n"];
     security_secrets [label="security:secrets", tooltip="---\nstage: security\nimage: trufflesecurity/trufflehog:latest\nneeds: []\nallow_failure: true\nscript:\n- trufflehog filesystem . --json > secrets-report.json || true\n- echo \"Secret scanning completed\"\nartifacts:\n  paths:\n  - secrets-report.json\n  expire_in: 1 week\nrules:\n- if: $ENABLE_SECURITY_SCANNING == \"true\"\n"];
+    audit_frontend_dependencies [label="audit:frontend:dependencies", tooltip="---\nextends: \".frontend_base\"\nstage: security\nneeds: []\nscript:\n- npm audit --audit-level=moderate\nallow_failure: true\nrules:\n- if: $CI_PIPELINE_SOURCE == \"schedule\"\n- if: $CI_COMMIT_BRANCH == \"main\"\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
+    audit_backend_dependencies [label="audit:backend:dependencies", tooltip="---\nextends: \".backend_base\"\nstage: security\nneeds: []\nscript:\n- bundle audit check --update\nallow_failure: true\nrules:\n- if: $CI_PIPELINE_SOURCE == \"schedule\"\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
+    _security_base [label=".security_base", tooltip="---\nstage: security\nallow_failure: true\nartifacts:\n  expire_in: 1 week\n"];
   }
 
   subgraph cluster_quality {
@@ -68,14 +85,19 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_quality [style=invis, width=0, height=0];
+
     quality_codeclimate [label="quality:codeclimate", tooltip="---\nstage: quality\nimage: codeclimate/codeclimate:latest\nneeds: []\nscript:\n- codeclimate analyze -f json > codeclimate-report.json || true\n- echo \"Code quality analysis completed\"\nartifacts:\n  reports:\n    codequality: codeclimate-report.json\n  expire_in: 1 week\nrules:\n- if: $ENABLE_CODE_QUALITY == \"true\"\n"];
     quality_metrics [label="quality:metrics", tooltip="---\nstage: quality\nimage: alpine:latest\nneeds:\n- test:frontend:unit\n- test:backend:unit\n- test:api:unit\n- test:workers\nscript:\n- echo \"Aggregating quality metrics...\"\n- echo \"Test coverage across all services meets minimum threshold\"\n- echo \"Code complexity is within acceptable limits\"\nrules:\n- if: $ENABLE_CODE_QUALITY == \"true\"\n"];
+    bundle_frontend_analyze [label="bundle:frontend:analyze", tooltip="---\nextends: \".frontend_base\"\nstage: quality\nneeds:\n- build:frontend\nscript:\n- npm run build -- --stats\n- npx webpack-bundle-analyzer dist/stats.json --mode static --report bundle-report.html\nartifacts:\n  paths:\n  - services/frontend/bundle-report.html\n  expire_in: 1 week\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n"];
   }
 
   subgraph cluster_package {
     label="package";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_package [style=invis, width=0, height=0];
 
     _docker_build_job [label=".docker_build_job", tooltip="---\nextends: \".base_job\"\nimage: docker:24-alpine\nservices:\n- docker:24-dind\nvariables:\n  DOCKER_TLS_CERTDIR: \"/certs\"\ntags:\n- docker\nstage: package\nscript:\n- docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $DOCKER_REGISTRY\n- docker build --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${CI_COMMIT_SHA} -t\n  ${IMAGE_NAME}:latest .\n- docker push ${IMAGE_NAME}:${CI_COMMIT_SHA}\n- docker push ${IMAGE_NAME}:latest\nartifacts:\n  reports:\n    dotenv: build.env\n  expire_in: 1 day\n"];
   }
@@ -84,6 +106,8 @@ digraph pipeline {
     label="deploy_dev";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_deploy_dev [style=invis, width=0, height=0];
 
     deploy_dev_frontend [label="deploy:dev:frontend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_dev\nneeds:\n- package:frontend\nenvironment:\n  name: development/frontend\n  url: https://frontend-dev.example.com\n  on_stop: stop:dev:frontend\nscript:\n- echo \"Deploying frontend to development environment\"\n- kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA}\n  -n dev\n- kubectl rollout status deployment/frontend -n dev --timeout=5m\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
     deploy_dev_backend [label="deploy:dev:backend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_dev\nneeds:\n- package:backend\nenvironment:\n  name: development/backend\n  url: https://backend-dev.example.com\n  on_stop: stop:dev:backend\nscript:\n- echo \"Deploying backend to development environment\"\n- kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA}\n  -n dev\n- kubectl rollout status deployment/backend -n dev --timeout=5m\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
@@ -98,6 +122,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_integration [style=invis, width=0, height=0];
+
     integration_e2e [label="integration:e2e", tooltip="---\nstage: integration\nimage: cypress/included:13.6.0\nneeds:\n- deploy:dev:frontend\n- deploy:dev:backend\n- deploy:dev:api\nvariables:\n  CYPRESS_BASE_URL: https://frontend-dev.example.com\n  CYPRESS_API_URL: https://api-dev.example.com\nscript:\n- cypress run --spec \"cypress/e2e/**/*\" --reporter junit --reporter-options \"mochaFile=reports/e2e-junit.xml\"\nartifacts:\n  when: always\n  reports:\n    junit: reports/e2e-junit.xml\n  paths:\n  - cypress/videos/\n  - cypress/screenshots/\n  expire_in: 1 week\nrules:\n- if: $CI_COMMIT_BRANCH == \"develop\"\n"];
   }
 
@@ -105,6 +131,8 @@ digraph pipeline {
     label="deploy_stage";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_deploy_stage [style=invis, width=0, height=0];
 
     deploy_staging_frontend [label="deploy:staging:frontend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_stage\nneeds:\n- package:frontend\n- integration:e2e\nresource_group: staging-frontend\nenvironment:\n  name: staging/frontend\n  url: https://frontend-staging.example.com\nscript:\n- echo \"Deploying frontend to staging environment\"\n- kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA}\n  -n staging\n- kubectl rollout status deployment/frontend -n staging --timeout=10m\n- echo \"Running smoke tests...\"\n- curl -f https://frontend-staging.example.com/health || exit 1\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
     deploy_staging_backend [label="deploy:staging:backend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_stage\nneeds:\n- package:backend\n- integration:e2e\nresource_group: staging-backend\nenvironment:\n  name: staging/backend\n  url: https://backend-staging.example.com\nscript:\n- echo \"Deploying backend to staging environment\"\n- kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA}\n  -n staging\n- kubectl rollout status deployment/backend -n staging --timeout=10m\n- echo \"Running database migrations...\"\n- kubectl exec -n staging deployment/backend -- bundle exec rake db:migrate\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n"];
@@ -116,6 +144,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_performance [style=invis, width=0, height=0];
+
     performance_load_test [label="performance:load-test", tooltip="---\nstage: performance\nimage: grafana/k6:latest\nneeds:\n- deploy:staging:frontend\n- deploy:staging:backend\n- deploy:staging:api\nscript:\n- k6 run --out json=performance-report.json tests/performance/load-test.js\n- echo \"Load test completed\"\nartifacts:\n  reports:\n    performance: performance-report.json\n  expire_in: 1 week\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\" && $ENABLE_PERFORMANCE_TESTS == \"true\"\n"];
     performance_stress_test [label="performance:stress-test", tooltip="---\nstage: performance\nimage: grafana/k6:latest\nneeds:\n- deploy:staging:frontend\n- deploy:staging:backend\n- deploy:staging:api\nscript:\n- k6 run --vus 100 --duration 5m tests/performance/stress-test.js\n- echo \"Stress test completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\" && $ENABLE_PERFORMANCE_TESTS == \"true\"\n  when: manual\n"];
   }
@@ -124,6 +154,8 @@ digraph pipeline {
     label="deploy_prod";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_deploy_prod [style=invis, width=0, height=0];
 
     deploy_prod_frontend [label="deploy:prod:frontend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_prod\nneeds:\n- deploy:staging:frontend\n- performance:load-test\nresource_group: production-frontend\nenvironment:\n  name: production/frontend\n  url: https://frontend.example.com\nscript:\n- echo \"Deploying frontend to production environment\"\n- kubectl set image deployment/frontend frontend=${DOCKER_IMAGE_BASE}/frontend:${CI_COMMIT_SHA}\n  -n production\n- kubectl rollout status deployment/frontend -n production --timeout=15m\n- echo \"Production deployment completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\nretry:\n  max: 1\n  when:\n  - api_failure\n"];
     deploy_prod_backend [label="deploy:prod:backend", tooltip="---\nextends: \".deploy_job\"\nstage: deploy_prod\nneeds:\n- deploy:staging:backend\n- performance:load-test\nresource_group: production-backend\nenvironment:\n  name: production/backend\n  url: https://backend.example.com\nbefore_script:\n- - before_script\n- echo \"Creating database backup before deployment...\"\nscript:\n- echo \"Deploying backend to production environment\"\n- kubectl set image deployment/backend backend=${DOCKER_IMAGE_BASE}/backend:${CI_COMMIT_SHA}\n  -n production\n- kubectl rollout status deployment/backend -n production --timeout=15m\n- echo \"Running production database migrations...\"\n- kubectl exec -n production deployment/backend -- bundle exec rake db:migrate\nafter_script:\n- - after_script\n- echo \"Deployment metrics recorded\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n"];
@@ -136,269 +168,76 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_cleanup [style=invis, width=0, height=0];
+
     cleanup_old_images [label="cleanup:old-images", tooltip="---\nstage: cleanup\nimage: alpine:latest\nneeds: []\nscript:\n- echo \"Cleaning up old Docker images...\"\n- echo \"Removing images older than 30 days\"\n- echo \"Cleanup completed\"\nrules:\n- if: $CI_COMMIT_BRANCH == \"main\"\n  when: manual\n"];
     cleanup_artifacts [label="cleanup:artifacts", tooltip="---\nstage: cleanup\nimage: alpine:latest\nneeds: []\nscript:\n- echo \"Cleaning up old artifacts...\"\n- echo \"Removing artifacts older than 7 days\"\nrules:\n- if: $CI_PIPELINE_SOURCE == \"schedule\"\n"];
     notify_pipeline_status [label="notify:pipeline-status", tooltip="---\nstage: cleanup\nimage: alpine:latest\nneeds: []\nscript:\n- echo \"================================================\"\n- echo \"Pipeline Summary\"\n- echo \"================================================\"\n- echo \"Pipeline ID: ${CI_PIPELINE_ID}\"\n- echo \"Pipeline URL: ${CI_PIPELINE_URL}\"\n- echo \"Commit: ${CI_COMMIT_SHA}\"\n- echo \"Branch: ${CI_COMMIT_REF_NAME}\"\n- echo \"Status: ${CI_JOB_STATUS}\"\n- echo \"================================================\"\n- |\n  if [ \"${CI_JOB_STATUS}\" = \"success\" ]; then\n    echo \"All pipeline jobs completed successfully!\"\n  else\n    echo \"Some pipeline jobs failed. Please review.\"\n  fi\nrules:\n- if: \"$CI_COMMIT_BRANCH\"\n  when: always\n"];
   }
 
-  validate_yaml -> _base_config;
-  validate_dependencies -> _base_config;
-  lint_frontend -> _base_config;
-  lint_backend -> _base_config;
-  lint_api -> _base_config;
-  build_frontend -> _base_config;
-  build_backend -> _base_config;
-  build_api -> _base_config;
-  build_workers -> _base_config;
-  validate_yaml -> _docker_config;
-  validate_dependencies -> _docker_config;
-  lint_frontend -> _docker_config;
-  lint_backend -> _docker_config;
-  lint_api -> _docker_config;
-  build_frontend -> _docker_config;
-  build_backend -> _docker_config;
-  build_api -> _docker_config;
-  build_workers -> _docker_config;
-  validate_yaml -> _node_config;
-  validate_dependencies -> _node_config;
-  lint_frontend -> _node_config;
-  lint_backend -> _node_config;
-  lint_api -> _node_config;
-  build_frontend -> _node_config;
-  build_backend -> _node_config;
-  build_api -> _node_config;
-  build_workers -> _node_config;
-  validate_yaml -> _ruby_config;
-  validate_dependencies -> _ruby_config;
-  lint_frontend -> _ruby_config;
-  lint_backend -> _ruby_config;
-  lint_api -> _ruby_config;
-  build_frontend -> _ruby_config;
-  build_backend -> _ruby_config;
-  build_api -> _ruby_config;
-  build_workers -> _ruby_config;
-  validate_yaml -> _python_config;
-  validate_dependencies -> _python_config;
-  lint_frontend -> _python_config;
-  lint_backend -> _python_config;
-  lint_api -> _python_config;
-  build_frontend -> _python_config;
-  build_backend -> _python_config;
-  build_api -> _python_config;
-  build_workers -> _python_config;
-  validate_yaml -> _base_job;
-  validate_dependencies -> _base_job;
-  lint_frontend -> _base_job;
-  lint_backend -> _base_job;
-  lint_api -> _base_job;
-  build_frontend -> _base_job;
-  build_backend -> _base_job;
-  build_api -> _base_job;
-  build_workers -> _base_job;
-  validate_yaml -> _test_job;
-  validate_dependencies -> _test_job;
-  lint_frontend -> _test_job;
-  lint_backend -> _test_job;
-  lint_api -> _test_job;
-  build_frontend -> _test_job;
-  build_backend -> _test_job;
-  build_api -> _test_job;
-  build_workers -> _test_job;
-  validate_yaml -> _deploy_job;
-  validate_dependencies -> _deploy_job;
-  lint_frontend -> _deploy_job;
-  lint_backend -> _deploy_job;
-  lint_api -> _deploy_job;
-  build_frontend -> _deploy_job;
-  build_backend -> _deploy_job;
-  build_api -> _deploy_job;
-  build_workers -> _deploy_job;
-  _base_config -> _docker_build_job;
-  _docker_config -> _docker_build_job;
-  _node_config -> _docker_build_job;
-  _ruby_config -> _docker_build_job;
-  _python_config -> _docker_build_job;
-  _base_job -> _docker_build_job;
-  _test_job -> _docker_build_job;
-  _deploy_job -> _docker_build_job;
-  validate_yaml -> _docker_build_job;
-  validate_dependencies -> _docker_build_job;
-  lint_frontend -> _docker_build_job;
-  lint_backend -> _docker_build_job;
-  lint_api -> _docker_build_job;
-  build_frontend -> _docker_build_job;
-  build_backend -> _docker_build_job;
-  build_api -> _docker_build_job;
-  build_workers -> _docker_build_job;
-  test_frontend_unit -> _docker_build_job;
-  test_frontend_integration -> _docker_build_job;
-  test_backend_unit -> _docker_build_job;
-  test_backend_integration -> _docker_build_job;
-  test_api_unit -> _docker_build_job;
-  test_api_integration -> _docker_build_job;
-  test_workers -> _docker_build_job;
-  test_matrix_compatibility -> _docker_build_job;
-  security_sast -> _docker_build_job;
-  security_dependency_scanning -> _docker_build_job;
-  security_secrets -> _docker_build_job;
-  quality_codeclimate -> _docker_build_job;
-  quality_metrics -> _docker_build_job;
-  package_frontend -> _docker_build_job;
-  package_backend -> _docker_build_job;
-  package_api -> _docker_build_job;
-  package_workers -> _docker_build_job;
-  lint_frontend -> build_frontend;
-  lint_backend -> build_backend;
-  lint_api -> build_api;
-  build_frontend -> test_frontend_unit;
-  build_frontend -> test_frontend_integration;
-  build_backend -> test_backend_unit;
-  build_backend -> test_backend_integration;
-  build_api -> test_api_unit;
-  build_api -> test_api_integration;
-  build_workers -> test_workers;
-  test_frontend_unit -> quality_metrics;
-  test_backend_unit -> quality_metrics;
-  test_api_unit -> quality_metrics;
-  test_workers -> quality_metrics;
-  build_frontend -> package_frontend;
-  test_frontend_unit -> package_frontend;
-  build_backend -> package_backend;
-  test_backend_unit -> package_backend;
-  build_api -> package_api;
-  test_api_unit -> package_api;
-  build_workers -> package_workers;
-  test_workers -> package_workers;
-  package_frontend -> deploy_dev_frontend;
-  package_backend -> deploy_dev_backend;
-  package_api -> deploy_dev_api;
-  _base_config -> stop_dev_frontend;
-  _docker_config -> stop_dev_frontend;
-  _node_config -> stop_dev_frontend;
-  _ruby_config -> stop_dev_frontend;
-  _python_config -> stop_dev_frontend;
-  _base_job -> stop_dev_frontend;
-  _test_job -> stop_dev_frontend;
-  _deploy_job -> stop_dev_frontend;
-  _docker_build_job -> stop_dev_frontend;
-  validate_yaml -> stop_dev_frontend;
-  validate_dependencies -> stop_dev_frontend;
-  lint_frontend -> stop_dev_frontend;
-  lint_backend -> stop_dev_frontend;
-  lint_api -> stop_dev_frontend;
-  build_frontend -> stop_dev_frontend;
-  build_backend -> stop_dev_frontend;
-  build_api -> stop_dev_frontend;
-  build_workers -> stop_dev_frontend;
-  test_frontend_unit -> stop_dev_frontend;
-  test_frontend_integration -> stop_dev_frontend;
-  test_backend_unit -> stop_dev_frontend;
-  test_backend_integration -> stop_dev_frontend;
-  test_api_unit -> stop_dev_frontend;
-  test_api_integration -> stop_dev_frontend;
-  test_workers -> stop_dev_frontend;
-  test_matrix_compatibility -> stop_dev_frontend;
-  security_sast -> stop_dev_frontend;
-  security_dependency_scanning -> stop_dev_frontend;
-  security_secrets -> stop_dev_frontend;
-  quality_codeclimate -> stop_dev_frontend;
-  quality_metrics -> stop_dev_frontend;
-  package_frontend -> stop_dev_frontend;
-  package_backend -> stop_dev_frontend;
-  package_api -> stop_dev_frontend;
-  package_workers -> stop_dev_frontend;
-  _base_config -> stop_dev_backend;
-  _docker_config -> stop_dev_backend;
-  _node_config -> stop_dev_backend;
-  _ruby_config -> stop_dev_backend;
-  _python_config -> stop_dev_backend;
-  _base_job -> stop_dev_backend;
-  _test_job -> stop_dev_backend;
-  _deploy_job -> stop_dev_backend;
-  _docker_build_job -> stop_dev_backend;
-  validate_yaml -> stop_dev_backend;
-  validate_dependencies -> stop_dev_backend;
-  lint_frontend -> stop_dev_backend;
-  lint_backend -> stop_dev_backend;
-  lint_api -> stop_dev_backend;
-  build_frontend -> stop_dev_backend;
-  build_backend -> stop_dev_backend;
-  build_api -> stop_dev_backend;
-  build_workers -> stop_dev_backend;
-  test_frontend_unit -> stop_dev_backend;
-  test_frontend_integration -> stop_dev_backend;
-  test_backend_unit -> stop_dev_backend;
-  test_backend_integration -> stop_dev_backend;
-  test_api_unit -> stop_dev_backend;
-  test_api_integration -> stop_dev_backend;
-  test_workers -> stop_dev_backend;
-  test_matrix_compatibility -> stop_dev_backend;
-  security_sast -> stop_dev_backend;
-  security_dependency_scanning -> stop_dev_backend;
-  security_secrets -> stop_dev_backend;
-  quality_codeclimate -> stop_dev_backend;
-  quality_metrics -> stop_dev_backend;
-  package_frontend -> stop_dev_backend;
-  package_backend -> stop_dev_backend;
-  package_api -> stop_dev_backend;
-  package_workers -> stop_dev_backend;
-  _base_config -> stop_dev_api;
-  _docker_config -> stop_dev_api;
-  _node_config -> stop_dev_api;
-  _ruby_config -> stop_dev_api;
-  _python_config -> stop_dev_api;
-  _base_job -> stop_dev_api;
-  _test_job -> stop_dev_api;
-  _deploy_job -> stop_dev_api;
-  _docker_build_job -> stop_dev_api;
-  validate_yaml -> stop_dev_api;
-  validate_dependencies -> stop_dev_api;
-  lint_frontend -> stop_dev_api;
-  lint_backend -> stop_dev_api;
-  lint_api -> stop_dev_api;
-  build_frontend -> stop_dev_api;
-  build_backend -> stop_dev_api;
-  build_api -> stop_dev_api;
-  build_workers -> stop_dev_api;
-  test_frontend_unit -> stop_dev_api;
-  test_frontend_integration -> stop_dev_api;
-  test_backend_unit -> stop_dev_api;
-  test_backend_integration -> stop_dev_api;
-  test_api_unit -> stop_dev_api;
-  test_api_integration -> stop_dev_api;
-  test_workers -> stop_dev_api;
-  test_matrix_compatibility -> stop_dev_api;
-  security_sast -> stop_dev_api;
-  security_dependency_scanning -> stop_dev_api;
-  security_secrets -> stop_dev_api;
-  quality_codeclimate -> stop_dev_api;
-  quality_metrics -> stop_dev_api;
-  package_frontend -> stop_dev_api;
-  package_backend -> stop_dev_api;
-  package_api -> stop_dev_api;
-  package_workers -> stop_dev_api;
-  deploy_dev_frontend -> integration_e2e;
-  deploy_dev_backend -> integration_e2e;
-  deploy_dev_api -> integration_e2e;
-  package_frontend -> deploy_staging_frontend;
-  integration_e2e -> deploy_staging_frontend;
-  package_backend -> deploy_staging_backend;
-  integration_e2e -> deploy_staging_backend;
-  package_api -> deploy_staging_api;
-  integration_e2e -> deploy_staging_api;
-  deploy_staging_frontend -> performance_load_test;
-  deploy_staging_backend -> performance_load_test;
-  deploy_staging_api -> performance_load_test;
-  deploy_staging_frontend -> performance_stress_test;
-  deploy_staging_backend -> performance_stress_test;
-  deploy_staging_api -> performance_stress_test;
-  deploy_staging_frontend -> deploy_prod_frontend;
-  performance_load_test -> deploy_prod_frontend;
-  deploy_staging_backend -> deploy_prod_backend;
-  performance_load_test -> deploy_prod_backend;
-  deploy_staging_api -> deploy_prod_api;
-  performance_load_test -> deploy_prod_api;
-  deploy_prod_frontend -> trigger_monitoring_setup;
-  deploy_prod_backend -> trigger_monitoring_setup;
-  deploy_prod_api -> trigger_monitoring_setup;
+  __stage_anchor_build -> _base_config [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> _docker_config [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> _node_config [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> _ruby_config [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> _python_config [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> _base_job [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> _test_job [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> _deploy_job [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_quality -> _docker_build_job [ltail=cluster_quality, style=bold, color="#4DAF4A"];
+  lint_frontend -> build_frontend [color="#E41A1C"];
+  lint_backend -> build_backend [color="#FFED6F"];
+  lint_api -> build_api [color="#CCEBC5"];
+  build_frontend -> test_frontend_unit [color="#A65628"];
+  build_frontend -> test_frontend_integration [color="#A65628"];
+  build_backend -> test_backend_unit [color="#FFFF33"];
+  build_backend -> test_backend_integration [color="#FFFF33"];
+  build_api -> test_api_unit [color="#FF7F00"];
+  build_api -> test_api_integration [color="#FF7F00"];
+  build_workers -> test_workers [color="#F781BF"];
+  test_frontend_unit -> quality_metrics [color="#F781BF"];
+  test_backend_unit -> quality_metrics [color="#A65628"];
+  test_api_unit -> quality_metrics [color="#FFFF33"];
+  test_workers -> quality_metrics [color="#8DD3C7"];
+  build_frontend -> package_frontend [color="#A65628"];
+  test_frontend_unit -> package_frontend [color="#F781BF"];
+  build_backend -> package_backend [color="#FFFF33"];
+  test_backend_unit -> package_backend [color="#A65628"];
+  build_api -> package_api [color="#FF7F00"];
+  test_api_unit -> package_api [color="#FFFF33"];
+  build_workers -> package_workers [color="#F781BF"];
+  test_workers -> package_workers [color="#8DD3C7"];
+  package_frontend -> deploy_dev_frontend [color="#984EA3"];
+  package_backend -> deploy_dev_backend [color="#4DAF4A"];
+  package_api -> deploy_dev_api [color="#377EB8"];
+  __stage_anchor_package -> stop_dev_frontend [ltail=cluster_package, style=bold, color="#377EB8"];
+  __stage_anchor_package -> stop_dev_backend [ltail=cluster_package, style=bold, color="#377EB8"];
+  __stage_anchor_package -> stop_dev_api [ltail=cluster_package, style=bold, color="#377EB8"];
+  deploy_dev_frontend -> integration_e2e [color="#BEBADA"];
+  deploy_dev_backend -> integration_e2e [color="#FFFFB3"];
+  deploy_dev_api -> integration_e2e [color="#8DD3C7"];
+  package_frontend -> deploy_staging_frontend [color="#984EA3"];
+  integration_e2e -> deploy_staging_frontend [color="#BC80BD"];
+  package_backend -> deploy_staging_backend [color="#4DAF4A"];
+  integration_e2e -> deploy_staging_backend [color="#BC80BD"];
+  package_api -> deploy_staging_api [color="#377EB8"];
+  integration_e2e -> deploy_staging_api [color="#BC80BD"];
+  deploy_staging_frontend -> performance_load_test [color="#D9D9D9"];
+  deploy_staging_backend -> performance_load_test [color="#FCCDE5"];
+  deploy_staging_api -> performance_load_test [color="#B3DE69"];
+  deploy_staging_frontend -> performance_stress_test [color="#D9D9D9"];
+  deploy_staging_backend -> performance_stress_test [color="#FCCDE5"];
+  deploy_staging_api -> performance_stress_test [color="#B3DE69"];
+  deploy_staging_frontend -> deploy_prod_frontend [color="#D9D9D9"];
+  performance_load_test -> deploy_prod_frontend [color="#FF7F00"];
+  deploy_staging_backend -> deploy_prod_backend [color="#FCCDE5"];
+  performance_load_test -> deploy_prod_backend [color="#FF7F00"];
+  deploy_staging_api -> deploy_prod_api [color="#B3DE69"];
+  performance_load_test -> deploy_prod_api [color="#FF7F00"];
+  deploy_prod_frontend -> trigger_monitoring_setup [color="#FDB462"];
+  deploy_prod_backend -> trigger_monitoring_setup [color="#80B1D3"];
+  deploy_prod_api -> trigger_monitoring_setup [color="#FB8072"];
+  __stage_anchor_build -> _frontend_base [ltail=cluster_build, style=bold, color="#E41A1C"];
+  build_frontend -> bundle_frontend_analyze [color="#A65628"];
+  __stage_anchor_build -> _backend_base [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> _security_base [ltail=cluster_test, style=bold, color="#984EA3"];
 }

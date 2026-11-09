@@ -10,6 +10,8 @@
     "Job 'verify-includes' references undefined stage '.pre'"
   ],
   "warnings": [
-
+    "Job '.build-template' is a hidden job template (starts with '.')",
+    "Job '.test-template' is a hidden job template (starts with '.')",
+    "Job '.deploy-template' is a hidden job template (starts with '.')"
   ]
 }

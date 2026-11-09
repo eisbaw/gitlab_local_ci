@@ -14,6 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Mitigation for a dev-shell defect (TASK-30): nixpkgs' ruby_3_3 ships the
+# bundled gems debug/racc/rbs without built extensions, so any require that
+# makes RubyGems scan all specs prints "Ignoring ... extensions are not built"
+# to stderr. rexml is a bundled (not default) gem, so a bare require triggers
+# that scan; activating it by name loads only rexml's spec. Version
+# constraint lives in the Gemfile.
+gem 'rexml'
 require 'rexml/document'
 require_relative 'base_formatter'
 

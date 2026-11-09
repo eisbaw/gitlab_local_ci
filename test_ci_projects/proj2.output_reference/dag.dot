@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
     label="build";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_build [style=invis, width=0, height=0];
 
     build_job [label="build_job", tooltip="---\nstage: build\nscript:\n- echo \"Building the project...\"\n- echo \"Compiling source files\"\n- echo \"Build complete\"\n"];
   }
@@ -16,6 +19,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_test [style=invis, width=0, height=0];
+
     test_job [label="test_job", tooltip="---\nstage: test\nscript:\n- echo \"Running tests...\"\n- echo \"Executing unit tests\"\n- echo \"All tests passed\"\n"];
   }
 
@@ -24,10 +29,11 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     deploy_job [label="deploy_job", tooltip="---\nstage: deploy\nscript:\n- echo \"Deploying application...\"\n- echo \"Uploading artifacts\"\n- echo \"Deployment successful\"\n"];
   }
 
-  build_job -> test_job;
-  build_job -> deploy_job;
-  test_job -> deploy_job;
+  __stage_anchor_build -> test_job [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> deploy_job [ltail=cluster_test, style=bold, color="#377EB8"];
 }

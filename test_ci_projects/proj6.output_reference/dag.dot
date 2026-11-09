@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_build {
     label="build";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_build [style=invis, width=0, height=0];
 
     build_app [label="build:app", tooltip="---\nstage: build\nscript:\n- echo \"Building application version $BUILD_VERSION\"\n- mkdir -p build/bin\n- echo \"app-binary-content\" > build/bin/app\n- echo \"Version $BUILD_VERSION built at $(date)\" > build/version.txt\nartifacts:\n  paths:\n  - build/\n  expire_in: 1 week\n  name: app-build-$CI_COMMIT_REF_SLUG\n"];
     build_assets [label="build:assets", tooltip="---\nstage: build\nscript:\n- echo \"Compiling assets\"\n- mkdir -p dist/css dist/js\n- echo \"body { color: blue; }\" > dist/css/style.css\n- echo \"console.log('hello');\" > dist/js/app.js\nartifacts:\n  paths:\n  - dist/\n  expire_in: 2 days\n  name: assets-$CI_JOB_NAME-$CI_COMMIT_SHORT_SHA\n"];
@@ -17,6 +20,8 @@ digraph pipeline {
     label="test";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_test [style=invis, width=0, height=0];
 
     test_unit [label="test:unit", tooltip="---\nstage: test\ndependencies:\n- build:app\nscript:\n- echo \"Running unit tests with $(cat build/version.txt)\"\n- mkdir -p test-results\n- |\n  cat > test-results/junit.xml << EOF\n  <?xml version=\"1.0\" encoding=\"UTF-8\"?>\n  <testsuites>\n    <testsuite name=\"UnitTests\" tests=\"5\" failures=\"0\" errors=\"0\">\n      <testcase name=\"test_login\" time=\"0.5\"/>\n      <testcase name=\"test_logout\" time=\"0.3\"/>\n      <testcase name=\"test_validation\" time=\"0.7\"/>\n      <testcase name=\"test_api\" time=\"1.2\"/>\n      <testcase name=\"test_database\" time=\"0.8\"/>\n    </testsuite>\n  </testsuites>\n  EOF\nartifacts:\n  reports:\n    junit: test-results/junit.xml\n  paths:\n  - test-results/\n  expire_in: 30 days\n"];
     test_coverage [label="test:coverage", tooltip="---\nstage: test\ndependencies:\n- build:app\nscript:\n- echo \"Generating coverage report\"\n- mkdir -p coverage\n- |\n  cat > coverage/cobertura.xml << EOF\n  <?xml version=\"1.0\"?>\n  <coverage line-rate=\"0.85\" branch-rate=\"0.80\" version=\"1.0\">\n    <packages>\n      <package name=\"main\" line-rate=\"0.85\" branch-rate=\"0.80\">\n        <classes>\n          <class name=\"App\" line-rate=\"0.90\" branch-rate=\"0.85\"/>\n        </classes>\n      </package>\n    </packages>\n  </coverage>\n  EOF\n- echo \"Total coverage: 85%\" > coverage/summary.txt\nartifacts:\n  reports:\n    coverage_report:\n      coverage_format: cobertura\n      path: coverage/cobertura.xml\n  paths:\n  - coverage/\n  expire_in: 1 month\n"];
@@ -29,6 +34,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_report [style=invis, width=0, height=0];
+
     report_summary [label="report:summary", tooltip="---\nstage: report\ndependencies:\n- test:unit\n- test:coverage\n- test:integration\nscript:\n- echo \"Generating test summary report\"\n- echo \"=== Test Summary ===\" > summary.txt\n- echo \"Unit Tests:\" >> summary.txt\n- cat test-results/junit.xml | grep 'testsuite' >> summary.txt || true\n- echo \"\" >> summary.txt\n- echo \"Coverage:\" >> summary.txt\n- cat coverage/summary.txt >> summary.txt\n- echo \"\" >> summary.txt\n- echo \"Integration:\" >> summary.txt\n- cat integration-logs/status.txt >> summary.txt\n- cat summary.txt\nartifacts:\n  paths:\n  - summary.txt\n  expire_in: 90 days\n  name: test-summary-$CI_PIPELINE_ID\n"];
   }
 
@@ -37,43 +44,17 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     deploy_staging [label="deploy:staging", tooltip="---\nstage: deploy\ndependencies:\n- build:app\n- build:assets\nscript:\n- echo \"Deploying to staging\"\n- echo \"Application binary: $(cat build/bin/app)\"\n- echo \"CSS files: $(ls dist/css/)\"\n- echo \"JS files: $(ls dist/js/)\"\n- echo \"Deployed version: $(cat build/version.txt)\"\nenvironment:\n  name: staging\nartifacts:\n  paths:\n  - build/version.txt\n  expire_in: 6 months\n  name: deployment-info\n"];
     deploy_docs [label="deploy:docs", tooltip="---\nstage: deploy\ndependencies: []\nscript:\n- echo \"Deploying documentation\"\n- mkdir -p docs\n- echo \"# API Documentation\" > docs/README.md\n- echo \"Version: $BUILD_VERSION\" >> docs/README.md\nartifacts:\n  paths:\n  - docs/\n  expire_in: never\n"];
   }
 
-  build_app -> test_unit;
-  build_assets -> test_unit;
-  build_package -> test_unit;
-  build_app -> test_coverage;
-  build_assets -> test_coverage;
-  build_package -> test_coverage;
-  build_app -> test_integration;
-  build_assets -> test_integration;
-  build_package -> test_integration;
-  build_app -> report_summary;
-  build_assets -> report_summary;
-  test_unit -> report_summary;
-  test_coverage -> report_summary;
-  test_integration -> report_summary;
-  test_debug -> report_summary;
-  build_package -> report_summary;
-  build_app -> deploy_staging;
-  build_assets -> deploy_staging;
-  test_unit -> deploy_staging;
-  test_coverage -> deploy_staging;
-  test_integration -> deploy_staging;
-  report_summary -> deploy_staging;
-  test_debug -> deploy_staging;
-  build_package -> deploy_staging;
-  build_app -> deploy_docs;
-  build_assets -> deploy_docs;
-  test_unit -> deploy_docs;
-  test_coverage -> deploy_docs;
-  test_integration -> deploy_docs;
-  report_summary -> deploy_docs;
-  test_debug -> deploy_docs;
-  build_package -> deploy_docs;
-  build_app -> test_debug;
-  build_assets -> test_debug;
-  build_package -> test_debug;
+  __stage_anchor_build -> test_unit [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_coverage [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> test_integration [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor_test -> report_summary [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_report -> deploy_staging [ltail=cluster_report, style=bold, color="#377EB8"];
+  __stage_anchor_report -> deploy_docs [ltail=cluster_report, style=bold, color="#377EB8"];
+  __stage_anchor_build -> test_debug [ltail=cluster_build, style=bold, color="#E41A1C"];
 }

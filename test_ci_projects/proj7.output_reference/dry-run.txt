@@ -1,0 +1,22 @@
+Pipeline #1 created with 7 job(s)
+
+[T+0s] Job 'test:postgres' → Runner 'runner_001'
+[T+0s] Job 'test:redis' → Runner 'runner_001'
+[T+0s] Job 'integration:full-stack' → Runner 'runner_001'
+[T+0s] Job 'build:docker' → Runner 'runner_001'
+[T+5s] Job 'test:postgres' completed
+[T+5s] Job 'test:redis' completed
+[T+5s] Job 'integration:full-stack' completed
+[T+5s] Job 'build:docker' completed
+[T+6s] Job 'test:mysql' → Runner 'runner_001'
+[T+6s] Job 'test:mongodb' → Runner 'runner_001'
+[T+6s] Job 'test:custom-service' → Runner 'runner_001'
+[T+11s] Job 'test:mysql' completed
+[T+11s] Job 'test:mongodb' completed
+[T+11s] Job 'test:custom-service' completed
+
+Simulation completed at T+12s
+
+Pipeline status: success
+Job summary:
+  completed: 7

@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_triggers {
     label="triggers";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_triggers [style=invis, width=0, height=0];
 
     trigger_child1 [label="trigger_child1", tooltip="---\nstage: triggers\ntrigger:\n  include: \".gitlab/ci/child1.yml\"\n  strategy: depend\nvariables:\n  CHILD_VAR: for_child1\n  ENVIRONMENT: development\n"];
     trigger_child2 [label="trigger_child2", tooltip="---\nstage: triggers\ntrigger:\n  include: \".gitlab/ci/child2.yml\"\n  strategy: depend\nvariables:\n  CHILD_VAR: for_child2\n  ENVIRONMENT: production\n"];

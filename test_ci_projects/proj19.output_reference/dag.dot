@@ -1,12 +1,15 @@
 digraph pipeline {
   rankdir="LR";
   ranksep=2;
+  compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
   subgraph cluster_prepare {
     label="prepare";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_prepare [style=invis, width=0, height=0];
 
     prepare_environment [label="prepare:environment", tooltip="---\nstage: prepare\nscript:\n- echo \"Setting up build environment\"\n- echo \"Loading configuration from vault\"\n- sleep 1\n"];
     prepare_dependencies [label="prepare:dependencies", tooltip="---\nstage: prepare\nscript:\n- echo \"Downloading and caching dependencies\"\n- echo \"npm install, pip install, etc.\"\n- sleep 1\n"];
@@ -16,6 +19,8 @@ digraph pipeline {
     label="build";
     style=filled;
     fillcolor=lightgrey;
+
+    __stage_anchor_build [style=invis, width=0, height=0];
 
     build_api_gateway [label="build:api-gateway", tooltip="---\nstage: build\nneeds:\n- prepare:environment\n- prepare:dependencies\nscript:\n- echo \"Building API Gateway service\"\n- echo \"Compiling TypeScript, running webpack\"\n- sleep 2\n"];
     build_auth_service [label="build:auth-service", tooltip="---\nstage: build\nneeds:\n- prepare:environment\n- prepare:dependencies\nscript:\n- echo \"Building Authentication Service\"\n- echo \"Compiling Go binaries\"\n- sleep 2\n"];
@@ -29,6 +34,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_test [style=invis, width=0, height=0];
+
     test_api_gateway [label="test:api-gateway", tooltip="---\nstage: test\nneeds:\n- build:api-gateway\nscript:\n- echo \"Running API Gateway unit tests\"\n- echo \"Jest test suite\"\n- sleep 2\n"];
     test_auth_service [label="test:auth-service", tooltip="---\nstage: test\nneeds:\n- build:auth-service\nscript:\n- echo \"Running Auth Service unit tests\"\n- echo \"Go test coverage\"\n- sleep 2\n"];
     test_user_service [label="test:user-service", tooltip="---\nstage: test\nneeds:\n- build:user-service\nscript:\n- echo \"Running User Service unit tests\"\n- echo \"JUnit test suite\"\n- sleep 2\n"];
@@ -41,6 +48,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_integration [style=invis, width=0, height=0];
+
     integration_auth_flow [label="integration:auth-flow", tooltip="---\nstage: integration\nneeds:\n- test:api-gateway\n- test:auth-service\n- test:user-service\nscript:\n- echo \"Testing authentication flow integration\"\n- echo \"API Gateway -> Auth Service -> User Service\"\n- sleep 3\n"];
     integration_payment_flow [label="integration:payment-flow", tooltip="---\nstage: integration\nneeds:\n- test:api-gateway\n- test:payment-service\n- test:user-service\nscript:\n- echo \"Testing payment flow integration\"\n- echo \"API Gateway -> Payment Service -> User Service\"\n- sleep 3\n"];
     integration_notification_flow [label="integration:notification-flow", tooltip="---\nstage: integration\nneeds:\n- test:notification-service\n- test:user-service\n- test:payment-service\nscript:\n- echo \"Testing notification flow integration\"\n- echo \"Payment Service triggers -> Notification Service\"\n- sleep 3\n"];
@@ -51,6 +60,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_security [style=invis, width=0, height=0];
+
     security_sast [label="security:sast", tooltip="---\nstage: security\nneeds:\n- build:api-gateway\n- build:auth-service\n- build:user-service\n- build:payment-service\n- build:notification-service\nscript:\n- echo \"Running SAST security analysis\"\n- echo \"Scanning all service codebases for vulnerabilities\"\n- sleep 2\n"];
     security_dependency_scan [label="security:dependency-scan", tooltip="---\nstage: security\nneeds:\n- prepare:dependencies\nscript:\n- echo \"Scanning dependencies for known vulnerabilities\"\n- echo \"Checking npm audit, safety, etc.\"\n- sleep 2\n"];
   }
@@ -60,6 +71,8 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_deploy [style=invis, width=0, height=0];
+
     deploy_staging [label="deploy:staging", tooltip="---\nstage: deploy\nneeds:\n- integration:auth-flow\n- integration:payment-flow\n- integration:notification-flow\n- security:sast\n- security:dependency-scan\nscript:\n- echo \"Deploying all services to staging environment\"\n- echo \"Updating Kubernetes manifests\"\n- echo \"Rolling out with zero downtime\"\n- sleep 3\n"];
   }
 
@@ -68,47 +81,49 @@ digraph pipeline {
     style=filled;
     fillcolor=lightgrey;
 
+    __stage_anchor_verify [style=invis, width=0, height=0];
+
     verify_e2e_tests [label="verify:e2e-tests", tooltip="---\nstage: verify\nneeds:\n- deploy:staging\nscript:\n- echo \"Running end-to-end tests on staging\"\n- echo \"Simulating real user workflows\"\n- echo \"Testing complete microservices ecosystem\"\n- sleep 3\n"];
     verify_smoke_tests [label="verify:smoke-tests", tooltip="---\nstage: verify\nneeds:\n- deploy:staging\nscript:\n- echo \"Running smoke tests\"\n- echo \"Verifying critical paths are functional\"\n- sleep 2\n"];
     verify_performance_tests [label="verify:performance-tests", tooltip="---\nstage: verify\nneeds:\n- deploy:staging\nscript:\n- echo \"Running performance tests\"\n- echo \"Load testing with k6\"\n- echo \"Measuring response times and throughput\"\n- sleep 3\n"];
   }
 
-  prepare_environment -> build_api_gateway;
-  prepare_dependencies -> build_api_gateway;
-  prepare_environment -> build_auth_service;
-  prepare_dependencies -> build_auth_service;
-  prepare_environment -> build_user_service;
-  prepare_dependencies -> build_user_service;
-  prepare_environment -> build_payment_service;
-  prepare_dependencies -> build_payment_service;
-  prepare_environment -> build_notification_service;
-  prepare_dependencies -> build_notification_service;
-  build_api_gateway -> test_api_gateway;
-  build_auth_service -> test_auth_service;
-  build_user_service -> test_user_service;
-  build_payment_service -> test_payment_service;
-  build_notification_service -> test_notification_service;
-  test_api_gateway -> integration_auth_flow;
-  test_auth_service -> integration_auth_flow;
-  test_user_service -> integration_auth_flow;
-  test_api_gateway -> integration_payment_flow;
-  test_payment_service -> integration_payment_flow;
-  test_user_service -> integration_payment_flow;
-  test_notification_service -> integration_notification_flow;
-  test_user_service -> integration_notification_flow;
-  test_payment_service -> integration_notification_flow;
-  build_api_gateway -> security_sast;
-  build_auth_service -> security_sast;
-  build_user_service -> security_sast;
-  build_payment_service -> security_sast;
-  build_notification_service -> security_sast;
-  prepare_dependencies -> security_dependency_scan;
-  integration_auth_flow -> deploy_staging;
-  integration_payment_flow -> deploy_staging;
-  integration_notification_flow -> deploy_staging;
-  security_sast -> deploy_staging;
-  security_dependency_scan -> deploy_staging;
-  deploy_staging -> verify_e2e_tests;
-  deploy_staging -> verify_smoke_tests;
-  deploy_staging -> verify_performance_tests;
+  prepare_environment -> build_api_gateway [color="#BEBADA"];
+  prepare_dependencies -> build_api_gateway [color="#FFFFB3"];
+  prepare_environment -> build_auth_service [color="#BEBADA"];
+  prepare_dependencies -> build_auth_service [color="#FFFFB3"];
+  prepare_environment -> build_user_service [color="#BEBADA"];
+  prepare_dependencies -> build_user_service [color="#FFFFB3"];
+  prepare_environment -> build_payment_service [color="#BEBADA"];
+  prepare_dependencies -> build_payment_service [color="#FFFFB3"];
+  prepare_environment -> build_notification_service [color="#BEBADA"];
+  prepare_dependencies -> build_notification_service [color="#FFFFB3"];
+  build_api_gateway -> test_api_gateway [color="#E41A1C"];
+  build_auth_service -> test_auth_service [color="#377EB8"];
+  build_user_service -> test_user_service [color="#FF7F00"];
+  build_payment_service -> test_payment_service [color="#984EA3"];
+  build_notification_service -> test_notification_service [color="#4DAF4A"];
+  test_api_gateway -> integration_auth_flow [color="#FDB462"];
+  test_auth_service -> integration_auth_flow [color="#B3DE69"];
+  test_user_service -> integration_auth_flow [color="#BC80BD"];
+  test_api_gateway -> integration_payment_flow [color="#FDB462"];
+  test_payment_service -> integration_payment_flow [color="#D9D9D9"];
+  test_user_service -> integration_payment_flow [color="#BC80BD"];
+  test_notification_service -> integration_notification_flow [color="#FCCDE5"];
+  test_user_service -> integration_notification_flow [color="#BC80BD"];
+  test_payment_service -> integration_notification_flow [color="#D9D9D9"];
+  build_api_gateway -> security_sast [color="#E41A1C"];
+  build_auth_service -> security_sast [color="#377EB8"];
+  build_user_service -> security_sast [color="#FF7F00"];
+  build_payment_service -> security_sast [color="#984EA3"];
+  build_notification_service -> security_sast [color="#4DAF4A"];
+  prepare_dependencies -> security_dependency_scan [color="#FFFFB3"];
+  integration_auth_flow -> deploy_staging [color="#A65628"];
+  integration_payment_flow -> deploy_staging [color="#8DD3C7"];
+  integration_notification_flow -> deploy_staging [color="#F781BF"];
+  security_sast -> deploy_staging [color="#80B1D3"];
+  security_dependency_scan -> deploy_staging [color="#FB8072"];
+  deploy_staging -> verify_e2e_tests [color="#FFFF33"];
+  deploy_staging -> verify_smoke_tests [color="#FFFF33"];
+  deploy_staging -> verify_performance_tests [color="#FFFF33"];
 }

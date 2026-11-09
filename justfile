@@ -138,14 +138,50 @@ test-proj19:
 test-proj20:
     cd test_ci_projects/proj20 && just test
 
-# Test all projects sequentially
-test-all-projects:
-    @echo "Testing all 20 CI projects..."
-    @for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do \
-        echo ""; \
-        echo "=== Testing proj$i ==="; \
-        cd test_ci_projects/proj$i && just test || exit 1; \
-        cd ../..; \
+# Snapshots lint/dag/dry-run output (stdout, stderr, exit code) for every
+# test_ci_projects/projN into a temp dir and diffs it against
+# projN.output_reference/. Non-zero CLI exit codes are recorded data (proj10
+# lint=1 is expected); only a diff fails. metadata.txt (tool version) and
+# dag.svg (derived from dag.dot, graphviz-version dependent) are not compared.
+# Supersedes the old test-all-projects loop, which could not express expected
+# failures and stopped at proj10.
+# E2E gate: diff all test_ci_projects against their golden outputs
+e2e:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    out="$(mktemp -d)"
+    trap 'rm -rf "$out"' EXIT
+    ./generate_output_references.sh "$out"
+    # Same set of golden dirs on both sides (catches added/removed projects).
+    diff -u <(cd test_ci_projects && ls -d *.output_reference) <(cd "$out" && ls -d *.output_reference)
+    failed=0
+    for generated in "$out"/*.output_reference; do
+        name="$(basename "$generated")"
+        diff -ru -x metadata.txt -x dag.svg "test_ci_projects/$name" "$generated" || failed=1
     done
-    @echo ""
-    @echo "✓ All 20 projects tested successfully!"
+    if [ "$failed" -ne 0 ]; then
+        echo "e2e: FAILED - CLI output differs from goldens. If intended: just e2e-update, then review git diff test_ci_projects/" >&2
+        exit 1
+    fi
+    echo "e2e: OK - all goldens match"
+
+# Each golden dir is replaced wholesale, so files a change no longer
+# produces do not linger and break `just e2e`. Afterwards review
+# `git diff test_ci_projects/` and justify every change in the commit message.
+# Regenerate test_ci_projects goldens from the current CLI (review the diff!)
+e2e-update:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    out="$(mktemp -d)"
+    trap 'rm -rf "$out"' EXIT
+    ./generate_output_references.sh "$out"
+    for generated in "$out"/*.output_reference; do
+        golden="test_ci_projects/$(basename "$generated")"
+        rm -rf "$golden"
+        mv "$generated" "$golden"
+    done
+    # A golden whose project is gone is reported, not deleted: removing
+    # reference data is a decision for the human, and just e2e fails on it.
+    for golden in test_ci_projects/*.output_reference; do
+        [ -d "${golden%.output_reference}" ] || echo "e2e-update: orphaned golden $golden (project removed?)" >&2
+    done
