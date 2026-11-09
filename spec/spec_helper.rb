@@ -55,7 +55,9 @@ SimpleCov.start do
   # coverage drops. Only ever raise these, to the new floor, when specs add
   # coverage; never lower them to make a change pass. The aspiration is
   # still 90/80, tracked as a backlog task with the lowest-covered files.
-  minimum_coverage line: 84, branch: 73
+  # Raised at TASK-22/51 (run/export-just specs): measured 88.24/81.83 on
+  # main and in a detached worktree.
+  minimum_coverage line: 88, branch: 81
 end
 
 require 'rspec'
