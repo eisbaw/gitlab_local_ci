@@ -1,3 +1,3 @@
 GitLab CI configuration is valid
-Stages: build, test, report, deploy
+Stages: .pre, build, test, report, deploy, .post
 Jobs: 10

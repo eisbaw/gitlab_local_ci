@@ -1,13 +1,15 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "prepare",
     "build",
     "test",
     "integration",
     "security",
     "deploy",
-    "verify"
+    "verify",
+    ".post"
   ],
   "jobs": [
     "prepare:environment",

@@ -266,11 +266,24 @@ RSpec.describe MockServer do
     end
   end
 
-  describe '#create_pipeline_from stage check' do
-    it 'rejects a job whose stage is not in stages, in lint\'s wording' do
+  describe 'stage check' do
+    # Stages are validated once, by PipelineBuilder.stage_errors (TASK-50).
+    it 'rejects a raw config whose job stage is not in stages, in upstream wording' do
+      expect do
+        described_class.new.create_pipeline("stages: [build]\nj:\n  script: x\n")
+      end.to raise_error(MockServer::ConfigurationError,
+                         /j job: chosen stage test does not exist; available stages are \.pre, build, \.post/)
+    end
+
+    it 'accepts .pre/.post in a raw config without declaring them' do
+      pipeline = described_class.new.create_pipeline("stages: [build]\np:\n  stage: .pre\n  script: x\nb:\n  stage: build\n  script: x\n")
+      expect(pipeline.stages).to eq(%w[.pre build .post])
+    end
+
+    it 'leaves resolved jobs in an unknown stage to MockPipeline\'s invariant' do
       expect do
         described_class.new.create_pipeline_from(stages: %w[build], jobs: { 'j' => { 'script' => 'x' } })
-      end.to raise_error(MockServer::ConfigurationError, /Job 'j' references undefined stage 'test'/)
+      end.to raise_error(ArgumentError, /stage 'test', not in stages/)
     end
   end
 

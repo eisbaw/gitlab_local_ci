@@ -1,8 +1,10 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "test",
-    "deploy"
+    "deploy",
+    ".post"
   ],
   "jobs": [
     "unit_tests",

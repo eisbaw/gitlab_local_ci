@@ -298,11 +298,14 @@ Check your `needs:` dependencies for cycles:
 gitlab_ci_cli dag --entry .gitlab-ci.yml  # Visualize dependencies
 ```
 
-**Issue: Job references undefined stage**
+**Issue: chosen stage does not exist**
 ```
-Error: Job 'deploy' references undefined stage 'production'
+deploy job: chosen stage production does not exist; available stages are .pre, build, test, deploy, .post
 ```
 Add the stage to your `stages:` list or remove the invalid stage reference.
+`.pre` and `.post` never need declaring: they are always the first and last
+stage. A pipeline whose jobs are all in `.pre`/`.post` (after rules) is not
+created, as upstream.
 
 ## Performance Comparison
 

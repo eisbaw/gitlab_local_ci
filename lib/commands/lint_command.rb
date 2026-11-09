@@ -127,7 +127,7 @@ module Commands
 
       # Validate each job
       jobs.each do |job_name, job_config|
-        validate_job(job_name, job_config, stages, jobs.keys, errors, warnings)
+        validate_job(job_name, job_config, jobs.keys, errors, warnings)
       end
 
       # Check for circular dependencies in needs
@@ -159,11 +159,10 @@ module Commands
     #
     # @param job_name [String] Name of the job
     # @param job_config [Hash] Job configuration
-    # @param stages [Array<String>] Valid stages
     # @param all_job_names [Array<String>] All job names for needs validation
     # @param errors [Array<String>] Accumulator for error messages
     # @param warnings [Array<String>] Accumulator for warning messages
-    def validate_job(job_name, job_config, stages, all_job_names, errors, warnings)
+    def validate_job(job_name, job_config, all_job_names, errors, warnings)
       # Check for invalid job keywords
       job_config.each_key do |key|
         unless CiKeywords::JOB.include?(key)
@@ -182,13 +181,8 @@ module Commands
         validate_script(job_name, job_config['script'], errors)
       end
 
-      # Validate stage reference if present (skip for template jobs)
-      if job_config['stage'] && !job_name.start_with?('.')
-        stage = job_config['stage']
-        unless stages.include?(stage)
-          errors << "Job '#{job_name}' references undefined stage '#{stage}'"
-        end
-      end
+      # Stages are checked once for every command, in
+      # PipelineBuilder.stage_errors (upstream YamlProcessor).
 
       # Validate needs dependencies (skip for template jobs)
       if job_config['needs'] && !job_name.start_with?('.')

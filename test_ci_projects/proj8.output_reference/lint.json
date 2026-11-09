@@ -1,10 +1,12 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "build",
     "test",
     "deploy",
-    "cleanup"
+    "cleanup",
+    ".post"
   ],
   "jobs": [
     "build_main",

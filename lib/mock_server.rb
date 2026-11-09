@@ -70,9 +70,13 @@ class MockServer
   # @raise [WorkflowRulesFilteredError] workflow:rules created no pipeline
   def create_pipeline(config, options = {})
     parsed_config = parse_configuration(config)
+    job_definitions = PipelineBuilder.compose_jobs(parsed_config)
+    stage_errors = PipelineBuilder.stage_errors(job_definitions, extract_stages(parsed_config))
+    raise ConfigurationError, "Configuration errors:\n  - #{stage_errors.join("\n  - ")}" unless stage_errors.empty?
+
     evaluated = PipelineBuilder.evaluate_rules(
       parsed_config,
-      jobs: PipelineBuilder.visible_jobs(PipelineBuilder.compose_jobs(parsed_config)),
+      jobs: PipelineBuilder.visible_jobs(job_definitions),
       predefined: PredefinedVariables.build(project_dir: @project_dir, pipeline_source: @pipeline_source),
       cli_variables: options[:variables] || {},
       project_dir: @project_dir
@@ -96,7 +100,7 @@ class MockServer
   def create_pipeline_from(stages:, jobs:, ref: nil, variables: nil)
     raise ConfigurationError, "No jobs defined in configuration" if jobs.empty?
 
-    validate_job_configs(jobs, stages)
+    validate_job_configs(jobs)
     validate_dag(jobs)
 
     @pipeline_counter += 1
@@ -147,21 +151,18 @@ class MockServer
   # @param config [Hash] Parsed configuration
   # @return [Array<String>] List of stages
   def extract_stages(config)
-    config['stages'] || PipelineBuilder::DEFAULT_STAGES
+    PipelineBuilder.stages(config)
   end
 
   # Validate job configurations
   #
+  # Stages are checked before rules, by PipelineBuilder.stage_errors.
+  #
   # @param job_configs [Hash] Job configurations
-  # @param stages [Array<String>] the pipeline's stages
-  def validate_job_configs(job_configs, stages)
+  def validate_job_configs(job_configs)
     errors = []
 
     job_configs.each do |job_name, job_config|
-      # Same wording as lint. .pre/.post are not implicit yet (TASK-17).
-      stage = (job_config['stage'] || job_config[:stage] || MockPipeline::DEFAULT_JOB_STAGE).to_s
-      errors << "Job '#{job_name}' references undefined stage '#{stage}'" unless stages.include?(stage)
-
       # Validate script is present (unless trigger or pages is defined)
       script = job_config['script'] || job_config[:script]
       trigger = job_config['trigger'] || job_config[:trigger]

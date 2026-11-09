@@ -1,10 +1,12 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "build",
     "test",
     "report",
-    "deploy"
+    "deploy",
+    ".post"
   ],
   "jobs": [
     "build:app",

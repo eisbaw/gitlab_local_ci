@@ -1,9 +1,11 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "test",
     "security",
-    "quality"
+    "quality",
+    ".post"
   ],
   "jobs": [
     "unit-tests",

@@ -1,10 +1,12 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "vars_test",
     "build",
     "test",
-    "deploy"
+    "deploy",
+    ".post"
   ],
   "jobs": [
     "test_variables",

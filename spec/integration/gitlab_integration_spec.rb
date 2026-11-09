@@ -44,7 +44,7 @@ RSpec.describe 'GitLab Integration', :integration do
 
       expect(pipeline).to be_a(MockPipeline)
       expect(pipeline.id).to eq(1)
-      expect(pipeline.stages).to eq(['build', 'test'])
+      expect(pipeline.stages).to eq(['.pre', 'build', 'test', '.post'])
 
       # Jobs are now MockJob instances in an array
       expect(pipeline.jobs).to be_an(Array)

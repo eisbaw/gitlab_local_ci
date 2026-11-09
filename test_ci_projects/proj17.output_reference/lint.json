@@ -1,9 +1,11 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "test",
     "build",
-    "deploy"
+    "deploy",
+    ".post"
   ],
   "jobs": [
     "test:matrix",

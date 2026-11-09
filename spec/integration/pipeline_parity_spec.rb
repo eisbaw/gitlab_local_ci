@@ -337,6 +337,58 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
     end
   end
 
+  context '.pre/.post edge stages (TASK-17) and the stage check (TASK-50)' do
+    it 'run .pre first and .post last in every command without declaring them' do
+      write('.gitlab-ci.yml', <<~YAML)
+        stages: [build]
+        last:
+          stage: .post
+          script: [echo]
+        b:
+          stage: build
+          script: [echo]
+        first:
+          stage: .pre
+          script: [echo]
+      YAML
+      expect(lint_jobs).to eq(%w[last b first])
+      expect(dag_jobs).to eq(%w[first b last])
+      expect(dry_run_jobs).to eq(%w[first b last])
+      expect(export_just_jobs).to contain_exactly('last', 'b', 'first')
+      _stdout, stderr, status = cli('run', 'first')
+      expect(stderr).not_to include('stage')
+      expect(status).to eq(0)
+    end
+
+    it 'reject an undeclared stage once, in upstream wording, in every command' do
+      write('.gitlab-ci.yml', "stages: [build]\nj:\n  script: [echo]\n")
+      message = 'j job: chosen stage test does not exist; available stages are .pre, build, .post'
+      [['lint'], ['dag'], ['dry-run', '--runners', runners_dir], ['export-just'], %w[run j]].each do |command, *extra|
+        stdout, stderr, status = cli(command, *extra)
+        expect(status).not_to eq(0), "#{command} exited 0"
+        expect((stdout + stderr).lines.grep(/#{Regexp.escape(message)}/).size).to eq(1), "#{command}: #{stdout}#{stderr}"
+      end
+    end
+
+    it 'create no pipeline from .pre/.post jobs alone' do
+      write('.gitlab-ci.yml', <<~YAML)
+        first:
+          stage: .pre
+          script: [echo]
+        b:
+          stage: build
+          rules:
+            - if: $NOPE == "1"
+          script: [echo]
+      YAML
+      expect(dag_jobs).to eq([])
+      expect(export_just_jobs).to eq([])
+      _stdout, stderr, status = cli('run', 'first')
+      expect(status).not_to eq(0)
+      expect(stderr).to include("Job 'first' is excluded by rules in this pipeline context: only .pre/.post jobs left")
+    end
+  end
+
   context '--project' do
     it 'is where include:local resolves from' do
       Dir.mktmpdir('pipeline_parity_root') do |root|

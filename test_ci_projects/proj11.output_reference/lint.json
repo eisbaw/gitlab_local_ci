@@ -1,13 +1,29 @@
 {
-  "valid": false,
+  "valid": true,
   "stages": [
-
+    ".pre",
+    "build",
+    "test",
+    "deploy",
+    ".post"
   ],
   "jobs": [
-
+    ".build-template",
+    "build-app",
+    "build-docker",
+    ".test-template",
+    "unit-tests",
+    "integration-tests",
+    "security-scan",
+    ".deploy-template",
+    "deploy-staging",
+    "deploy-production",
+    "rollback-production",
+    "code-quality",
+    "verify-includes"
   ],
   "errors": [
-    "Job 'verify-includes' references undefined stage '.pre'"
+
   ],
   "warnings": [
     "Job '.build-template' is a hidden job template (starts with '.')",

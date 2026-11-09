@@ -140,8 +140,8 @@ test-proj20:
 
 # Snapshots lint/dag/dry-run output (stdout, stderr, exit code) for every
 # test_ci_projects/projN into a temp dir and diffs it against
-# projN.output_reference/. Non-zero CLI exit codes are recorded data (proj11
-# lint=1 pins the missing .pre stage, TASK-17); only a diff fails. metadata.txt (tool version) and
+# projN.output_reference/. Non-zero CLI exit codes are recorded data (proj13
+# dry-run=1 pins a stuck pipeline, TASK-28); only a diff fails. metadata.txt (tool version) and
 # dag.svg (derived from dag.dot, graphviz-version dependent) are not compared.
 # Supersedes the old test-all-projects loop, which could not express expected
 # failures and stopped at proj10 (then accidentally invalid YAML, TASK-44).

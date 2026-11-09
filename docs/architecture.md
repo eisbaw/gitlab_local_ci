@@ -359,10 +359,7 @@ Suggestion: Remove one of the 'needs' relationships to break the cycle
 ```
 
 ```
-Error: Job 'deploy' references undefined stage 'production'
-Available stages: build, test, deploy
-
-Suggestion: Add 'production' to the stages list or change the job's stage
+deploy job: chosen stage production does not exist; available stages are .pre, build, test, deploy, .post
 ```
 
 ## Extensibility

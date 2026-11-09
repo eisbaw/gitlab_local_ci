@@ -1,6 +1,7 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "prebuild",
     "build",
     "test",
@@ -12,7 +13,8 @@
     "deploy_stage",
     "performance",
     "deploy_prod",
-    "cleanup"
+    "cleanup",
+    ".post"
   ],
   "jobs": [
     ".frontend_base",

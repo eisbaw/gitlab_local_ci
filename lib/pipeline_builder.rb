@@ -28,15 +28,31 @@ require_relative 'predefined_variables'
 #   !reference             ReferenceResolver  (after extends, before split)
 #   nested lists           flatten_lists      (upstream Entry values)
 #   default:/inherit:      compose_jobs       (on the split jobs, before rules)
+#   .pre/.post, stage check stages, stage_errors (YamlProcessor, on the composed jobs)
 #   workflow:rules         apply_workflow_rules
 #   job rules              filter_jobs_by_rules
+#   only .pre/.post jobs   drop_only_edge_stage_jobs (Chain::Populate)
 #
 # resolve_config stops after composing the jobs (the static config lint
 # validates);
 # build continues through the rules (the jobs of one pipeline).
 module PipelineBuilder
-  # Upstream's default is .pre build test deploy .post (TASK-17).
-  DEFAULT_STAGES = %w[build test deploy].freeze
+  # Upstream Config::Stages::EDGES: always first and last, never declared.
+  EDGE_PRE = '.pre'
+  EDGE_POST = '.post'
+  EDGE_STAGES = [EDGE_PRE, EDGE_POST].freeze
+
+  # Stages when `stages:` is absent (upstream Entry::Stages.default).
+  DEFAULT_STAGES = [EDGE_PRE, 'build', 'test', 'deploy', EDGE_POST].freeze
+
+  # Stage of a job without `stage:` (upstream Entry::Job default).
+  DEFAULT_JOB_STAGE = 'test'
+
+  # Upstream Ci::Pipeline.rules_failure_message (Chain::Populate), link
+  # markup dropped. Why the jobs of a pipeline that has jobs only in
+  # .pre/.post are dropped.
+  ONLY_EDGE_STAGE_JOBS_MESSAGE = 'only .pre/.post jobs left: The resulting pipeline would have been empty. ' \
+                                 'Review the rules configuration.'
 
   # Printed by every command when Result#workflow_skipped.
   WORKFLOW_SKIPPED_MESSAGE = 'workflow:rules: matched no rule, no pipeline is created'
@@ -85,7 +101,7 @@ module PipelineBuilder
     end
 
     def stages
-      config['stages'] || DEFAULT_STAGES
+      PipelineBuilder.stages(config)
     end
 
     # Visible jobs before rules: the static job set.
@@ -149,10 +165,52 @@ module PipelineBuilder
     return Result.new(errors: commands_errors) unless commands_errors.empty?
 
     config = flatten_lists(config)
-    begin
-      Result.new(config: config, job_definitions: compose_jobs(config), errors: [])
+    job_definitions = begin
+      compose_jobs(config)
     rescue ConfigError => e
-      failure(e.message)
+      return failure(e.message)
+    end
+
+    stage_errors = stage_errors(job_definitions, stages(config))
+    return Result.new(errors: stage_errors) unless stage_errors.empty?
+
+    Result.new(config: config, job_definitions: job_definitions, errors: [])
+  end
+
+  # The pipeline's stages, upstream Config::Stages#inject_edge_stages!:
+  # .pre first and .post last, moved there if the user listed them
+  # elsewhere. Absent `stages:` gives DEFAULT_STAGES. A `stages:` that is
+  # not a non-empty list is returned as-is, as upstream does (its own
+  # validation reports it).
+  #
+  # Derived on every call rather than written into config, so config stays
+  # what the user wrote and MockServer#create_pipeline (raw configs) gets
+  # the same answer.
+  def stages(config)
+    declared = config['stages']
+    return DEFAULT_STAGES if declared.nil?
+    return declared unless declared.is_a?(Array) && !declared.empty?
+
+    [EDGE_PRE, *(declared - EDGE_STAGES), EDGE_POST]
+  end
+
+  # Upstream YamlProcessor#validate_job_stage!, for every visible job; a
+  # job without `stage:` is in DEFAULT_JOB_STAGE and checked too
+  # (normalized jobs carry the default). Hidden templates are not jobs.
+  #
+  # @return [Array<String>] empty when valid
+  def stage_errors(job_definitions, stages)
+    # Entry::Stages validation (nested lists are flattened by now).
+    unless stages.is_a?(Array) && stages.all?(String)
+      return ["stages config should be an array of strings or a nested array of strings up to 10 levels deep"]
+    end
+
+    visible_jobs(job_definitions).filter_map do |name, job|
+      stage = job.fetch('stage', nil)
+      stage = DEFAULT_JOB_STAGE if stage.nil?
+      next if stage.is_a?(String) && stages.include?(stage)
+
+      "#{name} job: chosen stage #{stage} does not exist; available stages are #{stages.join(', ')}"
     end
   end
 
@@ -199,7 +257,22 @@ module PipelineBuilder
     pipeline_jobs, excluded_jobs = filter_jobs_by_rules(jobs, project_dir: project_dir) do |name, job|
       predefined.merge(inherited_root_variables(name, job, root)).merge(cli)
     end
+    pipeline_jobs, excluded_jobs = drop_only_edge_stage_jobs(pipeline_jobs, excluded_jobs)
     { workflow_skipped: false, pipeline_jobs: pipeline_jobs, excluded_jobs: excluded_jobs }
+  end
+
+  # Upstream Chain::Populate#no_pipeline_to_create?: .pre/.post jobs alone
+  # are not a pipeline (gitlab-org/gitlab#198518), so none of them run.
+  # Expressed as the same outcome as "rules left no job": every kept job
+  # moves to excluded with upstream's reason, and each command reports an
+  # empty pipeline its usual way (one convention for that is TASK-36).
+  #
+  # @return [Array(Hash, Hash)] [kept, excluded]
+  def drop_only_edge_stage_jobs(kept, excluded)
+    return [kept, excluded] if kept.empty?
+    return [kept, excluded] unless kept.values.all? { |job| EDGE_STAGES.include?(job['stage']) }
+
+    [{}, excluded.merge(kept.transform_values { ONLY_EDGE_STAGE_JOBS_MESSAGE })]
   end
 
   def failure(message)
@@ -503,7 +576,7 @@ module PipelineBuilder
       # Per-job overlay so rules can reference CI_JOB_NAME / CI_JOB_STAGE.
       job_vars = yield(name, job_config).dup
       job_vars['CI_JOB_NAME']  = name.to_s
-      job_vars['CI_JOB_STAGE'] = (job_config['stage'] || job_config[:stage] || 'test').to_s
+      job_vars['CI_JOB_STAGE'] = (job_config['stage'] || job_config[:stage] || DEFAULT_JOB_STAGE).to_s
 
       context = {
         project_dir: project_dir,

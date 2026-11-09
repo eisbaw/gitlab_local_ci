@@ -1,9 +1,11 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "test",
     "integration",
-    "build"
+    "build",
+    ".post"
   ],
   "jobs": [
     "test:postgres",

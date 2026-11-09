@@ -329,7 +329,7 @@ open pipeline.png
 # Remove or reorder needs to break the cycle
 ```
 
-#### Issue: "Job references undefined stage"
+#### Issue: "chosen stage ... does not exist"
 
 **Cause:** Missing stage in stages list
 

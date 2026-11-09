@@ -1,9 +1,11 @@
 {
   "valid": true,
   "stages": [
+    ".pre",
     "build",
     "test",
-    "deploy"
+    "deploy",
+    ".post"
   ],
   "jobs": [
     "build:default-cache",

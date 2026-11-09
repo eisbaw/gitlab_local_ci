@@ -1,7 +1,9 @@
 {
   "valid": true,
   "stages": [
-    "triggers"
+    ".pre",
+    "triggers",
+    ".post"
   ],
   "jobs": [
     "trigger_child1",

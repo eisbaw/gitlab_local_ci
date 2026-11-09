@@ -36,7 +36,7 @@ class MockPipeline
   STATE_FAILED = :failed
 
   # Upstream Entry::Job default stage.
-  DEFAULT_JOB_STAGE = 'test'
+  DEFAULT_JOB_STAGE = PipelineBuilder::DEFAULT_JOB_STAGE
 
   # Initialize pipeline with parsed configuration data
   #

@@ -4,6 +4,16 @@ digraph pipeline {
   compound=true;
   node [shape=box, style=filled, fillcolor=lightblue];
 
+  subgraph cluster__pre {
+    label=".pre";
+    style=filled;
+    fillcolor=lightgrey;
+
+    __stage_anchor__pre [style=invis, width=0, height=0];
+
+    verify_includes [label="verify-includes", tooltip="---\nstage: \".pre\"\nscript:\n- echo \"Verifying CI configuration includes...\"\n- 'echo \"Main config: .gitlab-ci.yml\"'\n- 'echo \"Included: .gitlab/ci/build.yml\"'\n- 'echo \"Included: .gitlab/ci/test.yml\"'\n- 'echo \"Included: .gitlab/ci/deploy.yml\"'\n- echo \"All includes loaded successfully\"\nretry:\n  max: 2\n  when:\n  - runner_system_failure\n  - stuck_or_timeout_failure\n"];
+  }
+
   subgraph cluster_build {
     label="build";
     style=filled;
@@ -40,11 +50,13 @@ digraph pipeline {
     rollback_production [label="rollback-production", tooltip="---\nstage: deploy\nscript:\n- echo \"Rolling back production deployment...\"\n- echo \"Restoring previous version...\"\n- echo \"Rollback completed\"\nenvironment:\n  name: production\n  action: rollback\nwhen: manual\nonly:\n- main\nretry:\n  max: 2\n  when:\n  - runner_system_failure\n  - stuck_or_timeout_failure\n"];
   }
 
-  __stage_anchor_build -> unit_tests [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> integration_tests [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_build -> security_scan [ltail=cluster_build, style=bold, color="#E41A1C"];
-  __stage_anchor_test -> deploy_staging [ltail=cluster_test, style=bold, color="#377EB8"];
-  __stage_anchor_test -> deploy_production [ltail=cluster_test, style=bold, color="#377EB8"];
-  __stage_anchor_test -> rollback_production [ltail=cluster_test, style=bold, color="#377EB8"];
-  __stage_anchor_build -> code_quality [ltail=cluster_build, style=bold, color="#E41A1C"];
+  __stage_anchor__pre -> build_app [ltail=cluster__pre, style=bold, color="#E41A1C"];
+  __stage_anchor__pre -> build_docker [ltail=cluster__pre, style=bold, color="#E41A1C"];
+  __stage_anchor_build -> unit_tests [ltail=cluster_build, style=bold, color="#377EB8"];
+  __stage_anchor_build -> integration_tests [ltail=cluster_build, style=bold, color="#377EB8"];
+  __stage_anchor_build -> security_scan [ltail=cluster_build, style=bold, color="#377EB8"];
+  __stage_anchor_test -> deploy_staging [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_test -> deploy_production [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_test -> rollback_production [ltail=cluster_test, style=bold, color="#4DAF4A"];
+  __stage_anchor_build -> code_quality [ltail=cluster_build, style=bold, color="#377EB8"];
 }
