@@ -234,6 +234,22 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
     end
   end
 
+  context 'job keywords' do
+    it 'that upstream allows are accepted by lint and dry-run alike' do
+      write('.gitlab-ci.yml', <<~YAML)
+        job:
+          script: [echo]
+          when: delayed
+          start_in: 1 minute
+          id_tokens:
+            ID_TOKEN: {aud: https://example.com}
+      YAML
+      stdout, = cli('lint', '--format', 'json')
+      expect(JSON.parse(stdout).fetch('warnings')).to be_empty
+      expect(dry_run_jobs).to eq(%w[job])
+    end
+  end
+
   context '--project' do
     it 'is where include:local resolves from' do
       Dir.mktmpdir('pipeline_parity_root') do |root|

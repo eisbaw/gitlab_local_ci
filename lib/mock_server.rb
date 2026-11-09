@@ -158,15 +158,6 @@ class MockServer
   def validate_job_configs(job_configs)
     errors = []
 
-    # Known valid job keys
-    valid_keys = %w[
-      script before_script after_script stage image services
-      artifacts cache dependencies variables tags when
-      allow_failure retry timeout parallel extends needs rules
-      environment coverage resource_group release inherit
-      interruptible only except trigger pages
-    ]
-
     job_configs.each do |job_name, job_config|
       # Validate script is present (unless trigger or pages is defined)
       script = job_config['script'] || job_config[:script]
@@ -182,7 +173,7 @@ class MockServer
       # Check for unknown keys
       job_config.each_key do |key|
         key_str = key.to_s
-        unless valid_keys.include?(key_str)
+        unless CiKeywords::JOB.include?(key_str)
           errors << "Job '#{job_name}' has unknown key: '#{key_str}'"
         end
       end

@@ -23,6 +23,25 @@ RSpec.describe CiKeywords do
     expect(described_class::ROOT.sort).to eq(upstream.split.sort)
   end
 
+  it 'JOB equals the union of upstream Job, EE Job, Bridge and Processable allowed keys' do
+    entry_dir = File.expand_path('../../gitlab/lib/gitlab/ci/config/entry', __dir__)
+    ee_job_rb = File.expand_path('../../gitlab/ee/lib/ee/gitlab/ci/config/entry/job.rb', __dir__)
+    skip 'gitlab/ submodule not checked out' unless File.exist?(ee_job_rb)
+
+    lists = {
+      File.join(entry_dir, 'job.rb') => /^\s+ALLOWED_KEYS = %i\[([^\]]+)\]/m,
+      ee_job_rb => /EE_ALLOWED_KEYS = %i\[([^\]]+)\]/m,
+      File.join(entry_dir, 'bridge.rb') => /ALLOWED_KEYS = %i\[([^\]]+)\]/m,
+      File.join(entry_dir, 'processable.rb') => /PROCESSABLE_ALLOWED_KEYS = %i\[([^\]]+)\]/m
+    }
+    upstream = lists.flat_map do |file, pattern|
+      keys = File.read(file)[pattern, 1]
+      expect(keys).not_to be_nil, "allowed keys not found in #{file}; update this parser"
+      keys.split
+    end
+    expect(described_class::JOB.sort).to eq(upstream.uniq.sort)
+  end
+
   it 'classifies Hash values under non-root keys as job entries, nothing else' do
     expect(described_class.job_entry?('build', { 'script' => ['x'] })).to be true
     expect(described_class.job_entry?('.tpl', { 'script' => ['x'] })).to be true

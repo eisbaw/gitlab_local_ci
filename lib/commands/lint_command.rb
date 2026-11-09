@@ -30,15 +30,6 @@ module Commands
   # - Composable: returns data structure that formatters can transform
   # - Fundamentals first: implements validation logic directly
   class LintCommand
-    # Valid job keywords according to GitLab CI schema
-    VALID_JOB_KEYWORDS = %w[
-      script stage needs dependencies artifacts cache image services
-      before_script after_script variables allow_failure when timeout
-      retry parallel tags only except rules extends environment
-      resource_group release coverage interruptible trigger inherit
-      pages secrets id_tokens hooks
-    ].freeze
-
     # Result object for lint command output
     # Using a data class to make the return value explicit and typed
     class Result
@@ -175,7 +166,7 @@ module Commands
     def validate_job(job_name, job_config, stages, all_job_names, errors, warnings)
       # Check for invalid job keywords
       job_config.each_key do |key|
-        unless VALID_JOB_KEYWORDS.include?(key)
+        unless CiKeywords::JOB.include?(key)
           warnings << "Job '#{job_name}' uses non-standard keyword: #{key}"
         end
       end

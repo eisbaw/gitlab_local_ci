@@ -21,6 +21,24 @@ module CiKeywords
     after_script variables stages cache workflow
   ].freeze
 
+  # Keys a job entry may have: the union of upstream
+  #   Entry::Job::ALLOWED_KEYS        (gitlab/lib/gitlab/ci/config/entry/job.rb)
+  #   EE::...::Job::EE_ALLOWED_KEYS   (gitlab/ee/lib/ee/gitlab/ci/config/entry/job.rb)
+  #   Entry::Bridge::ALLOWED_KEYS     (trigger jobs, .../entry/bridge.rb)
+  #   Entry::Processable::PROCESSABLE_ALLOWED_KEYS (.../entry/processable.rb)
+  # Upstream checks a Job against Job + Processable and a Bridge (has
+  # trigger:) against Bridge + Processable; this list does not tell the two
+  # apart (e.g. it accepts trigger: next to script:). Per-type checks: TASK-16.
+  JOB = %w[
+    tags script image services start_in artifacts cache dependencies
+    before_script after_script hooks coverage retry parallel timeout inputs
+    release id_tokens publish pages manual_confirmation run
+    dast_configuration identity secrets
+    trigger
+    extends stage only except rules variables inherit allow_failure when
+    needs resource_group environment interruptible
+  ].uniq.freeze
+
   module_function
 
   # Upstream Entry::Jobs: a non-root key whose value is a Hash is a job
