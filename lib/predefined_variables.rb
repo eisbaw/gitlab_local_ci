@@ -278,11 +278,21 @@ module PredefinedVariables
     text.downcase.gsub(/[^a-z0-9]/, '-')[0, SLUG_LENGTH_MAX].gsub(/\A-+|-+\z/, '')
   end
 
+  # One namespace or project path segment: upstream Gitlab::PathRegex
+  # PATH_REGEX_STR without its length bound. Excludes '@', ':', '%', '?'
+  # and whitespace, so userinfo or a query can never pass as a path.
+  PATH_SEGMENT = /\A[a-zA-Z0-9_.][a-zA-Z0-9_\-.]*\z/
+
   # "namespace/.../name" from a GitLab remote URL, or nil when the URL has
-  # no host or no namespace (e.g. a local path remote).
+  # no host or no namespace (e.g. a local path remote), or when what it
+  # yields is not a plausible GitLab path. nil makes the caller fall back
+  # to the directory name: the remote URL may carry credentials, and a
+  # malformed one (https://u:p/w@host/g/n, '/' unencoded in the password)
+  # would otherwise leak them into CI_PROJECT_PATH.
   #   git@host:group/sub/name.git          -> group/sub/name
   #   https://user:pw@host/group/name.git  -> group/name
   #   ssh://git@host:2222/group/name       -> group/name
+  #   https://u:p/w@host/group/name        -> nil
   def project_path_from_remote(url)
     return nil if url.nil? || url.empty?
 
@@ -295,7 +305,8 @@ module PredefinedVariables
     return nil if path.nil?
 
     path = path.delete_suffix('/').delete_suffix('.git')
-    path.include?('/') && !path.split('/').any?(&:empty?) ? path : nil
+    segments = path.split('/', -1)
+    segments.size >= 2 && segments.all? { |segment| PATH_SEGMENT.match?(segment) } ? path : nil
   end
 
   # The ref name --ref asks about, without refs/heads/ or refs/tags/, or nil

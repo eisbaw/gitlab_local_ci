@@ -124,6 +124,23 @@ RSpec.describe PredefinedVariables do
       expect(v.keys).not_to include('CI_PROJECT_NAMESPACE', 'CI_PROJECT_ROOT_NAMESPACE')
     end
 
+    it 'never emits remote credentials, also from malformed URLs: falls back to the directory name' do
+      random = Random.new(20_261_110)
+      urls = ['https://u:p/w@gitlab.example.com/group/proj', 'u:pa/ss@gitlab.example.com:group/proj.git']
+      urls += Array.new(50) do
+        secret = "S#{Array.new(8) { ['/', '@', ':', 'x', '%2F', '?', '#'].sample(random: random) }.join}S"
+        ["https://user:#{secret}@host/group/proj.git", "ssh://#{secret}@host/group/proj", "#{secret}@host:group/proj"]
+          .sample(random: random)
+      end
+      urls.each do |url|
+        v = vars(facts: git.merge(remote_url: url))
+        # Only the path-derived variables (CI_COMMIT_AUTHOR has an '@').
+        leaked = v.select { |key, value| key.include?('PROJECT') && value.match?(%r{@|S.*S|pa/ss|p/w}) }
+        expect(leaked).to be_empty, "#{url}: #{leaked}"
+        expect(%w[group/proj proj]).to include(v['CI_PROJECT_PATH']), url
+      end
+    end
+
     it 'sets CI_DEFAULT_BRANCH and its slug, main when unknown' do
       expect(vars(facts: git.merge(default_branch: 'Release/2'))).to include(
         'CI_DEFAULT_BRANCH' => 'Release/2', 'CI_DEFAULT_BRANCH_SLUG' => 'release-2'
@@ -211,6 +228,26 @@ RSpec.describe PredefinedVariables do
     }.each do |url, expected|
       it "#{url.inspect} -> #{expected.inspect}" do
         expect(described_class.project_path_from_remote(url)).to eq(expected)
+      end
+    end
+
+    # Malformed URLs whose userinfo the URL regexes cannot strip: no part
+    # of the secret may reach the path; the caller then falls back to the
+    # directory name (pipeline_variables spec below).
+    [
+      'https://u:p/w@gitlab.example.com/group/proj.git', # '/' unencoded in the password
+      'https://u:p/w/x@gitlab.example.com/group/proj',
+      'https://u@x:p/w@gitlab.example.com/group/proj',   # '@' unencoded in the user
+      'u:pa/ss@gitlab.example.com:group/proj.git',        # scp-like with '/' in the password
+      'ssh://git@host/group/proj@secret',
+      'https://gitlab.example.com/group/proj?private_token=secret',
+      'https://gitlab.example.com/group/proj#secret',
+      'https://gitlab.example.com/group/pro%20j',
+      'https://gitlab.example.com/group//proj',
+      "https://gitlab.example.com/group/proj\nsecret"
+    ].each do |url|
+      it "#{url.inspect} -> nil (no userinfo, query or junk in the path)" do
+        expect(described_class.project_path_from_remote(url)).to be_nil
       end
     end
   end

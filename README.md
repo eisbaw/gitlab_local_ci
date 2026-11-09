@@ -169,7 +169,10 @@ open MR). Exceptions, so MR rules work:
 - `CI_DEFAULT_BRANCH` comes from `origin/HEAD`, else `main`.
 - `CI_PROJECT_PATH` is `namespace/name` from the `origin` remote URL; without
   a usable `origin` it falls back to the project directory's name (and the
-  `CI_PROJECT_NAMESPACE*` variables are unset).
+  `CI_PROJECT_NAMESPACE*` variables are unset). A URL whose path is not a
+  plausible GitLab path (e.g. `https://u:p/w@host/g/n`, a password with an
+  unencoded `/`) also falls back: credentials in the URL never reach a
+  variable.
 
 `--pipeline` takes upstream source names (`push`, `web`, `schedule`, `api`,
 `trigger`, `merge_request_event`, ...). The older names `merge_request` and
