@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:53:00Z'
-updated_date: '2026-11-09T17:54:00Z'
+updated_date: '2026-11-09T18:42:00Z'
 labels:
   - audit
   - architecture
@@ -34,3 +34,9 @@ Upstream has one pipeline: Gitlab::Ci::Config (YAML load + !reference, includes,
 - [ ] #2 Single source of reserved top-level keys and allowed job keys
 - [ ] #3 Regression specs: same config yields identical job set in dag, dry-run, export-just
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Forward-carried from TASK-5/6: lint, dry-run, run, export-just each run process_includes then ExtendsResolver#resolve_extends via their own private copies; dag runs only includes. Unify on one function (includes -> extends -> later !reference/default) so the TASK-6 array-replace semantics reach dag tooltips too. Key order is observable (lint jobs list, dag node order, dry-run dispatch): includes now emit included keys first (upstream deep_merge! order), but resolve_extends still moves jobs after globals/templates (TASK-31).
+<!-- SECTION:NOTES:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-5
 title: 'Include merge order reversed: included file overrides main file'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:53:00Z'
-updated_date: '2026-11-09T18:39:00Z'
+updated_date: '2026-11-09T18:42:00Z'
 labels:
   - audit
   - include
@@ -46,3 +46,9 @@ Bite: new 'merge precedence' specs on pre-fix code: 5 examples, 4 failures (late
 Goldens: proj11 dag.dot tooltips now show the main-file overrides (build-app/integration-tests/deploy-production) = the fix; proj11/proj20 dag.dot, lint.json, dry-run(.stderr) otherwise only permute job order, because key order now follows upstream deep_merge! (included keys first, main-only keys appended). dry-run schedule permutes because the simulator dispatches in config order ignoring stages (TASK-7).
 Gotchas: deep_merge is NOT associative (hash, non-hash, hash on one key) so merge tree order must match upstream exactly; do not 'simplify' into a flat fold. Key order is observable in lint/dag/dry-run output. Empty included file still crashes (already listed in TASK-21).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Main file now wins over includes and later includes over earlier ones, via upstream's merge tree (includes in order into {}, then the including file on top) and one shared ConfigMerge.deep_merge (hashes merge, arrays replace). Specs bite (4/5 red pre-fix). proj11/proj20 goldens updated and explained in commit d8ef7fb.
+<!-- SECTION:FINAL_SUMMARY:END -->
