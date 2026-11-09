@@ -203,6 +203,32 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
       expect(stderr).to include("needs 'mr_only', which is not in this pipeline")
     end
 
+    it 'keep jobs whose only missing needs are optional or cross-project' do
+      write('.gitlab-ci.yml', <<~YAML)
+        stages: [build, test]
+        maybe:
+          stage: build
+          script: [echo maybe]
+          rules:
+            - if: $CI_PIPELINE_SOURCE == "schedule"
+        opt:
+          stage: test
+          script: [echo opt]
+          needs:
+            - job: maybe
+              optional: true
+        xproj:
+          stage: test
+          script: [echo xproj]
+          needs:
+            - project: group/other
+              job: compile
+              ref: main
+      YAML
+      expect(dag_jobs.sort).to eq(%w[opt xproj])
+      expect(export_just_jobs.sort).to eq(%w[opt xproj])
+    end
+
     it 'make run refuse a hidden template' do
       _stdout, stderr, status = cli('run', '.tpl')
       expect(status).to eq(1)
@@ -247,6 +273,29 @@ RSpec.describe 'Pipeline parity across subcommands', type: :integration do
       stdout, = cli('lint', '--format', 'json')
       expect(JSON.parse(stdout).fetch('warnings')).to be_empty
       expect(dry_run_jobs).to eq(%w[job])
+    end
+  end
+
+  context 'workflow:rules:variables' do
+    it 'override top-level variables but not CLI variables' do
+      write('.gitlab-ci.yml', <<~YAML)
+        variables:
+          MODE: normal
+        workflow:
+          rules:
+            - variables:
+                MODE: workflow
+        workflow_only:
+          script: [echo]
+          rules:
+            - if: $MODE == "workflow"
+        cli_only:
+          script: [echo]
+          rules:
+            - if: $MODE == "nightly"
+      YAML
+      expect(dag_jobs).to eq(%w[workflow_only])
+      expect(dag_jobs('--variables', 'MODE=nightly')).to eq(%w[cli_only])
     end
   end
 

@@ -64,12 +64,11 @@ module PipelineBuilder
   # non-empty every other field is nil and the caller reports the errors.
   #
   # config          merged + extended config (globals, templates, jobs)
-  # variables       pipeline variables rules saw (build only)
   # workflow_skipped workflow:rules created no pipeline (build only)
   # pipeline_jobs   name => job config of the jobs this pipeline creates,
   #                 rule attributes applied, config order (build only)
   # excluded_jobs   name => reason, visible jobs rules dropped (build only)
-  Result = Struct.new(:config, :errors, :variables, :workflow_skipped,
+  Result = Struct.new(:config, :errors, :workflow_skipped,
                       :pipeline_jobs, :excluded_jobs, keyword_init: true) do
     def ok?
       errors.empty?
@@ -150,17 +149,21 @@ module PipelineBuilder
 
   # Workflow rules, then job rules, over a resolved config.
   #
-  # @return [Hash] { variables:, workflow_skipped:, pipeline_jobs:, excluded_jobs: }
+  # @return [Hash] { workflow_skipped:, pipeline_jobs:, excluded_jobs: }
   # @raise [StandardError] on a rule the evaluator rejects
   def evaluate_rules(config, predefined:, cli_variables:, project_dir:)
     variables = pipeline_variables(config, predefined: predefined, cli_variables: cli_variables)
     workflow = apply_workflow_rules(config, variables, project_dir: project_dir)
+    # Pipeline (CLI) variables outrank every .gitlab-ci.yml variable,
+    # workflow:rules:variables included (doc/ci/variables "CI/CD variable
+    # precedence").
+    workflow[:variables] = workflow[:variables].merge(cli_variables.to_h { |k, v| [k.to_s, v.to_s] })
     if workflow[:filtered]
-      return { variables: workflow[:variables], workflow_skipped: true, pipeline_jobs: {}, excluded_jobs: {} }
+      return { workflow_skipped: true, pipeline_jobs: {}, excluded_jobs: {} }
     end
 
     pipeline_jobs, excluded_jobs = filter_jobs_by_rules(visible_jobs(config), workflow[:variables], project_dir: project_dir)
-    { variables: workflow[:variables], workflow_skipped: false, pipeline_jobs: pipeline_jobs, excluded_jobs: excluded_jobs }
+    { workflow_skipped: false, pipeline_jobs: pipeline_jobs, excluded_jobs: excluded_jobs }
   end
 
   def failure(message)
@@ -252,7 +255,8 @@ module PipelineBuilder
   # Evaluate workflow:rules. Returns { variables:, filtered: }; filtered
   # means workflow rules exist and matched nothing (or matched when: never),
   # so upstream creates no pipeline (Chain::EvaluateWorkflowRules). The
-  # matched rule's `variables:` are layered over the input variables.
+  # matched rule's `variables:` are layered over the input variables; the
+  # caller re-applies CLI variables on top.
   def apply_workflow_rules(config, variables, project_dir:)
     workflow = config['workflow'] || config[:workflow]
     rules = workflow.is_a?(Hash) ? (workflow['rules'] || workflow[:rules]) : nil
@@ -347,7 +351,7 @@ module PipelineBuilder
     loop do
       surviving = job_configs.keys
       orphaned = job_configs.each_with_object({}) do |(name, cfg), acc|
-        missing = needs_job_names(cfg['needs']).find { |n| !surviving.include?(n) && !n.include?('/') }
+        missing = required_same_pipeline_needs(cfg['needs']).find { |n| !surviving.include?(n) && !n.include?('/') }
         acc[name] = "needs '#{missing}', which is not in this pipeline" if missing
       end
       break if orphaned.empty?
@@ -356,6 +360,25 @@ module PipelineBuilder
       dropped.merge!(orphaned)
     end
     dropped
+  end
+
+  # Needs the job cannot run without inside this pipeline: drops
+  # `optional: true` and cross-project/-pipeline needs ({project:},
+  # {pipeline:}, {ref:}), which upstream does not resolve against this
+  # pipeline's jobs (entry/need.rb, seed/build.rb#needs_errors).
+  def required_same_pipeline_needs(needs_config)
+    return [] unless needs_config.is_a?(Array)
+
+    needs_config.filter_map do |need|
+      case need
+      when String then need
+      when Hash
+        next if need['optional'] == true
+        next if %w[project pipeline ref].any? { |k| need.key?(k) }
+
+        need['job']
+      end
+    end
   end
 
   # `needs:` entries as job names (String or {job: ...}); others ignored.

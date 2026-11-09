@@ -294,7 +294,9 @@ module GitlabCiCli
         OPTIONS:
             --entry FILE      Path to CI config (default: ./.gitlab-ci.yml)
             --project DIR     Project root: include:local, exists:/changes:, CI_PROJECT_DIR
-                              (default: directory of --entry)
+                              (default: directory of --entry; upstream uses the
+                              repository root, so pass --project when the entry
+                              file is not at the root)
             --runners DIR     Runner fleet directory (default: ./runners)
             --ref REF         Git ref to simulate (default: HEAD)
             --pipeline TYPE   Pipeline type: push|merge_request|schedule|manual (default: push)
