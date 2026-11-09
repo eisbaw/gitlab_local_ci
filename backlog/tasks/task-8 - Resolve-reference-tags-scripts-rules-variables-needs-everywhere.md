@@ -4,13 +4,14 @@ title: Resolve !reference tags (scripts, rules, variables, needs) everywhere
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:54:00Z'
-updated_date: '2026-11-09T18:42:00Z'
+updated_date: '2026-11-09T18:45:00Z'
 labels:
   - audit
   - config
   - correctness
 dependencies:
   - TASK-1
+  - TASK-31
 priority: high
 ordinal: 8000
 ---

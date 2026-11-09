@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:53:00Z'
-updated_date: '2026-11-09T18:42:00Z'
+updated_date: '2026-11-09T18:45:00Z'
 labels:
   - audit
   - architecture
@@ -39,4 +39,6 @@ Upstream has one pipeline: Gitlab::Ci::Config (YAML load + !reference, includes,
 
 <!-- SECTION:NOTES:BEGIN -->
 Forward-carried from TASK-5/6: lint, dry-run, run, export-just each run process_includes then ExtendsResolver#resolve_extends via their own private copies; dag runs only includes. Unify on one function (includes -> extends -> later !reference/default) so the TASK-6 array-replace semantics reach dag tooltips too. Key order is observable (lint jobs list, dag node order, dry-run dispatch): includes now emit included keys first (upstream deep_merge! order), but resolve_extends still moves jobs after globals/templates (TASK-31).
+
+From architect review of TASK-5/6: reserved top-level key list %w[stages variables workflow include default] duplicated twice in ExtendsResolver#resolve_extends and incomplete (top-level cache:, image, services, before_script etc. classified as jobs). Make one constant shared with command layer (also TASK-9). Hardening idea: differential property test of ConfigMerge vs ActiveSupport Hash#deep_merge as test-only oracle.
 <!-- SECTION:NOTES:END -->

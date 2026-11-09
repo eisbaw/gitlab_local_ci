@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T18:41:00Z'
+updated_date: '2026-11-09T18:45:00Z'
 labels:
   - audit
   - config
 dependencies: []
-priority: low
+priority: high
 ordinal: 31000
 ---
 
@@ -26,3 +27,9 @@ Found while fixing TASK-6. Upstream Extendable iterates every top-level key (Ext
 - [ ] #2 Key order preserved through extends resolution (goldens reviewed)
 - [ ] #3 Error texts match upstream; specs for each
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From architect review of TASK-5/6 (GO): (1) BLOCKS TASK-8 - upstream Extendable extend!s every key incl. hidden templates and writes results back before Tags::Resolver, so !reference [.tpl, script] sees .tpl post-extends; resolve all roots (with a memo hash, fixes fan-out^depth too) so circular/nesting errors in unused templates are also raised. (2) Then delete lint_command.rb#validate_extends (second source of truth; only sees hidden templates) and surface resolver errors. (4) resolve_extends rebuilds the hash with reject+merge, moving jobs after templates/globals; upstream keeps positions (@context[key] = merged) - matters since dry-run schedules in key order. (5) error texts for unknown parent / circular differ from upstream.
+<!-- SECTION:NOTES:END -->
