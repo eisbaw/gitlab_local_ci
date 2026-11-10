@@ -138,6 +138,16 @@ open MR). Exceptions, so MR rules work:
 `manual` still work as aliases for `merge_request_event` and `web`.
 
 
+## Includes
+
+`include: local` reads from `--project`. The other kinds may need the
+network (`https://` only, certificates verified; see
+[SECURITY.md](../SECURITY.md#network)):
+
+- `remote`: fetched from the URL. A host that resolves to any non-public
+  address (loopback, private, link-local, IPv6 ULA, ...) is refused.
+  `GITLAB_CI_ALLOWED_DOMAINS=host1,host2` restricts the allowed hosts.
+
 ## Parallel jobs
 
 `parallel: N` and `parallel:matrix` expand as GitLab does, before rules, so

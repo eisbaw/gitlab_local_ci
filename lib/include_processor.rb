@@ -18,6 +18,9 @@ require_relative 'ci_yaml'
 require 'net/http'
 require 'uri'
 require 'set'
+require 'ipaddr'
+require 'resolv'
+require 'socket'
 require_relative 'external_resource_cache'
 require_relative 'rules_evaluator'
 require_relative 'config_merge'
@@ -327,13 +330,18 @@ class IncludeProcessor
   def fetch_remote_include(include_spec)
     url_string = include_spec['remote']
 
-    # Validate and parse URL
-    uri = validate_remote_url(url_string)
+    # Validate and parse URL; address is the vetted public IP to connect to
+    uri, address = validate_remote_url(url_string)
 
-    # Fetch with timeouts to prevent resource exhaustion
+    # Connect to the vetted address, not to whatever a second DNS lookup
+    # returns: Net::HTTP would resolve the name again, and an answer that
+    # changed in between (DNS rebinding) would bypass the check. ipaddr only
+    # changes the TCP peer; the Host header, SNI and the certificate check
+    # still use uri.hostname. Timeouts bound a slow or silent server.
     response = Net::HTTP.start(
-      uri.host,
+      uri.hostname,
       uri.port,
+      ipaddr: address,
       use_ssl: true,
       read_timeout: 5,      # 5 second read timeout
       open_timeout: 3,      # 3 second connection timeout
@@ -356,7 +364,8 @@ class IncludeProcessor
   # Validate a remote URL for security
   #
   # @param url_string [String] URL to validate
-  # @return [URI] Parsed and validated URI
+  # @return [Array(URI, String)] parsed URI, and the public IP address to
+  #   connect to
   # @raise [RuntimeError] If URL is invalid or not allowed
   def validate_remote_url(url_string)
     uri = URI.parse(url_string)
@@ -371,13 +380,6 @@ class IncludeProcessor
       raise "Remote URL missing host: #{url_string}"
     end
 
-    # SSRF Protection: Block requests to private IP ranges
-    # This prevents attacks targeting internal services
-    # Note: DNS rebinding attacks are still possible (hostname could resolve to
-    # private IP after this check). Ruby's Net::HTTP doesn't provide hooks to
-    # validate resolved IPs. This is a known limitation.
-    validate_not_private_ip(uri.host)
-
     # Optional: Check against allowlist if configured
     # Set GITLAB_CI_ALLOWED_DOMAINS environment variable to enable
     allowed_domains = ENV['GITLAB_CI_ALLOWED_DOMAINS']
@@ -389,37 +391,80 @@ class IncludeProcessor
       end
     end
 
-    uri
+    # After the allowlist, so a host it rejects is never looked up.
+    # SSRF protection: a config must not make this tool talk to services on
+    # this machine or its network (cloud metadata, admin ports). The caller
+    # connects to the returned address only.
+    address = public_address_of(uri.hostname)
+
+    [uri, address]
   rescue URI::InvalidURIError => e
     raise "Invalid remote URL: #{url_string} - #{e.message}"
   end
 
-  # Validate that a hostname does not resolve to a private IP address
-  # Prevents SSRF attacks targeting internal services
+  # Address ranges a remote include must not reach: this host, private and
+  # shared (CGNAT) networks, link-local (cloud metadata 169.254.169.254),
+  # multicast, and ranges reserved for documentation, benchmarks or future
+  # use. IPv6 forms that embed an IPv4 address are checked by that address
+  # (embedded_ipv4), not listed here.
+  NON_PUBLIC_RANGES = %w[
+    0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16
+    172.16.0.0/12 192.0.0.0/24 192.0.2.0/24 192.168.0.0/16 198.18.0.0/15
+    198.51.100.0/24 203.0.113.0/24 224.0.0.0/4 240.0.0.0/4
+    ::/128 ::1/128 100::/64 2001:db8::/32 fc00::/7 fe80::/10 fec0::/10 ff00::/8
+  ].map { |cidr| IPAddr.new(cidr) }.freeze
+
+  # IPv6 prefixes whose low 32 bits are an IPv4 address the packet ends up
+  # at: IPv4-mapped (::ffff:a.b.c.d), IPv4-compatible (::a.b.c.d, deprecated)
+  # and NAT64 (64:ff9b::a.b.c.d; DNS64 networks synthesize these for every
+  # IPv4-only host, so the prefix itself must stay allowed).
+  IPV4_EMBEDDING_PREFIXES = %w[::ffff:0:0/96 ::/96 64:ff9b::/96].map { |cidr| IPAddr.new(cidr) }.freeze
+
+  # The address to connect to for hostname, after checking that every
+  # address it resolves to is public. Every address, not just the first: the
+  # connection may use any of them. A literal IP host is checked as is.
   #
-  # @param hostname [String] Hostname to validate
-  # @raise [RuntimeError] If hostname resolves to private IP
-  def validate_not_private_ip(hostname)
-    require 'resolv'
+  # @param hostname [String] URI#hostname (IPv6 literal without brackets)
+  # @return [String] first resolved address
+  # @raise [RuntimeError] no address, or any address not public
+  def public_address_of(hostname)
+    addresses = literal_ip?(hostname) ? [hostname] : Resolv.getaddresses(hostname)
+    raise "Cannot resolve hostname '#{hostname}': no address" if addresses.empty?
 
-    begin
-      # Resolve hostname to IP address
-      ip = Resolv.getaddress(hostname)
-
-      # Check for private IP ranges (SSRF protection)
-      if ip.start_with?('127.') ||              # Loopback (127.0.0.0/8)
-         ip.start_with?('10.') ||               # Private class A (10.0.0.0/8)
-         ip.match?(/^172\.(1[6-9]|2\d|3[01])\./) || # Private class B (172.16.0.0/12)
-         ip.start_with?('192.168.') ||          # Private class C (192.168.0.0/16)
-         ip == '0.0.0.0' ||                     # Unspecified address
-         ip.start_with?('169.254.') ||          # Link-local (169.254.0.0/16)
-         ip.start_with?('224.') ||              # Multicast (224.0.0.0/4)
-         ip == '255.255.255.255'                # Broadcast
-        raise "Remote URL hostname '#{hostname}' resolves to private IP address: #{ip}"
-      end
-    rescue Resolv::ResolvError => e
-      raise "Cannot resolve hostname '#{hostname}': #{e.message}"
+    blocked = addresses.reject { |address| public_ip?(IPAddr.new(address)) }
+    unless blocked.empty?
+      raise "Remote URL host '#{hostname}' resolves to a non-public address (#{blocked.join(', ')}); " \
+            'remote includes may only reach public hosts'
     end
+
+    addresses.first
+  rescue IPAddr::InvalidAddressError => e
+    raise "Cannot check address of '#{hostname}': #{e.message}"
+  end
+
+  def literal_ip?(hostname)
+    IPAddr.new(hostname)
+    true
+  rescue IPAddr::InvalidAddressError
+    false
+  end
+
+  # @param ip [IPAddr]
+  def public_ip?(ip)
+    embedded = embedded_ipv4(ip)
+    return public_ip?(embedded) if embedded
+
+    NON_PUBLIC_RANGES.none? { |range| range.family == ip.family && range.include?(ip) }
+  end
+
+  # The IPv4 address an IPv6 address embeds (IPV4_EMBEDDING_PREFIXES), or
+  # nil. :: and ::1 lie inside ::/96 but are IPv6 unspecified/loopback, not
+  # IPv4, and stay with NON_PUBLIC_RANGES.
+  def embedded_ipv4(ip)
+    return nil unless ip.ipv6? && ip.to_i > 1
+    return nil unless IPV4_EMBEDDING_PREFIXES.any? { |prefix| prefix.include?(ip) }
+
+    IPAddr.new(ip.to_i & 0xffff_ffff, Socket::AF_INET)
   end
 
   # Fetch a GitLab CI template

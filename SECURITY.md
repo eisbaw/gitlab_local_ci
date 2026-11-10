@@ -38,12 +38,19 @@ The tool makes no connection except to fetch an include that is not on disk:
 `gitlab/` checkout. All of them use `https://` only, with certificate
 verification.
 
-- `include: remote`: hosts whose first resolved address is an IPv4 loopback
-  or private address are refused. IPv6 is not checked, so a name that
-  resolves to `::1` first (such as `localhost`) gets through, and a DNS
-  rebinding between the check and the request is not prevented.
+- `include: remote`: every address the host resolves to must be public,
+  else the include is refused: loopback, private, shared (100.64.0.0/10),
+  link-local (including the cloud metadata address 169.254.169.254),
+  multicast and reserved IPv4 ranges, and IPv6 `::1`, `::`, `fc00::/7`,
+  `fe80::/10`, multicast and documentation ranges. An IPv6 address that
+  embeds an IPv4 one (`::ffff:a.b.c.d`, NAT64 `64:ff9b::a.b.c.d`) is
+  checked by that IPv4 address. A literal IP host is checked the same way;
+  a host with no address is an error. The tool then connects to the
+  address it checked (the certificate is still verified against the host
+  name), so a DNS answer that changes after the check is not used.
   `GITLAB_CI_ALLOWED_DOMAINS=host1,host2` restricts remote includes to those
-  hosts. The fetch times out after 3 s (connect) / 5 s (read).
+  hosts. The fetch times out after 3 s (connect) / 5 s (read). With an
+  `https_proxy` set, the proxy makes the connection, to the checked address.
 - `project`: read from `../<project>/<file>` next to the project directory
   if that exists (`ref` is then ignored); otherwise requested from
   gitlab.com, gitlab.gnome.org and gitlab.freedesktop.org in turn, so the

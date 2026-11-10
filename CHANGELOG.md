@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A dry-run that cannot finish exits 1 and names the reason per job.
 
 ### Security
+- `include: remote` checked only the first address a host resolved to, and
+  only against IPv4 ranges: `https://localhost:9/` (resolving to `::1`) or an
+  answer mixing a public and a private address got through. Every address
+  is now checked, IPv6 and IPv4-mapped ones included, literal IP hosts too,
+  and the connection goes to the checked address (no DNS rebinding window).
 - `export-just`: a newline in a job name, stage or tag could add recipes or
   assignments to the generated justfile, and an assignment ran when any
   recipe was invoked. Config text is now escaped wherever it lands outside
