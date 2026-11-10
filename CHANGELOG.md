@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A dry-run that cannot finish exits 1 and names the reason per job.
 
 ### Security
+- `$CI_SERVER_URL`, `$CI_SERVER_HOST` and `$CI_SERVER_FQDN` in an include
+  path were read from the tool's own environment, so running it inside a
+  CI job on another instance changed which host a component was fetched
+  from. They now come from `--variables`, else the instance `include:
+  project` uses (`origin` host, else gitlab.com).
 - `include: project` requested a file not found next to the project from
   gitlab.com, gitlab.gnome.org and gitlab.freedesktop.org in turn, sending
   a private project path to unrelated hosts. It now asks one instance:

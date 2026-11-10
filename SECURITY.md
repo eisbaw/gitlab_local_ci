@@ -29,7 +29,11 @@ steps that reproduce it.
   names; `--pass-env all` passes everything, including `CI_*` values that
   can shadow the simulated ones.
   `CI_PROJECT_PATH` is derived from the `origin` remote; credentials in that
-  URL never reach a variable.
+  URL never reach a variable. `$CI_SERVER_*` in include paths come from
+  `--variables` or the derived GitLab instance, not from the host
+  environment. Of the host environment, building the pipeline reads only
+  `GITLAB_CI_ALLOWED_DOMAINS` (below); fetches honour `https_proxy`, and
+  the `git` calls git's own `GIT_*` variables.
 
 ## Network
 

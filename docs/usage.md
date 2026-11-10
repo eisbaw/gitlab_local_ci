@@ -159,6 +159,10 @@ network (`https://` only, certificates verified; see
   (`gitlab.com/group/project/name@1.0`).
 - `template`: read from `--gitlab-dir`, else fetched from gitlab.com.
 
+`$CI_SERVER_URL`, `$CI_SERVER_HOST` and `$CI_SERVER_FQDN` in a component
+reference expand to that same instance (`--variables` wins per name), never
+to values in your shell's environment.
+
 Downloads are cached in `ext_tmp/` in the current directory.
 
 ## Parallel jobs

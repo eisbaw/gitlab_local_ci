@@ -613,25 +613,36 @@ class IncludeProcessor
     raise "Failed to fetch component '#{component_ref}': #{e.message}"
   end
 
-  # Expand CI variables in a string
+  # Expand $CI_SERVER_URL, $CI_SERVER_HOST and $CI_SERVER_FQDN (also ${...})
+  # in an include path. From the builder's variable set, never from this
+  # process's environment: running the tool inside a CI job on another
+  # instance must not change what a config resolves to. CI_SERVER_URL is
+  # the instance include:project uses (@server_url, TASK-75), so both agree;
+  # HOST and FQDN are taken from --variables when set, else derived from
+  # that URL as upstream does (FQDN carries a non-default port).
   #
   # @param string [String] String potentially containing CI variables
   # @return [String] String with variables expanded
   def expand_ci_variables(string)
-    # Common CI variables
-    ci_vars = {
-      'CI_SERVER_FQDN' => ENV['CI_SERVER_FQDN'] || 'gitlab.com',
-      'CI_SERVER_HOST' => ENV['CI_SERVER_HOST'] || 'gitlab.com',
-      'CI_SERVER_URL' => ENV['CI_SERVER_URL'] || 'https://gitlab.com'
-    }
-
-    result = string.dup
-    ci_vars.each do |var_name, var_value|
-      result.gsub!("${#{var_name}}", var_value)
-      result.gsub!("$#{var_name}", var_value)
+    values = server_variables
+    string.gsub(/\$\{(CI_SERVER_(?:URL|HOST|FQDN))\}|\$(CI_SERVER_(?:URL|HOST|FQDN))\b/) do
+      values.fetch(Regexp.last_match(1) || Regexp.last_match(2))
     end
+  end
 
-    result
+  # @return [Hash{String=>String}] CI_SERVER_URL, _HOST, _FQDN
+  def server_variables
+    uri = URI.parse(@server_url.to_s)
+    raise "CI_SERVER_URL #{@server_url.inspect} has no host" if uri.host.nil? || uri.host.empty?
+
+    fqdn = uri.port == uri.default_port ? uri.host : "#{uri.host}:#{uri.port}"
+    {
+      'CI_SERVER_URL' => @server_url,
+      'CI_SERVER_HOST' => @variables['CI_SERVER_HOST'] || uri.host,
+      'CI_SERVER_FQDN' => @variables['CI_SERVER_FQDN'] || fqdn
+    }
+  rescue URI::InvalidURIError => e
+    raise "CI_SERVER_URL #{@server_url.inspect} is not a URL: #{e.message}"
   end
 
   # Generate unique identifier for an include to detect circular references
