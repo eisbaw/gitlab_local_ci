@@ -18,6 +18,7 @@ require 'net/http'
 require 'uri'
 require 'fileutils'
 require 'openssl'
+require_relative 'public_address'
 
 # ExternalResourceCache manages downloading and caching of external GitLab resources
 #
@@ -123,9 +124,12 @@ class ExternalResourceCache
   # @param project [String] Project path
   # @param file [String] Component file path
   # @param version [String] Component version/ref
+  # @param instance_url [String, nil] the user's GitLab instance
+  #   (PredefinedVariables.server_url): a component on exactly that
+  #   host:port is not address-checked (see download_file)
   # @return [String] Component content
   # @raise [RuntimeError] If component cannot be fetched
-  def fetch_component(fqdn, project, file, version)
+  def fetch_component(fqdn, project, file, version, instance_url: nil)
     # Components are cached separately
     cache_path = component_cache_path(fqdn, project, file, version)
     if File.exist?(cache_path)
@@ -136,7 +140,8 @@ class ExternalResourceCache
     base_url = "https://#{fqdn}"
     url = "#{base_url}/#{project}/-/raw/#{version}/#{file}"
 
-    content = download_file(url, "component: #{fqdn}/#{project}/#{file}@#{version}")
+    content = download_file(url, "component: #{fqdn}/#{project}/#{file}@#{version}",
+                            trusted_endpoint: endpoint_of(instance_url))
 
     # Validate content is not HTML
     if content.strip =~ /^<(!DOCTYPE|html|HTML)/i
@@ -189,6 +194,15 @@ class ExternalResourceCache
     raise "Refusing cache path #{path.inspect}: outside #{root}" unless File.expand_path(path).start_with?(root)
 
     path
+  end
+
+  # [host, port] of an https instance URL, nil when there is none or it is
+  # not one (then nothing is exempt).
+  def endpoint_of(instance_url)
+    uri = URI.parse(instance_url.to_s)
+    uri.is_a?(URI::HTTPS) && uri.host && !uri.host.empty? ? [uri.hostname.downcase, uri.port] : nil
+  rescue URI::InvalidURIError
+    nil
   end
 
   # Get cache path for a template
@@ -248,7 +262,7 @@ class ExternalResourceCache
     cache_path = template_cache_path(template_name)
     url = "#{GITLAB_COM_URL}/#{GITLAB_REPO}/-/raw/#{DEFAULT_BRANCH}/lib/gitlab/ci/templates/#{template_name}"
 
-    content = download_file(url, "template: #{template_name}")
+    content = download_file(url, "template: #{template_name}", trusted_endpoint: nil)
 
     # Save to cache
     FileUtils.mkdir_p(File.dirname(cache_path))
@@ -266,7 +280,8 @@ class ExternalResourceCache
   def download_project_file(instance, project, file, ref)
     base_url = instance.to_s.chomp('/')
     url = "#{base_url}/#{project}/-/raw/#{ref}/#{file}"
-    content = download_file(url, "project file: #{project}/#{file}@#{ref}")
+    content = download_file(url, "project file: #{project}/#{file}@#{ref}",
+                            trusted_endpoint: [instance.hostname.downcase, instance.port])
 
     # Validate content is not HTML (fallback check for login redirects)
     if content.strip =~ /^<(!DOCTYPE|html|HTML)/i
@@ -290,7 +305,19 @@ class ExternalResourceCache
   # @param max_redirects [Integer] Maximum number of redirects to follow
   # @return [String] File content
   # @raise [RuntimeError] If download fails
-  def download_file(url, description, max_redirects: 5)
+  #
+  # SSRF policy. Every hop (the first URL and each redirect target) is
+  # address-checked (PublicAddress: all resolved addresses public) and the
+  # connection pinned to the checked address, before connecting, because
+  # the host comes from the CI config or from a server. The one exception
+  # is trusted_endpoint, the user's own GitLab instance ([host, port] from
+  # --variables CI_SERVER_URL or the origin remote): it may be on a
+  # private network, and the user chose it, not the config. Same host AND
+  # port only, so a config cannot reach other ports of that host.
+  #
+  # @param trusted_endpoint [Array(String, Integer), nil] downcased host
+  #   and port exempt from the check, or nil for none
+  def download_file(url, description, trusted_endpoint:, max_redirects: 5)
     redirect_count = 0
     current_url = url
 
@@ -302,10 +329,12 @@ class ExternalResourceCache
         raise "Insecure URL for #{description}: #{current_url} (must use HTTPS)"
       end
 
-      # Perform HTTP request with timeout
+      # Perform HTTP request with timeout, to the checked address
+      pin = trusted_endpoint == [uri.hostname.to_s.downcase, uri.port] ? {} : { ipaddr: PublicAddress.resolve!(uri.hostname) }
       response = Net::HTTP.start(
-        uri.host,
+        uri.hostname,
         uri.port,
+        **pin,
         use_ssl: true,
         read_timeout: HTTP_TIMEOUT,
         open_timeout: HTTP_TIMEOUT,

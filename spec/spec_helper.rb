@@ -119,3 +119,17 @@ end
 RSpec.configure do |config|
   config.include SpecHelpers
 end
+
+# No spec may reach the real network. Every DNS lookup the tool makes goes
+# through PublicAddress (Resolv.getaddresses); an in-process spec that
+# reaches it without stubbing the resolver fails here instead of querying
+# DNS. Specs that need answers stub Resolv.getaddresses themselves, which
+# overrides this. (Spawned CLI processes are not covered; those specs cut
+# the network with http_proxy pointing at a closed local port.)
+require 'resolv'
+RSpec.configure do |config|
+  config.before do
+    allow(Resolv).to receive(:getaddresses) { |name| raise "spec reached real DNS for #{name.inspect}; stub Resolv.getaddresses" }
+    allow(Resolv).to receive(:getaddress) { |name| raise "spec reached real DNS for #{name.inspect}; stub Resolv.getaddress" }
+  end
+end

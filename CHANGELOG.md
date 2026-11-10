@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A dry-run that cannot finish exits 1 and names the reason per job.
 
 ### Security
+- A component host, and every redirect hop of a project, component or
+  template download, was connected to without an address check:
+  `component: 127.0.0.1:18443/g/c@1.0` reached loopback, and a public host
+  could redirect to 169.254.169.254. These now get the `include: remote`
+  check and pinning before connecting (one implementation,
+  `lib/public_address.rb`). Only your GitLab instance (`CI_SERVER_URL` /
+  `origin`), same host and port, is exempt.
 - A component reference with `..` in its project path
   (`evil.example/a/../../../../tmp/pwn@v1`) read a `template.yml` from, and
   wrote the downloaded one to, a path outside `ext_tmp/`. Every cache path

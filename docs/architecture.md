@@ -36,6 +36,10 @@ Around it:
 - `lib/host_environment.rb`: which host environment variables a job
   started by `run` or an exported recipe sees (`--pass-env`; by default only
   `PATH`, `HOME` and a few other basics).
+- `lib/external_resource_cache.rb`: downloads and the `ext_tmp/` cache for
+  `include: project`, `component` and `template`; `lib/public_address.rb`:
+  the address check and pinning every config-chosen fetch goes through
+  ([SECURITY.md](../SECURITY.md#network)).
 - `lib/mock_server.rb`, `lib/runner_fleet.rb`, `lib/mock_runner.rb`: the
   dry-run scheduler and the mock fleet ([runners.md](runners.md)).
 - `lib/commands/*.rb`: one file per command; `lib/formatters/`: text, JSON

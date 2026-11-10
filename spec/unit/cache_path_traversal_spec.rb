@@ -29,6 +29,7 @@ RSpec.describe ExternalResourceCache, 'cache paths stay under the cache root' do
   let(:requests) { [] }
 
   before do
+    allow(Resolv).to receive(:getaddresses).and_return(['93.184.215.14'])
     allow(Net::HTTP).to receive(:start) do |host, *_rest, &block|
       requests << host
       response = Net::HTTPOK.new('1.1', '200', 'OK')

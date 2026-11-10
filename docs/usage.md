@@ -156,7 +156,9 @@ network (`https://` only, certificates verified; see
   host is asked. For a repository whose `origin` is not on GitLab (say a
   GitHub mirror), pass `CI_SERVER_URL`.
 - `component`: fetched from the host in the reference
-  (`gitlab.com/group/project/name@1.0`).
+  (`gitlab.com/group/project/name@1.0`). Like `remote`, that host (and any
+  redirect target) must resolve to public addresses only, unless it is
+  your instance above.
 - `template`: read from `--gitlab-dir`, else fetched from gitlab.com.
 
 `$CI_SERVER_URL`, `$CI_SERVER_HOST` and `$CI_SERVER_FQDN` in a component

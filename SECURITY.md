@@ -70,13 +70,19 @@ verification.
 - `component`: fetched from the host named in the component reference.
   `template`: read from the `gitlab/` checkout, else fetched from
   gitlab.com (templates are public).
+- Address check for these downloads: every host a download connects to
+  (component hosts, gitlab.com for templates, and every redirect hop) gets
+  the same check and pinning as `include: remote`, before connecting. The
+  one exemption is the GitLab instance you chose (`CI_SERVER_URL` or the
+  `origin` host), same host and port only: it may be on a private
+  network. So project files, components on that instance and redirects
+  that stay on it are not address-checked; a redirect away from it is.
 - `project`, `component` and `template` fetches time out after 10 s and are
   cached in `ext_tmp/` in the working directory, `project` files per
   instance. Every cache path is checked to stay under `ext_tmp/`: a name
   with a `..`, `.` or empty segment, a NUL or a backslash is refused.
-- `project`, `component` and `template` downloads follow up to 5 redirects
-  to any `https://` host, and those hops are not address-checked like
-  `include: remote` (policy: TASK-80).
+- `project`, `component` and `template` downloads follow up to 5 redirects,
+  `https://` only; each hop is address-checked as above.
 
 YAML is loaded with a safe loader (no arbitrary Ruby objects), and include
 nesting stops at 150 levels. There is no telemetry.

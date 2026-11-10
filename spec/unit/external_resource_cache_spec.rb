@@ -42,6 +42,9 @@ RSpec.describe ExternalResourceCache do
     http_response(Net::HTTPFound, '302', headers: { 'location' => location })
   end
 
+  # Every host here is public (download_file address-checks each hop).
+  before { allow(Resolv).to receive(:getaddresses).and_return(['93.184.215.14']) }
+
   before do
     allow(Net::HTTP).to receive(:start) do |host, port, **_options, &block|
       connection = double('http')

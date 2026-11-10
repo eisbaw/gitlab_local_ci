@@ -18,10 +18,8 @@ require_relative 'ci_yaml'
 require 'net/http'
 require 'uri'
 require 'set'
-require 'ipaddr'
-require 'resolv'
-require 'socket'
 require_relative 'external_resource_cache'
+require_relative 'public_address'
 require_relative 'rules_evaluator'
 require_relative 'config_merge'
 require_relative 'predefined_variables'
@@ -401,76 +399,11 @@ class IncludeProcessor
     # SSRF protection: a config must not make this tool talk to services on
     # this machine or its network (cloud metadata, admin ports). The caller
     # connects to the returned address only.
-    address = public_address_of(uri.hostname)
+    address = PublicAddress.resolve!(uri.hostname)
 
     [uri, address]
   rescue URI::InvalidURIError => e
     raise "Invalid remote URL: #{url_string} - #{e.message}"
-  end
-
-  # Address ranges a remote include must not reach: this host, private and
-  # shared (CGNAT) networks, link-local (cloud metadata 169.254.169.254),
-  # multicast, and ranges reserved for documentation, benchmarks or future
-  # use. IPv6 forms that embed an IPv4 address are checked by that address
-  # (embedded_ipv4), not listed here.
-  NON_PUBLIC_RANGES = %w[
-    0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16
-    172.16.0.0/12 192.0.0.0/24 192.0.2.0/24 192.168.0.0/16 198.18.0.0/15
-    198.51.100.0/24 203.0.113.0/24 224.0.0.0/4 240.0.0.0/4
-    ::/128 ::1/128 100::/64 2001:db8::/32 fc00::/7 fe80::/10 fec0::/10 ff00::/8
-  ].map { |cidr| IPAddr.new(cidr) }.freeze
-
-  # IPv6 prefixes whose low 32 bits are an IPv4 address the packet ends up
-  # at: IPv4-mapped (::ffff:a.b.c.d), IPv4-compatible (::a.b.c.d, deprecated)
-  # and NAT64 (64:ff9b::a.b.c.d; DNS64 networks synthesize these for every
-  # IPv4-only host, so the prefix itself must stay allowed).
-  IPV4_EMBEDDING_PREFIXES = %w[::ffff:0:0/96 ::/96 64:ff9b::/96].map { |cidr| IPAddr.new(cidr) }.freeze
-
-  # The address to connect to for hostname, after checking that every
-  # address it resolves to is public. Every address, not just the first: the
-  # connection may use any of them. A literal IP host is checked as is.
-  #
-  # @param hostname [String] URI#hostname (IPv6 literal without brackets)
-  # @return [String] first resolved address
-  # @raise [RuntimeError] no address, or any address not public
-  def public_address_of(hostname)
-    addresses = literal_ip?(hostname) ? [hostname] : Resolv.getaddresses(hostname)
-    raise "Cannot resolve hostname '#{hostname}': no address" if addresses.empty?
-
-    blocked = addresses.reject { |address| public_ip?(IPAddr.new(address)) }
-    unless blocked.empty?
-      raise "Remote URL host '#{hostname}' resolves to a non-public address (#{blocked.join(', ')}); " \
-            'remote includes may only reach public hosts'
-    end
-
-    addresses.first
-  rescue IPAddr::InvalidAddressError => e
-    raise "Cannot check address of '#{hostname}': #{e.message}"
-  end
-
-  def literal_ip?(hostname)
-    IPAddr.new(hostname)
-    true
-  rescue IPAddr::InvalidAddressError
-    false
-  end
-
-  # @param ip [IPAddr]
-  def public_ip?(ip)
-    embedded = embedded_ipv4(ip)
-    return public_ip?(embedded) if embedded
-
-    NON_PUBLIC_RANGES.none? { |range| range.family == ip.family && range.include?(ip) }
-  end
-
-  # The IPv4 address an IPv6 address embeds (IPV4_EMBEDDING_PREFIXES), or
-  # nil. :: and ::1 lie inside ::/96 but are IPv6 unspecified/loopback, not
-  # IPv4, and stay with NON_PUBLIC_RANGES.
-  def embedded_ipv4(ip)
-    return nil unless ip.ipv6? && ip.to_i > 1
-    return nil unless IPV4_EMBEDDING_PREFIXES.any? { |prefix| prefix.include?(ip) }
-
-    IPAddr.new(ip.to_i & 0xffff_ffff, Socket::AF_INET)
   end
 
   # Fetch a GitLab CI template
@@ -608,7 +541,7 @@ class IncludeProcessor
     component_file = "template.yml"
 
     # Use external cache with the specific GitLab instance
-    @external_cache.fetch_component(fqdn, project_path, component_file, version)
+    @external_cache.fetch_component(fqdn, project_path, component_file, version, instance_url: @server_url)
   rescue StandardError => e
     raise "Failed to fetch component '#{component_ref}': #{e.message}"
   end
