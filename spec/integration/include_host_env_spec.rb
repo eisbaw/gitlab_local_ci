@@ -72,13 +72,15 @@ RSpec.describe 'include paths and host CI_SERVER_* variables' do
   # CI job on another instance. The component is pre-cached for gitlab.com
   # (the instance with no origin and no --variables). The network is cut by
   # a proxy on a closed local port: if the host value leaked, the CLI would
-  # look for host-env.example, miss the cache and fail to connect.
+  # look for host-env.example, miss the cache and fail to connect. Net::HTTP
+  # 0.4 (Ruby 3.3) takes the proxy from http_proxy for https too and ignores
+  # https_proxy; 'cannot reach the network' proves the guard bites.
   describe 'bin/gitlab_ci_cli' do
     let(:bin_path) { File.expand_path('../../bin/gitlab_ci_cli', __dir__) }
     let(:host_env) do
       { 'CI_SERVER_URL' => 'https://host-env.example', 'CI_SERVER_HOST' => 'host-env.example',
-        'CI_SERVER_FQDN' => 'host-env.example', 'https_proxy' => 'http://127.0.0.1:9',
-        'HTTPS_PROXY' => 'http://127.0.0.1:9', 'no_proxy' => nil, 'NO_PROXY' => nil }
+        'CI_SERVER_FQDN' => 'host-env.example', 'http_proxy' => 'http://127.0.0.1:9',
+        'HTTP_PROXY' => 'http://127.0.0.1:9', 'no_proxy' => nil, 'NO_PROXY' => nil }
     end
 
     def lint(dir, *args)
@@ -108,6 +110,18 @@ RSpec.describe 'include paths and host CI_SERVER_* variables' do
         expect(stderr).to eq('')
         expect(status.success?).to be(true), stdout
         expect(JSON.parse(stdout)['jobs']).to include('component_job')
+      end
+    end
+
+    it 'cannot reach the network: a cache miss fails at the closed proxy port' do
+      Dir.mktmpdir do |dir|
+        layout(dir, 'not-the-instance.example')
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        stdout, _stderr, status = lint(dir)
+
+        expect(status.success?).to be(false)
+        expect(stdout).to match(%r{Failed to download component gitlab.com/group/comp.*127\.0\.0\.1:9.*refused}i)
+        expect(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).to be < 10
       end
     end
 

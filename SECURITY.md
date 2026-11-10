@@ -32,8 +32,12 @@ steps that reproduce it.
   URL never reach a variable. `$CI_SERVER_*` in include paths come from
   `--variables` or the derived GitLab instance, not from the host
   environment. Of the host environment, building the pipeline reads only
-  `GITLAB_CI_ALLOWED_DOMAINS` (below); fetches honour `https_proxy`, and
-  the `git` calls git's own `GIT_*` variables.
+  `GITLAB_CI_ALLOWED_DOMAINS` (below); fetches honour `http_proxy` and
+  `no_proxy` (Ruby's Net::HTTP uses `http_proxy` for https URLs too and
+  ignores `https_proxy`), and the `git` calls git's own `GIT_*` variables
+  and your git config: a global `url.<base>.insteadOf` rewrites the
+  `origin` URL that `CI_PROJECT_PATH` and the `include: project` instance
+  are derived from.
 
 ## Network
 
@@ -53,8 +57,10 @@ verification.
   address it checked (the certificate is still verified against the host
   name), so a DNS answer that changes after the check is not used.
   `GITLAB_CI_ALLOWED_DOMAINS=host1,host2` restricts remote includes to those
-  hosts. The fetch times out after 3 s (connect) / 5 s (read). With an
-  `https_proxy` set, the proxy makes the connection, to the checked address.
+  hosts. The fetch times out after 3 s (connect) / 5 s (read). With
+  `http_proxy` set, the proxy makes the connection, to the checked address;
+  an IPv6 address is then sent unbracketed in `CONNECT`, which proxies
+  reject, so such a fetch fails (closed).
 - `project`: read from `../<project>/<file>` next to the project directory
   if that exists (`ref` is then not honoured, and a warning says so);
   otherwise requested from one GitLab instance only, and no other host:
@@ -66,7 +72,11 @@ verification.
   gitlab.com (templates are public).
 - `project`, `component` and `template` fetches time out after 10 s and are
   cached in `ext_tmp/` in the working directory, `project` files per
-  instance.
+  instance. Every cache path is checked to stay under `ext_tmp/`: a name
+  with a `..`, `.` or empty segment, a NUL or a backslash is refused.
+- `project`, `component` and `template` downloads follow up to 5 redirects
+  to any `https://` host, and those hops are not address-checked like
+  `include: remote` (policy: TASK-80).
 
 YAML is loaded with a safe loader (no arbitrary Ruby objects), and include
 nesting stops at 150 levels. There is no telemetry.
