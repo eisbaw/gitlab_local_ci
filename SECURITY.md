@@ -22,8 +22,12 @@ steps that reproduce it.
   invoke them. Text from the config (job names, stages, tags, paths) lands in
   the justfile only as an identifier, as escaped comment text or inside the
   quoted recipe body, so it cannot add recipes or assignments.
-- **Variables:** host environment variables reach jobs started by `run`
-  (including `CI_*` ones, which can shadow the simulated values).
+- **Variables:** jobs started by `run` or an exported recipe see only a
+  small base of the host environment (`PATH`, `HOME`, `USER`, `LOGNAME`,
+  `SHELL`, `LANG`, `LC_*`, `TERM`, `TZ`, `TMPDIR`), so host `CI_*` values
+  and tokens in your shell do not reach them. `--pass-env NAME,...` adds
+  names; `--pass-env all` passes everything, including `CI_*` values that
+  can shadow the simulated ones.
   `CI_PROJECT_PATH` is derived from the `origin` remote; credentials in that
   URL never reach a variable.
 

@@ -42,9 +42,65 @@ RSpec.describe 'export-just', type: :integration do
   end
 
   # From `/`, so the recipe's cwd cannot be the caller's by accident.
-  def just(*args)
-    stdout, stderr, status = Open3.capture3('just', '--justfile', justfile_path, *args, chdir: '/')
+  # `host` is added to just's environment (this process's, otherwise).
+  def just(*args, host: {})
+    stdout, stderr, status = Open3.capture3(host, 'just', '--justfile', justfile_path, *args, chdir: '/')
     [stdout, stderr, status.exitstatus]
+  end
+
+  # TASK-56: the environment just runs in reaches the job only as the
+  # --pass-env given at export says; the recipe reads it when it runs.
+  describe '--pass-env' do
+    let(:host) { { 'CI_JOB_ID' => '999', 'FOO' => 'host-foo', 'BAR' => 'host-bar', 'SHADOWED' => 'host-value' } }
+    let(:config) do
+      probe = 'CI_JOB_ID=[${CI_JOB_ID-unset}] FOO=[${FOO-unset}] BAR=[${BAR-unset}] SHADOWED=[${SHADOWED-unset}] ' \
+              'PATH=[$PATH] HOME=[${HOME-unset}]'
+      <<~YAML
+        job:
+          variables:
+            SHADOWED: job-value
+          script:
+            - echo "main #{probe}"
+          after_script:
+            - echo "after #{probe}"
+      YAML
+    end
+
+    def lines(stdout)
+      %w[main after].map { |phase| stdout.lines.find { |text| text.start_with?("#{phase} ") } || "no #{phase} line" }
+    end
+
+    it 'hides the invoking environment by default, keeping PATH and HOME, in both shells' do
+      justfile = export(config)
+      expect(justfile).to include('--pass-env none')
+      stdout, stderr, status = just('job', host: host)
+      expect(status).to eq(0), stderr
+      lines(stdout).each do |text|
+        expect(text).to include('CI_JOB_ID=[unset] FOO=[unset] BAR=[unset] SHADOWED=[job-value] ' \
+                                "PATH=[#{ENV.fetch('PATH')}] HOME=[#{ENV.fetch('HOME')}]")
+      end
+    end
+
+    it 'passes the listed names as set when the recipe runs, job variables winning' do
+      export(config, '--pass-env', 'FOO,SHADOWED')
+      stdout, stderr, status = just('job', host: host)
+      expect(status).to eq(0), stderr
+      lines(stdout).each do |text|
+        expect(text).to include('CI_JOB_ID=[unset] FOO=[host-foo] BAR=[unset] SHADOWED=[job-value]')
+      end
+      stdout, stderr, status = just('job', host: host.merge('FOO' => 'later'))
+      expect(status).to eq(0), stderr
+      expect(lines(stdout)).to all(include('FOO=[later]'))
+    end
+
+    it 'passes the whole invoking environment under all, job variables winning' do
+      export(config, '--pass-env', 'all')
+      stdout, stderr, status = just('job', host: host)
+      expect(status).to eq(0), stderr
+      lines(stdout).each do |text|
+        expect(text).to include('CI_JOB_ID=[999] FOO=[host-foo] BAR=[host-bar] SHADOWED=[job-value]')
+      end
+    end
   end
 
   it 'writes a justfile just accepts for multi-line entries, heredocs and {{' do

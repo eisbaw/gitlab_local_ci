@@ -16,6 +16,7 @@
 
 require_relative '../pipeline_builder'
 require_relative '../job_environment'
+require_relative '../host_environment'
 require_relative '../mock_pipeline'
 require_relative '../shell_quote'
 
@@ -25,7 +26,9 @@ module GitlabCiCli
     # executor would (JobEnvironment): the job's variables exported,
     # before_script + script in one bash with errexit/pipefail, after_script
     # in a second bash that also runs after a failure and sees
-    # CI_JOB_STATUS, both in the project directory.
+    # CI_JOB_STATUS, both in the project directory. Of this host's
+    # environment both shells see only what --pass-env lets through
+    # (HostEnvironment), under the job's variables.
     #
     # With --run-deps incl it first runs the jobs the target waits for,
     # scheduled by MockPipeline exactly as dry-run schedules them (`needs:`
@@ -50,6 +53,7 @@ module GitlabCiCli
       # @option options [String] :gitlab_dir Path to GitLab submodule
       # @option options [String] :run_deps 'incl' or 'excl' (include/exclude dependencies)
       # @option options [Hash] :variables CLI --variables
+      # @option options [Array<String>, :all] :pass_env HostEnvironment mode (default [] = none)
       # @option options [Boolean] :verbose Enable verbose output
       def initialize(job_name, options = {})
         @job_name = job_name
@@ -98,6 +102,7 @@ module GitlabCiCli
           gitlab_dir: options[:gitlab_dir] || './gitlab',
           run_deps: options[:run_deps] || 'excl',
           variables: options[:variables] || {},
+          pass_env: options[:pass_env] || [],
           project: options[:project],
           pipeline: options[:pipeline],
           ref: options[:ref],
@@ -279,8 +284,9 @@ module GitlabCiCli
       end
 
       # bash -c SHELL_PRELUDE + script, stdin empty (runner: `: | eval`),
-      # stdout/stderr inherited, variables on top of this process's
-      # environment (a shell executor's bash inherits the runner's too).
+      # stdout/stderr inherited. Its environment is exactly the host
+      # variables --pass-env selects with the job's variables over them
+      # (unsetenv_others: nothing else of this process's environment).
       #
       # With a timeout the shell gets its own process group, so everything
       # it started is killed with it.
@@ -291,7 +297,9 @@ module GitlabCiCli
         $stderr.flush
         spawn_options = { chdir: project_dir, in: File::NULL }
         spawn_options[:pgroup] = true if timeout_s
-        pid = Process.spawn(variables, 'bash', '-c', JobEnvironment::SHELL_PRELUDE + script, **spawn_options)
+        environment = HostEnvironment.select(ENV.to_h, @options[:pass_env]).merge(variables)
+        pid = Process.spawn(environment, 'bash', '-c', JobEnvironment::SHELL_PRELUDE + script,
+                            unsetenv_others: true, **spawn_options)
         waiter = Process.detach(pid)
         return exit_code_of(waiter.value) if timeout_s.nil?
 

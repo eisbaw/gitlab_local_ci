@@ -164,6 +164,26 @@ target waits for, scheduled as dry-run schedules them. `export-just` writes
 one shebang recipe per job doing the same; its variables are a snapshot taken
 at export time.
 
+Of the host environment a job sees only a base a shell needs: `PATH`, `HOME`,
+`USER`, `LOGNAME`, `SHELL`, `LANG`, `LC_*`, `TERM`, `TZ`, `TMPDIR`
+(`lib/host_environment.rb`). `--pass-env` changes that:
+
+| `--pass-env` | The job also sees |
+|---|---|
+| `none` (default) | nothing more |
+| `NAME[,NAME...]`, e.g. `AWS_PROFILE,SSH_AUTH_SOCK` | those, when set |
+| `all` | the whole environment (the behaviour before this flag) |
+
+In every mode the job's own variables win over a host variable of the same
+name, and `--variables` win over both. GitLab's shell executor passes the
+runner's whole environment through, the docker executor none; the default
+here isolates, so a run on a laptop or inside a real CI job does not pick up
+the host's `CI_*` values (`CI_JOB_ID`, `CI_COMMIT_TAG`, ...). An exported
+recipe reads the names from the environment `just` runs in, when it runs,
+and starts both shells from `env -i` with them (plain `env` under `all`).
+The mode itself is written into the justfile at export time: regenerate to
+change it.
+
 `run` takes one instance by its full name, quoted:
 `gitlab_ci_cli run 'build: [aws, x86]'`. The base name (`run build`) is
 refused with the list of instances; it never runs them all.
@@ -227,6 +247,12 @@ OPTIONS:
     --gitlab-dir DIR  GitLab checkout, read only by include:template (default: ./gitlab)
     --run-deps MODE   For 'run': incl (also the jobs it waits for, scheduled as in
                       dry-run) | excl (only the job) (default: excl)
+    --pass-env MODE   For 'run' and 'export-just': which host environment variables
+                      the job sees, under its own variables. none (default): only
+                      PATH HOME USER LOGNAME SHELL LANG LC_* TERM TZ TMPDIR;
+                      all: everything, like a GitLab shell executor (and this
+                      tool before); NAME[,NAME...]: those as well. export-just
+                      writes the mode into the recipes
     --output FILE     Output file for export-just (default: stdout)
     -o FILE           Alias for --output
     --flat            Export flat justfile (no dependencies)

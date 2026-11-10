@@ -28,11 +28,77 @@ RSpec.describe 'run', type: :integration do
     File.write(File.join(@project_dir, '.gitlab-ci.yml'), yaml)
   end
 
-  # From `/`, so the job's cwd cannot be the caller's by accident.
-  def run_job(job, *args)
-    stdout, stderr, status = Open3.capture3(bin_path, 'run', job, *PinnedPipelineContext::CLI_ARGS, *args,
+  # From `/`, so the job's cwd cannot be the caller's by accident. `host`
+  # is added to the CLI's environment (this process's, otherwise).
+  def run_job(job, *args, host: {})
+    stdout, stderr, status = Open3.capture3(host, bin_path, 'run', job, *PinnedPipelineContext::CLI_ARGS, *args,
                                             '--entry', File.join(@project_dir, '.gitlab-ci.yml'), chdir: '/')
     [stdout, stderr, status.exitstatus]
+  end
+
+  # TASK-56: the host environment reaches the job only as --pass-env says.
+  describe '--pass-env' do
+    let(:host) { { 'CI_JOB_ID' => '999', 'CI_LEAK_PROBE' => 'hostleak', 'FOO' => 'host-foo', 'BAR' => 'host-bar',
+                   'SHADOWED' => 'host-value' } }
+    let(:probe) do
+      'echo "CI_JOB_ID=[${CI_JOB_ID-unset}] CI_LEAK_PROBE=[${CI_LEAK_PROBE-unset}] FOO=[${FOO-unset}] ' \
+        'BAR=[${BAR-unset}] SHADOWED=[${SHADOWED-unset}] PATH=[$PATH] HOME=[${HOME-unset}]"'
+    end
+
+    before do
+      write_config(<<~YAML)
+        job:
+          variables:
+            SHADOWED: job-value
+          script:
+            - #{probe.sub('echo "', 'echo "main ')}
+          after_script:
+            - #{probe.sub('echo "', 'echo "after ')}
+      YAML
+    end
+
+    def line(stdout, phase)
+      stdout.lines.find { |text| text.start_with?("#{phase} ") } or raise "no #{phase} line in:\n#{stdout}"
+    end
+
+    it 'hides every other host variable by default, CI_* included, in both shells' do
+      stdout, stderr, status = run_job('job', host: host)
+      expect(status).to eq(0), stderr
+      %w[main after].each do |phase|
+        expect(line(stdout, phase)).to include('CI_JOB_ID=[unset] CI_LEAK_PROBE=[unset] FOO=[unset] BAR=[unset] ' \
+                                               'SHADOWED=[job-value]')
+      end
+    end
+
+    it 'keeps the base a shell needs (PATH, HOME) by default' do
+      stdout, stderr, status = run_job('job', host: host)
+      expect(status).to eq(0), stderr
+      expect(line(stdout, 'main')).to include("PATH=[#{ENV.fetch('PATH')}] HOME=[#{ENV.fetch('HOME')}]")
+    end
+
+    it 'passes the whole host environment under all, with job variables winning' do
+      stdout, stderr, status = run_job('job', '--pass-env', 'all', host: host)
+      expect(status).to eq(0), stderr
+      %w[main after].each do |phase|
+        expect(line(stdout, phase)).to include('CI_JOB_ID=[999] CI_LEAK_PROBE=[hostleak] FOO=[host-foo] ' \
+                                               'BAR=[host-bar] SHADOWED=[job-value]')
+      end
+    end
+
+    it 'passes only the listed names, and a job variable still wins over a listed one' do
+      stdout, stderr, status = run_job('job', '--pass-env', 'FOO,SHADOWED', host: host)
+      expect(status).to eq(0), stderr
+      %w[main after].each do |phase|
+        expect(line(stdout, phase)).to include('CI_JOB_ID=[unset] CI_LEAK_PROBE=[unset] FOO=[host-foo] ' \
+                                               'BAR=[unset] SHADOWED=[job-value]')
+      end
+    end
+
+    it 'lets --variables win over the job and the host' do
+      stdout, stderr, status = run_job('job', '--pass-env', 'all', '--variables', 'SHADOWED=cli', host: host)
+      expect(status).to eq(0), stderr
+      expect(line(stdout, 'main')).to include('SHADOWED=[cli]')
+    end
   end
 
   describe 'variables' do

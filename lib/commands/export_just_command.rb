@@ -16,6 +16,7 @@
 
 require_relative '../pipeline_builder'
 require_relative '../job_environment'
+require_relative '../host_environment'
 require_relative '../mock_pipeline'
 require_relative '../shell_quote'
 require 'digest'
@@ -30,6 +31,11 @@ module GitlabCiCli
     #   variables and multi-line `- |` entries keep their meaning;
     # - the job's variables exported, values as of the export (CI_COMMIT_SHA
     #   and friends are a snapshot: regenerate after committing);
+    # - of the environment just runs the recipe in, both shells see only
+    #   what --pass-env (HostEnvironment) lets through, read when the recipe
+    #   runs: they start from `env -i` with those names re-exported and the
+    #   job's variables over them (`env` without -i under `all`). The mode
+    #   is the one given at export time, written into the recipe;
     # - cwd = the project directory, an absolute path (regenerate if the
     #   checkout moves);
     # - before_script + script in their own `bash -c` with the runner's
@@ -86,6 +92,7 @@ module GitlabCiCli
       # @option options [Boolean] :flat Generate flat list (no dependencies)
       # @option options [Boolean] :graph Generate with dependencies
       # @option options [Hash] :variables CLI --variables
+      # @option options [Array<String>, :all] :pass_env HostEnvironment mode (default [] = none)
       # @option options [Boolean] :verbose Enable verbose output
       def initialize(options = {})
         @options = validate_options(options)
@@ -131,6 +138,7 @@ module GitlabCiCli
           flat: options[:flat] || false,
           graph: options[:graph] || false,
           variables: options[:variables] || {},
+          pass_env: options[:pass_env] || [],
           project: options[:project],
           pipeline: options[:pipeline],
           ref: options[:ref],
@@ -240,20 +248,56 @@ module GitlabCiCli
       # @return [Array<String>]
       def recipe_body(environment)
         body = ['#!/usr/bin/env bash']
-        body.concat(environment.variables.map { |key, value| "export #{key}=#{ShellQuote.quote(value)}" })
+        body.concat(host_environment_lines)
+        body.concat(environment.variables.map { |key, value| "gitlab_ci_env+=(#{ShellQuote.quote("#{key}=#{value}")})" })
         body << "cd #{ShellQuote.quote(environment.project_dir)} || exit"
         body.concat(embedded_script('gitlab_ci_main_script', environment.main_script))
-        body << 'bash -c "$gitlab_ci_main_script" </dev/null'
+        body << '"${gitlab_ci_env[@]}" bash -c "$gitlab_ci_main_script" </dev/null'
         body << 'gitlab_ci_exit_code=$?'
         if environment.after_script
-          body << 'if [ "$gitlab_ci_exit_code" -eq 0 ]; then export CI_JOB_STATUS=success; else export CI_JOB_STATUS=failed; fi'
+          body << 'if [ "$gitlab_ci_exit_code" -eq 0 ]; then gitlab_ci_env+=(CI_JOB_STATUS=success); ' \
+                  'else gitlab_ci_env+=(CI_JOB_STATUS=failed); fi'
           body.concat(embedded_script('gitlab_ci_after_script', environment.after_script))
           body << 'gitlab_ci_timeout=(); if command -v timeout >/dev/null; then ' \
                   "gitlab_ci_timeout=(timeout #{environment.after_script_timeout_s}); fi"
-          body << '"${gitlab_ci_timeout[@]}" bash -c "$gitlab_ci_after_script" </dev/null ||' \
+          body << '"${gitlab_ci_timeout[@]}" "${gitlab_ci_env[@]}" bash -c "$gitlab_ci_after_script" </dev/null ||' \
                   ' echo "after_script failed or timed out (exit code $?); the job result is unchanged" >&2'
         end
         body << 'exit "$gitlab_ci_exit_code"'
+      end
+
+      # Starts the `gitlab_ci_env` command prefix both shells run under: the
+      # --pass-env host variables, read from just's environment when the
+      # recipe runs. `env` assigns left to right, so the job's variables,
+      # appended after these, win over a host variable of the same name.
+      #
+      # Only exported variables count, as for `run` (ENV): this bash's own
+      # unexported ones (SHELL, HOSTNAME, ... which bash sets itself) are
+      # not the invoking environment. `declare -p` and `${!prefix@}` rather
+      # than `${var@a}` or compgen: bash 3.2 has the first two, and nixpkgs'
+      # non-interactive bash has no compgen. Names are HostEnvironment
+      # entries (identifiers, or a prefix for ${!prefix@}), written unquoted.
+      def host_environment_lines
+        mode = @options[:pass_env]
+        return ['gitlab_ci_env=(env)'] if mode == :all
+
+        names = HostEnvironment.passed_names(mode).map do |entry|
+          entry.end_with?('*') ? "${!#{entry.delete_suffix('*')}@}" : entry
+        end
+        ['gitlab_ci_env=(env -i)',
+         "gitlab_ci_exported='^declare -[a-zA-Z]*x'",
+         "for gitlab_ci_name in #{names.join(' ')}; do",
+         '  if [[ $(declare -p "$gitlab_ci_name" 2>/dev/null) =~ $gitlab_ci_exported ]]; then ' \
+         'gitlab_ci_env+=("$gitlab_ci_name=${!gitlab_ci_name}"); fi',
+         'done']
+      end
+
+      # The --pass-env value that reproduces the mode (HostEnvironment.parse).
+      def pass_env_text
+        mode = @options[:pass_env]
+        return 'all' if mode == :all
+
+        mode.empty? ? 'none' : mode.join(',')
       end
 
       # `variable` := SHELL_PRELUDE + script, verbatim (quoted heredoc: no
@@ -288,12 +332,14 @@ module GitlabCiCli
           # Generated: #{Time.now.iso8601}
           #
           # DO NOT EDIT - Regenerate with:
-          #   gitlab_ci_cli export-just #{flag} --output #{comment_text(@options[:output] || default_output)}
+          #   gitlab_ci_cli export-just #{flag} --pass-env #{comment_text(pass_env_text)} --output #{comment_text(@options[:output] || default_output)}
           #
           # Each recipe runs its job like `gitlab_ci_cli run`: the job's variables
           # (as of this export) exported, cwd = the project directory,
           # before_script + script in one bash with errexit and pipefail,
           # after_script in a second bash with CI_JOB_STATUS, also after a failure.
+          # Of the environment just runs in, the jobs see only --pass-env #{comment_text(pass_env_text)}
+          # (fixed at export: regenerate to change it).
           #
           # Usage:
           #   just --list                 # Show all available jobs

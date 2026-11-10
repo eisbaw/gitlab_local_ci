@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed (breaking)
+- `run` and `export-just` recipes no longer pass the whole host environment
+  to jobs. A job sees its GitLab variables plus only `PATH`, `HOME`, `USER`,
+  `LOGNAME`, `SHELL`, `LANG`, `LC_*`, `TERM`, `TZ` and `TMPDIR`, so host
+  `CI_*`/`GITLAB_*` values (e.g. when the tool runs inside a CI job) no
+  longer shadow the simulated ones. New `--pass-env NAME[,NAME...]` adds
+  names; `--pass-env all` restores the old behaviour. `export-just` writes
+  the mode into the recipes: regenerate exported justfiles.
 - `export-just --shell` was removed: it was accepted but never read.
   Recipes are shebang recipes run by `bash`; drop the flag from scripts
   that pass it (it is now `Unknown flag: --shell`).

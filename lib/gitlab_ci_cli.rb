@@ -16,6 +16,7 @@
 
 require_relative 'version'
 require_relative 'predefined_variables'
+require_relative 'host_environment'
 
 # Main module for GitLab CI CLI tool
 module GitlabCiCli
@@ -53,6 +54,7 @@ module GitlabCiCli
       verbose: false,
       variables: {},
       run_deps: 'excl',
+      pass_env: [],
       job_name: nil,
       output: nil,
       flat: false,
@@ -85,6 +87,7 @@ module GitlabCiCli
       options = DEFAULTS.dup
       options[:variables] = {} # Ensure mutable hash for variables
       command = nil
+      pass_env_given = false
       i = 0
 
       while i < args.length
@@ -132,6 +135,12 @@ module GitlabCiCli
           i += 1
         when '--gitlab-dir'
           options[:gitlab_dir] = require_value(arg, args[i + 1])
+          i += 1
+        when '--pass-env'
+          raise ArgumentError, 'Flag --pass-env given twice: list every name in one comma-separated value' if pass_env_given
+
+          options[:pass_env] = HostEnvironment.parse(require_value(arg, args[i + 1]))
+          pass_env_given = true
           i += 1
         when '--run-deps'
           value = require_value(arg, args[i + 1])
@@ -317,6 +326,12 @@ module GitlabCiCli
             --gitlab-dir DIR  GitLab checkout, read only by include:template (default: ./gitlab)
             --run-deps MODE   For 'run': incl (also the jobs it waits for, scheduled as in
                               dry-run) | excl (only the job) (default: excl)
+            --pass-env MODE   For 'run' and 'export-just': which host environment variables
+                              the job sees, under its own variables. none (default): only
+                              PATH HOME USER LOGNAME SHELL LANG LC_* TERM TZ TMPDIR;
+                              all: everything, like a GitLab shell executor (and this
+                              tool before); NAME[,NAME...]: those as well. export-just
+                              writes the mode into the recipes
             --output FILE     Output file for export-just (default: stdout)
             -o FILE           Alias for --output
             --flat            Export flat justfile (no dependencies)

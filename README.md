@@ -72,7 +72,7 @@ Job 'test: [macos]' succeeded
 
 ## Limits
 
-It simulates the pipeline, not the infrastructure. `run` uses no image, services, cache or artifacts. `dry-run` uses mock runners and fixed durations. `spec:inputs` is not supported yet: CI components are fetched as plain includes and their `inputs:` are ignored. Manual and delayed jobs run as normal jobs. Values that only a GitLab instance knows (`CI_PROJECT_ID`, `CI_SERVER_*`, protected refs) are unset unless you pass `--variables`, or, for `run`, they are already set in your shell. `run` and exported recipes execute the config's scripts as you: run only configs you trust ([SECURITY.md](SECURITY.md)).
+It simulates the pipeline, not the infrastructure. `run` uses no image, services, cache or artifacts. `dry-run` uses mock runners and fixed durations. `spec:inputs` is not supported yet: CI components are fetched as plain includes and their `inputs:` are ignored. Manual and delayed jobs run as normal jobs. Values that only a GitLab instance knows (`CI_PROJECT_ID`, `CI_SERVER_*`, protected refs) are unset unless you pass `--variables`. Jobs see only `PATH`, `HOME` and a few other basics of your shell's environment by default, not its `CI_*` values; `--pass-env NAME,...` or `--pass-env all` lets more through ([usage](docs/usage.md#running-jobs-run-and-export-just)). `run` and exported recipes execute the config's scripts as you: run only configs you trust ([SECURITY.md](SECURITY.md)).
 
 ## Documentation
 

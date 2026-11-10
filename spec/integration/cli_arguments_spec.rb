@@ -29,6 +29,16 @@ RSpec.describe 'gitlab_ci_cli argument errors' do
     'a flag followed by another flag' => [%w[lint --gitlab-dir --verbose], 'Flag --gitlab-dir requires a value'],
     'a --format outside text/json/junit' => [%w[--format xml lint], "Invalid value 'xml' for --format. Must be one of: text, json, junit"],
     'a --run-deps outside incl/excl' => [%w[--run-deps maybe run build], "Invalid value 'maybe' for --run-deps. Must be one of: incl, excl"],
+    'an invalid --pass-env name' => [%w[--pass-env FOO,1BAD run build],
+                                     '--pass-env: invalid variable name "1BAD" in "FOO,1BAD": expected none, all, ' \
+                                     'or names like AWS_PROFILE,SSH_AUTH_SOCK ([A-Za-z_][A-Za-z0-9_]*)'],
+    'an empty name in --pass-env' => [['--pass-env', 'FOO,', 'run', 'build'],
+                                     '--pass-env: invalid variable name "" in "FOO,": expected none, all, ' \
+                                     'or names like AWS_PROFILE,SSH_AUTH_SOCK ([A-Za-z_][A-Za-z0-9_]*)'],
+    'a mode inside a --pass-env list' => [%w[--pass-env FOO,all run build],
+                                         "--pass-env: 'all' is a mode of its own, not a name to list with others: FOO,all"],
+    '--pass-env twice' => [%w[--pass-env A --pass-env B run build],
+                           'Flag --pass-env given twice: list every name in one comma-separated value'],
     'run without a job name' => [%w[run], "Job name required for 'run' command. Usage: gitlab_ci_cli run <job_name>"]
   }.each do |case_name, (args, message)|
     it "rejects #{case_name} with exit 1 and the reason on stderr" do
