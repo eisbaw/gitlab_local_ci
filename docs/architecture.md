@@ -33,6 +33,9 @@ Around it:
   pipeline, from `--pipeline`, `--ref` and the git checkout.
 - `lib/job_environment.rb`: a job's environment and script phases, shared by
   `run` and `export-just` (GitLab-side expansion, then the runner's).
+- `lib/host_environment.rb`: which host environment variables a job
+  started by `run` or an exported recipe sees (`--pass-env`; by default only
+  `PATH`, `HOME` and a few other basics).
 - `lib/mock_server.rb`, `lib/runner_fleet.rb`, `lib/mock_runner.rb`: the
   dry-run scheduler and the mock fleet ([runners.md](runners.md)).
 - `lib/commands/*.rb`: one file per command; `lib/formatters/`: text, JSON
