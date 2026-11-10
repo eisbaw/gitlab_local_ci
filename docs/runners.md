@@ -25,6 +25,6 @@ Other fields (`description`, `locked`, `access_level`, ...) are accepted and
 ignored. A file that misses a required field, or is not valid JSON, stops the
 dry-run with an error naming the file.
 
-If no runner can take a job, dry-run stops at once, lists the job and its
-tags, and exits 1. The fleet in `runners/` is an example; copy it next to your
+If no runner can take a job, dry-run stops as soon as that job is next to
+run, lists the job and its tags, and exits 1. The fleet in `runners/` is an example; copy it next to your
 project and edit the tags to match your real runners.

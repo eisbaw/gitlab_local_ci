@@ -2,7 +2,7 @@
 
 ```bash
 nix develop          # Ruby 3.3, graphviz, just
-just setup           # once: GitLab submodule (reference source) + gems
+just setup           # once: the gitlab/ submodule (reference source) + dev gems
 just test            # rspec, with the coverage ratchet
 just e2e             # golden outputs of test_ci_projects/
 ```
@@ -27,10 +27,14 @@ just e2e             # golden outputs of test_ci_projects/
 
 ## Upstream reference
 
-`gitlab/` is a shallow submodule of GitLab, pinned to a release tag
-(v19.5.3-ee). Behaviour is ported from its source, not guessed, and some
-specs read it (keyword lists, predefined variables). `include: template:`
-reads templates from it at run time.
+`gitlab/` is a submodule of GitLab, pinned to a release tag (v19.5.3-ee).
+Behaviour is ported from its source, not guessed, and some specs read it
+(keyword lists, predefined variables). `include: template:` reads templates
+from it at run time.
+
+The 11 real-world projects under `external_projects/` are separate
+submodules, a corpus for manual checks, fetched only on request
+(`git submodule update --init external_projects`).
 
 ## Other recipes
 

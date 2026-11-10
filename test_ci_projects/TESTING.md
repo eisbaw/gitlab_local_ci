@@ -207,8 +207,13 @@ just test-proj17  # Matrix expansion
 When a test passes, you should see:
 1. **Lint**: "GitLab CI configuration is valid"
 2. **DAG**: Valid Graphviz DOT output
-3. **Dry-run**: Job assignment timeline with "Pipeline completed: success"
+3. **Dry-run**: Job assignment timeline ending in "Pipeline status: success"
 4. **Final message**: "All tests completed successfully"
+
+`just test-projN` runs in the project directory with your real git ref
+(not the pinned one `just e2e` uses), so rule-dependent output can differ
+between branches, and it may create `projN/ext_tmp/`. proj13's dry-run
+exits 1 by design: no runner has its jobs' tags. Use `just e2e` as the gate.
 
 ### Failed Test Run
 
@@ -221,9 +226,9 @@ When a test fails, you should see:
 
 ### "just: command not found"
 
-Enter the nix-shell first:
+Enter the dev shell first:
 ```bash
-nix-shell
+nix develop
 just test-proj1
 ```
 
@@ -241,15 +246,6 @@ Verify you're in the correct directory:
 ```bash
 cd test_ci_projects/proj1
 ls -la .gitlab-ci.yml
-```
-
-### GitLab Dependencies Not Installed
-
-If you see errors about missing GitLab classes:
-```bash
-cd gitlab
-bundle install
-cd ..
 ```
 
 ## CI/CD Integration
@@ -320,12 +316,3 @@ When adding new test projects:
 4. Add `test-proj21` recipe to root justfile
 5. Run `just e2e-update` to create `proj21.output_reference/`, review it, commit it
 6. Update documentation
-
-## Summary
-
-- **20 justfiles** created (one per project)
-- **21 new recipes** in root justfile (20 projects + test-all)
-- **4 recipes per project** (lint, dag, dry-run, test)
-- **Total: 101 recipes** (80 project recipes + 21 root recipes)
-
-All test projects are now easily testable with consistent commands!

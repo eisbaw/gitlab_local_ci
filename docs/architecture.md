@@ -19,7 +19,7 @@ disagree about which jobs exist. The steps follow upstream GitLab
 | `default:` / `inherit:` / legacy globals | `PipelineBuilder.compose_jobs` | `Entry::Default`, `Entry::Inherit` |
 | `parallel:` / `parallel:matrix` | `lib/parallel_expander.rb` | `Config::Normalizer` |
 | stages, `.pre`/`.post`, stage check | `PipelineBuilder.stages`, `stage_errors` | `Config::Stages`, `YamlProcessor` |
-| `workflow:rules`, job `rules:` | `lib/rules_evaluator.rb` | `Build::Rules`, `Pipeline::Expression` |
+| `workflow:rules`, job `rules:` (also `include: rules:`, in the include step) | `lib/rules_evaluator.rb` | `Build::Rules`, `Pipeline::Expression` |
 
 `PipelineBuilder.resolve_config` stops after the stage check: that is what
 `lint` validates (every job, whatever the rules). `PipelineBuilder.build`

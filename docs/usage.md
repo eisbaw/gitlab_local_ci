@@ -101,8 +101,8 @@ Simulation completed at T+18s
 Pipeline status: success
 ```
 
-A pipeline that cannot finish (no runner has a job's tags) stops at once,
-names the reason per job and exits 1.
+A pipeline that cannot finish (no runner has a job's tags) stops as soon as
+such a job is next to run, names the reason per job and exits 1.
 
 ## Predefined variables
 
@@ -269,9 +269,10 @@ Check your YAML for unquoted strings with special characters.
 ```
 Error: Circular dependency detected involving job 'test'
 ```
-Check your `needs:` dependencies for cycles:
+`lint` names one job of the cycle (`dag` refuses to draw a cyclic graph);
+follow that job's `needs:` to find the loop:
 ```bash
-gitlab_ci_cli dag --entry .gitlab-ci.yml  # Visualize dependencies
+gitlab_ci_cli lint --entry .gitlab-ci.yml
 ```
 
 **Issue: chosen stage does not exist**

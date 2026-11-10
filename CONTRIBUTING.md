@@ -10,7 +10,6 @@ Thank you for your interest in contributing to gitlab_ci_cli! This document prov
 - [Pull Request Process](#pull-request-process)
 - [Updating GitLab Submodule](#updating-gitlab-submodule)
 - [Project Architecture](#project-architecture)
-- [Testing Strategy](#testing-strategy)
 
 ## Development Setup
 
@@ -60,7 +59,7 @@ just dag               # Generate DAG visualization
 just dry-run           # Run dry-run simulation
 just clean             # Remove temporary files
 just test-integration  # Run integration tests only
-just update-gitlab     # Update GitLab submodule
+just update-gitlab     # Update GitLab submodule (not working yet, see below)
 ```
 
 ## Running Tests
@@ -109,23 +108,13 @@ Follow these guidelines when writing tests:
 4. **Mocking**: Mock external dependencies (GitLab API, file system when appropriate)
 5. **Coverage**: Aim for 90%+ test coverage
 
-Example test structure:
-```ruby
-RSpec.describe MockServer do
-  let(:gitlab_path) { File.expand_path('../../gitlab', __dir__) }
-  let(:server) { described_class.new(gitlab_path: gitlab_path) }
-
-  describe '#create_pipeline' do
-    it 'creates a valid pipeline from YAML config' do
-      config = File.read('spec/fixtures/yaml/valid_simple.yml')
-      pipeline = server.create_pipeline(config: config, ref: 'main')
-
-      expect(pipeline).to be_valid
-      expect(pipeline.jobs.count).to eq(3)
-    end
-  end
-end
-```
+Prefer specs that go through `PipelineBuilder` or the CLI, and compare the
+result with what upstream GitLab does (cite the upstream file you checked).
+Specs that evaluate rules must pin the pipeline context with
+`spec/support/pinned_pipeline_context.rb`, so they pass on any branch. Each
+fix should come with a spec that fails without it. Existing examples:
+`spec/unit/pipeline_builder_defaults_spec.rb`,
+`spec/integration/pipeline_parity_spec.rb`.
 
 ## Code Style Guidelines
 
@@ -249,160 +238,27 @@ Closes #42
 
 ## Updating GitLab Submodule
 
-The GitLab submodule is pinned to a specific version for stability. When updating:
+`gitlab/` is the upstream reference: a checkout of a GitLab release tag. `just update-gitlab` does not work yet (it only re-reads the current
+tag); update by hand:
 
-### Quick Update
-
-Use the justfile command:
 ```bash
-just update-gitlab
+git -C gitlab ls-remote --tags origin | grep -E 'v[0-9]+\.[0-9]+\.[0-9]+-ee$' | sort -V -k2 | tail -1
+git -C gitlab fetch --depth 1 origin tag vX.Y.Z-ee
+git -C gitlab checkout vX.Y.Z-ee
+just test && just e2e          # keyword/variable drift specs read the submodule
+git add gitlab && git commit -m "chore: bump gitlab reference to vX.Y.Z-ee"
 ```
 
-This will:
-1. Fetch the latest tags
-2. Check out the latest stable version
-3. Stage the submodule change
-
-### Manual Update
-
-1. Navigate to the submodule:
-   ```bash
-   cd gitlab
-   ```
-
-2. Fetch latest changes:
-   ```bash
-   git fetch --tags
-   ```
-
-3. List available versions:
-   ```bash
-   git tag | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V
-   ```
-
-4. Checkout desired version:
-   ```bash
-   git checkout v17.0.0
-   ```
-
-5. Return to main project and commit:
-   ```bash
-   cd ..
-   git add gitlab
-   git commit -m "Update GitLab submodule to v17.0.0"
-   ```
-
-### Testing Submodule Updates
-
-After updating the GitLab submodule:
-
-1. Run the test suite:
-   ```bash
-   just test
-   ```
-
-2. Test against real GitLab CI files:
-   ```bash
-   just lint examples/.gitlab-ci.yml
-   just dry-run examples/.gitlab-ci.yml
-   ```
-
-3. Check for API changes:
-   - Review GitLab changelog for breaking changes
-   - Update wrapper code if necessary
-   - Update compatibility matrix in README.md
-
-### Version Compatibility Matrix
-
-When updating the submodule, update the compatibility table in README.md:
-
-```markdown
-| GitLab Version | Status | Notes |
-|---------------|--------|-------|
-| 17.x | Tested | Current |
-| 16.x | Tested | LTS |
-| 15.x | Tested | Minimum |
-```
+Then check what changed upstream in the areas the tool ports
+(`lib/gitlab/ci/config`, `lib/gitlab/ci/build/rules`,
+`lib/gitlab/ci/variables`, `lib/gitlab/ci/pipeline/expression`) and file
+tasks for new behaviour.
 
 ## Project Architecture
 
-Understanding the architecture helps with contributions:
-
-### Three-Module Design
-
-1. **MockServer** (`lib/mock_server.rb`):
-   - Wraps GitLab's YAML processor and pipeline services
-   - Intercepts runner API calls
-   - Emits events for job scheduling
-
-2. **RunnerFleet** (`lib/runner_fleet.rb`):
-   - Loads runner configurations from JSON
-   - Matches jobs to eligible runners
-   - Tracks runner capacity
-
-3. **MockRunner** (`lib/mock_runner.rb`):
-   - Simulates runner behavior
-   - Logs job details
-   - Emits job state transitions
-
-### Zero-Patch Policy
-
-**Critical Rule**: Never modify files in the `gitlab/` submodule directory.
-
-Instead:
-- Create wrapper classes in `lib/`
-- Use monkey-patching if absolutely necessary (document thoroughly)
-- Intercept at defined extension points
-
-This ensures easy upstream tracking and GitLab version updates.
-
-### Event-Driven Architecture
-
-The tool uses events to decouple components:
-
-```ruby
-# Emit event
-emit_event(:job_assigned, {
-  job_id: job.id,
-  runner_id: runner.id,
-  payload: build_payload(job)
-})
-
-# Handle event
-def handle_job_assignment(event)
-  # Process job
-end
-```
-
-## Testing Strategy
-
-### Unit Tests
-
-Test individual components in isolation:
-- Mock external dependencies
-- Test edge cases and error handling
-- Test public API contracts
-
-### Integration Tests
-
-Test end-to-end workflows:
-- Test CLI commands
-- Use real fixture files
-- Test against actual GitLab submodule code
-
-### GitLab Version Matrix Testing
-
-Test against multiple GitLab versions:
-- Maintain compatibility with 15.x, 16.x, 17.x
-- Run tests against each supported version
-- Document known issues or limitations
-
-### Performance Testing
-
-For large pipelines:
-- Benchmark parsing time for large YAML files
-- Test runner matching with large fleets
-- Profile memory usage
+See [docs/architecture.md](docs/architecture.md): one `PipelineBuilder`
+runs GitLab's pipeline-construction steps in GitLab's order, and every
+command uses it. Never patch the `gitlab/` submodule.
 
 ## Getting Help
 

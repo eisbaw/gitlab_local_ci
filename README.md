@@ -4,7 +4,7 @@
 
 **gitlab_ci_cli lints, draws, simulates and runs your `.gitlab-ci.yml` on your machine**, with GitLab's own rules for building a pipeline. No GitLab server, no runner install, no push-and-wait.
 
-Checking a CI change usually means pushing it and waiting for a pipeline. GitLab's CI Lint needs a server and only simulates the default branch: it does not show which jobs a feature branch, a tag or a merge request gets, or in what order. gitlab_ci_cli answers that locally, in under a second:
+Checking a CI change usually means pushing it and waiting for a pipeline. GitLab's CI Lint needs a server and only simulates the default branch: it does not show which jobs a feature branch, a tag or a merge request gets, or in what order. gitlab_ci_cli answers that locally, in about a second for typical configs:
 
 - `include`, `extends`, `!reference`, `default:`/`inherit:`, `parallel:matrix`, `.pre`/`.post`, `workflow:` and job `rules:` resolve as in GitLab, ported from its source (pinned in `gitlab/`).
 - Pick the pipeline: `--ref feature/x`, `--ref refs/tags/v1`, `--pipeline merge_request_event`. Predefined `CI_*` variables follow, unset where GitLab leaves them unset.
@@ -64,15 +64,15 @@ Job 'test: [macos]' succeeded
 
 | Command | Does |
 |---|---|
-| `lint` | Validates the config and lists every job (`--format text\|json\|junit`). |
+| `lint` | Validates the config and counts its jobs; `--format json\|junit` lists them. |
 | `dag` | Graphviz DOT of the jobs of one pipeline: stages and `needs:` edges. |
 | `dry-run` | Schedules the pipeline on a mock runner fleet ([docs/runners.md](docs/runners.md)); exits 1 if it cannot finish. |
 | `run <job>` | Runs a job in `bash` on this host, with GitLab's job environment, `after_script` and exit codes. `--run-deps incl` runs what it waits for first. |
-| `export-just` | Writes the jobs as `just` recipes doing the same as `run`. |
+| `export-just` | Writes the jobs as `just` recipes that run like `run`, except that variables are fixed at export time and an allowed failure still exits non-zero. |
 
 ## Limits
 
-It simulates the pipeline, not the infrastructure. `run` uses no image, services, cache or artifacts. `dry-run` uses mock runners and fixed durations. `spec:inputs` and CI components are not supported yet, and manual or delayed jobs run as normal jobs. Values that only a GitLab instance knows (`CI_PROJECT_ID`, `CI_SERVER_*`, protected refs) are unset unless you pass `--variables`. `run` and exported recipes execute the config's scripts as you: run only configs you trust ([SECURITY.md](SECURITY.md)).
+It simulates the pipeline, not the infrastructure. `run` uses no image, services, cache or artifacts. `dry-run` uses mock runners and fixed durations. `spec:inputs` is not supported yet: CI components are fetched as plain includes and their `inputs:` are ignored. Manual and delayed jobs run as normal jobs. Values that only a GitLab instance knows (`CI_PROJECT_ID`, `CI_SERVER_*`, protected refs) are unset unless you pass `--variables`, or, for `run`, they are already set in your shell. `run` and exported recipes execute the config's scripts as you: run only configs you trust ([SECURITY.md](SECURITY.md)).
 
 ## Documentation
 

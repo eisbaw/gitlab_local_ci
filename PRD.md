@@ -1,23 +1,48 @@
 # Product Requirements Document: gitlab_ci_cli
 ## Local GitLab CI Pipeline Simulator
 
-**Version:** 1.0  
-**Date:** October 2025  
+**Version:** 1.1  
+**Date:** October 2025, status updated November 2026  
 **Author:** Engineering Team  
-**Status:** Draft
+**Status:** Implemented in part; see "Status" below
+
+---
+
+## Status (November 2026)
+
+The product shipped, but not on the architecture this document first
+proposed. Read sections 2 and 3 as the original design, not the current one.
+
+- **Standalone port, not gem reuse.** Loading GitLab's own classes
+  (`Gitlab::Ci::YamlProcessor`, `Ci::RegisterJobService`) needed hundreds of
+  gems and a Rails environment. The tool instead ports GitLab's
+  pipeline-construction rules to plain Ruby, step by step in GitLab's order,
+  in one module (`lib/pipeline_builder.rb`). The `gitlab/` submodule
+  (unmodified, pinned to v19.5.3-ee) is the reference those rules are ported
+  and checked against, and the source of `include: template:` files. See
+  [docs/architecture.md](docs/architecture.md).
+- **Jobs can run.** Running jobs was a non-goal (1.4). `run <job>` now runs a
+  job in `bash` on the host with GitLab's job environment, and `export-just`
+  writes the jobs as `just` recipes. There is still no container, image,
+  service, cache or artifact handling.
+- **Network.** Everything runs locally except fetching includes that are not
+  on disk (`remote`, `project`, `component`, missing templates).
+- **Not yet built from this document:** `spec:inputs` and CI components
+  (3.5.3), the `--undefined` modes (3.5.1), runner export as a command
+  (3.2.3), and testing against several GitLab versions (6.2).
 
 ---
 
 ## 1. Executive Summary
 
 ### 1.1 Product Vision
-`gitlab_ci_cli` is a command-line tool that enables developers to simulate GitLab CI/CD pipelines locally by reusing the actual GitLab source code as a git submodule. It provides dry-run execution, DAG visualization, and comprehensive linting capabilities without requiring a GitLab server or actual job execution.
+`gitlab_ci_cli` is a command-line tool that enables developers to simulate GitLab CI/CD pipelines locally, following GitLab's own rules for building a pipeline (ported from the GitLab source, which is pinned as a git submodule). It provides linting, DAG visualization, dry-run scheduling on a mock runner fleet, local execution of single jobs, and export of jobs as `just` recipes, without requiring a GitLab server.
 
 ### 1.2 Key Principles
 - **Zero-patch policy**: Import GitLab as an unmodified git submodule to maintain upstream compatibility
-- **Event capture architecture**: Intercept runner communication events rather than reimplementing logic
-- **Ruby-native**: Written in Ruby to maximize code reuse from upstream GitLab
-- **Local-first**: All operations run locally without network dependencies
+- **Event capture architecture** (original design, superseded): Intercept runner communication events rather than reimplementing logic. Implemented instead: a standalone port of GitLab's pipeline construction, checked against the pinned source
+- **Ruby-native**: Written in Ruby, so GitLab's Ruby logic can be ported closely and its source read directly
+- **Local-first**: All operations run locally; the network is used only to fetch includes that are not on disk
 
 ### 1.3 Goals
 - **Local pipeline simulation**: Execute `.gitlab-ci.yml` files locally without a GitLab server
@@ -26,17 +51,17 @@
 - **Extensible architecture**: Enable future replacement of mock components with real executors
 
 ### 1.4 Non-Goals
-- Implementing actual job execution, artifact uploads, or networked API endpoints
+- Implementing artifact uploads, container/image execution, or networked API endpoints (single jobs can run locally with `run`, see Status)
 - Providing full UI parity with GitLab's web interface
 - Persisting pipeline state beyond in-memory simulation
 - Dynamic runner registration or auto-scaling
 
 ### 1.5 Assumptions
 - Users have Nix installed for reproducible dependency management
-- All dependencies (Ruby 3.0+, Git, Bundler, Graphviz) are managed via shell.nix
-- The ~100MB GitLab submodule size is acceptable
+- All dependencies (Ruby 3.3, Git, Graphviz, just) are managed via Nix (`flake.nix`, `nix develop`; `shell.nix` also works)
+- The GitLab submodule (a checkout of a release tag) is acceptable as a development dependency; the packaged CLI does not need it except for `include: template:`
 - Runners are represented by static JSON files
-- Ruby implementation enables direct reuse of upstream modules like `Gitlab::Ci::YamlProcessor`
+- (Original assumption, not borne out: direct reuse of upstream modules like `Gitlab::Ci::YamlProcessor`; see Status)
 
 ### 1.6 Primary Use Cases
 1. **Pre-commit validation**: Developers validate `.gitlab-ci.yml` before pushing
@@ -47,6 +72,11 @@
 ---
 
 ## 2. Architecture Overview
+
+> Sections 2 and 3 describe the original design (reuse of GitLab classes,
+> three mock modules). The implemented architecture is in
+> [docs/architecture.md](docs/architecture.md); the current CLI is in
+> [docs/usage.md](docs/usage.md).
 
 ### 2.1 Three-Module Design
 
@@ -306,14 +336,16 @@ Commands:
   lint              Validate .gitlab-ci.yml syntax and semantics
   dag               Generate Graphviz DOT of pipeline DAG
   dry-run          Simulate pipeline execution against mock fleet
+  run <job>         Execute a job locally (added after this document)
+  export-just       Export jobs as justfile recipes (added after this document)
   help              Show help message
 
 Options:
   --entry FILE      Path to CI config (default: ./.gitlab-ci.yml)
   --project DIR     Project directory (default: current directory)
   --runners DIR     Runner fleet directory (default: ./runners)
-  --ref REF         Git ref to simulate (default: HEAD)
-  --pipeline TYPE   Pipeline type: push|merge_request|schedule|manual
+  --ref REF         Git ref to simulate (default: the checked-out branch)
+  --pipeline TYPE   CI_PIPELINE_SOURCE (upstream names: push|merge_request_event|schedule|web|...)
   --variables K=V   Set CI variables (can be repeated)
   --env K=V         Set environment variables (alias for --variables)
   --undefined MODE  Handle undefined vars: warning|error|empty
@@ -559,14 +591,14 @@ end
 - Complete dry-run simulation within 30 seconds for typical pipelines
 
 ### 4.2 Compatibility
-- Support GitLab CE versions 15.0 through 17.0
-- Ruby 3.0+ required (matching GitLab's requirements)
-- Platform support: Linux, macOS, Windows (via WSL)
+- Follow the GitLab version pinned in the `gitlab/` submodule (v19.5.3-ee as of November 2026); older GitLab versions are not tested separately
+- Ruby 3.3 (the version the dev shell provides and the tests run on)
+- Platform support: Linux (tested); macOS and WSL expected to work but untested
 - Git 2.25+ for submodule operations
 
 ### 4.3 Maintainability
 - Zero patches to GitLab submodule
-- Automated tests for all interception points
+- Automated tests for every pipeline-construction step, and specs that compare keyword and variable lists against the pinned GitLab source
 - Version pinning for GitLab submodule with documented update process
 - Clear separation between mock logic and upstream code
 
@@ -713,8 +745,8 @@ end
 ### 7.1 Technical Dependencies
 - **Nix** - Primary dependency manager (shell.nix provides reproducible environment)
 - GitLab CE source code (Apache 2.0 license compatible)
-- Ruby 3.0+ runtime (via Nix)
-- Bundler for Ruby gem management (via Nix)
+- Ruby 3.3 runtime (via Nix); the CLI itself needs no gems beyond Ruby's bundled ones
+- Bundler-managed gems for development only (rspec, simplecov)
 - Git 2.25+ for submodule operations (via Nix)
 - Graphviz (optional, for DAG visualization, via Nix)
 - Just command runner (optional, for workflow automation, via Nix)
@@ -735,7 +767,7 @@ end
 ### 8.1 Version 2.0 Features
 - Web UI for pipeline visualization
 - Integration with VS Code and IntelliJ
-- Real runner execution mode (not just mock)
+- Real runner execution mode (not just mock); partly done: `run` executes a job on the host, without containers
 - Pipeline metrics and optimization suggestions
 
 ### 8.2 Ecosystem Integration
@@ -751,21 +783,23 @@ end
 ### 9.1 Installation and Setup
 1. Clone the repository and enter Nix shell:
    ```bash
-   git clone <repository>
-   cd gitlab_ci_cli
-   nix-shell  # Loads all dependencies from shell.nix
+   git clone https://github.com/eisbaw/gitlab_local_ci.git
+   cd gitlab_local_ci
+   nix develop  # Loads all dependencies from flake.nix
    ```
 
-2. Initialize the GitLab submodule:
+   Or run the packaged CLI without a clone of the dev environment:
+   `nix run github:eisbaw/gitlab_local_ci -- lint`.
+
+2. Initialize the GitLab submodule and the development gems:
    ```bash
-   git submodule update --init
-   bundle install
+   just setup
    ```
 
 3. Set up runner fleet (optional):
    ```bash
    mkdir runners/
-   # Create runner JSON files or export from production
+   # Create runner JSON files (see docs/runners.md)
    ```
 
 4. Verify installation:

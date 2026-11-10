@@ -34,13 +34,20 @@ The tool makes no connection except to fetch an include that is not on disk:
 `gitlab/` checkout. All of them use `https://` only, with certificate
 verification.
 
-- `include: remote`: hosts that resolve to loopback or private addresses are
-  refused (a DNS rebinding between the check and the request is not
-  prevented), `GITLAB_CI_ALLOWED_DOMAINS=host1,host2` restricts them to those
-  hosts, and the fetch times out after 3 s (connect) / 5 s (read).
-- `project`, `component`, `template`: fetched from the GitLab host
-  (gitlab.com, or the component's host) with a 10 s timeout, and cached in
-  `ext_tmp/` in the working directory.
+- `include: remote`: hosts whose first resolved address is an IPv4 loopback
+  or private address are refused. IPv6 is not checked, so a name that
+  resolves to `::1` first (such as `localhost`) gets through, and a DNS
+  rebinding between the check and the request is not prevented.
+  `GITLAB_CI_ALLOWED_DOMAINS=host1,host2` restricts remote includes to those
+  hosts. The fetch times out after 3 s (connect) / 5 s (read).
+- `project`: read from `../<project>/<file>` next to the project directory
+  if that exists (`ref` is then ignored); otherwise requested from
+  gitlab.com, gitlab.gnome.org and gitlab.freedesktop.org in turn, so the
+  project path is sent to all three until one has it.
+- `component`: fetched from the component's host. `template`: read from the
+  `gitlab/` checkout, else fetched from gitlab.com.
+- `project`, `component` and `template` fetches time out after 10 s and are
+  cached in `ext_tmp/` in the working directory.
 
 YAML is loaded with a safe loader (no arbitrary Ruby objects), and include
 nesting stops at 150 levels. There is no telemetry.

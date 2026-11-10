@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Earlier unreleased work
 
+Recorded in October 2025 and kept as history. Several items no longer
+hold: child-pipeline execution and the runner exporter are not reachable
+from any command; `--undefined` has no effect; the docs listed under
+"Comprehensive documentation suite" were replaced (the old ones are in
+`cruft/docs-2025/`); the CLI needs no gems at run time, but the
+development Gemfile and dev shell are not dependency-free; the example
+count and speed figures are from that time.
+
 ### Added
 - Fail-fast validation with enhanced error context for pipeline configuration issues
 - Error context improvements providing clearer diagnostic information

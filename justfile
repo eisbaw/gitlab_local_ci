@@ -8,9 +8,10 @@ help:
 shell:
     nix-shell
 
-# Initialize GitLab submodule and install dependencies
+# The external_projects/ corpus is separate: git submodule update --init external_projects
+# Initialize the GitLab reference submodule and install the dev gems
 setup:
-    git submodule update --init
+    git submodule update --init gitlab
     bundle install
 
 # NOT `bundle exec rspec`: that exports BUNDLE_GEMFILE which propagates via
