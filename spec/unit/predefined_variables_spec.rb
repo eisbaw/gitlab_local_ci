@@ -252,6 +252,74 @@ RSpec.describe PredefinedVariables do
     end
   end
 
+  # TASK-75: the instance include:project is fetched from. Same parser as
+  # project_path_from_remote, so a URL that yields no project path yields
+  # no instance either, and credentials never reach the result.
+  describe '.server_url_from_remote' do
+    {
+      'git@gitlab.gnome.org:GNOME/app.git' => 'https://gitlab.gnome.org',
+      'gitlab.com:group/sub/proj' => 'https://gitlab.com',
+      'https://user:token@GitLab.Example.com/group/proj.git' => 'https://gitlab.example.com',
+      'https://git.example.com:8443/group/proj.git' => 'https://git.example.com:8443',
+      'ssh://git@gitlab.example.com:2222/group/proj.git' => 'https://gitlab.example.com',
+      'http://gitlab.example.com:8080/group/proj.git' => 'https://gitlab.example.com',
+      'https://192.168.1.10/group/proj.git' => 'https://192.168.1.10', # an IPv4 literal has the host-name shape
+      'https://[::1]/group/proj.git' => nil,
+      'https://gitlab.com/proj.git' => nil,
+      '/srv/git/proj.git' => nil,
+      '../proj' => nil,
+      '' => nil,
+      nil => nil,
+      'https://u:p/w@gitlab.example.com/group/proj.git' => nil,
+      'https://u@x:p/w@gitlab.example.com/group/proj' => nil,
+      'u:pa/ss@gitlab.example.com:group/proj.git' => nil
+    }.each do |url, expected|
+      it "#{url.inspect} -> #{expected.inspect}" do
+        expect(described_class.server_url_from_remote(url)).to eq(expected)
+      end
+    end
+
+    it 'never carries remote credentials: https://host or nil' do
+      random = Random.new(75)
+      200.times do
+        secret = "S#{Array.new(8) { ['/', '@', ':', 'x', '%2F', '?', '#', '1'].sample(random: random) }.join}S"
+        url = ["https://user:#{secret}@host.example/group/proj.git", "ssh://#{secret}@host.example/group/proj",
+               "#{secret}@host.example:group/proj", "https://#{secret}@host.example:443/group/proj"].sample(random: random)
+        expect([nil, 'https://host.example', 'https://host.example:443']).to include(described_class.server_url_from_remote(url)), url
+      end
+    end
+  end
+
+  describe '.server_url' do
+    around do |example|
+      Dir.mktmpdir('server-url') do |dir|
+        @repo = dir
+        system('git', '-C', dir, 'init', '-q', exception: true)
+        example.run
+      end
+    end
+
+    def add_origin(url)
+      system('git', '-C', @repo, 'remote', 'add', 'origin', url, exception: true)
+    end
+
+    it 'takes CI_SERVER_URL from the variables over the origin' do
+      add_origin('git@gitlab.gnome.org:GNOME/app.git')
+      expect(described_class.server_url(project_dir: @repo, variables: { 'CI_SERVER_URL' => 'https://x.example' }))
+        .to eq('https://x.example')
+    end
+
+    it 'derives it from the origin remote' do
+      add_origin('git@gitlab.gnome.org:GNOME/app.git')
+      expect(described_class.server_url(project_dir: @repo, variables: {})).to eq('https://gitlab.gnome.org')
+    end
+
+    it 'falls back to gitlab.com without origin, and outside git' do
+      expect(described_class.server_url(project_dir: @repo, variables: {})).to eq('https://gitlab.com')
+      Dir.mktmpdir { |plain| expect(described_class.server_url(project_dir: plain, variables: {})).to eq('https://gitlab.com') }
+    end
+  end
+
   describe '.job_variables' do
     it 'sets name, slug, group name and stage' do
       expect(described_class.job_variables(name: 'Build: [aws, x86]', stage: 'build', when_value: nil)).to eq(

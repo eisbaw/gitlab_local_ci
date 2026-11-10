@@ -5,6 +5,7 @@ overview and a first session; [runners.md](runners.md) the runner fleet format.
 
 - [Commands](#commands)
 - [Predefined variables](#predefined-variables)
+- [Includes](#includes)
 - [Parallel jobs](#parallel-jobs)
 - [Running jobs: run and export-just](#running-jobs-run-and-export-just)
 - [CLI reference](#cli-reference)
@@ -147,6 +148,18 @@ network (`https://` only, certificates verified; see
 - `remote`: fetched from the URL. A host that resolves to any non-public
   address (loopback, private, link-local, IPv6 ULA, ...) is refused.
   `GITLAB_CI_ALLOWED_DOMAINS=host1,host2` restricts the allowed hosts.
+- `project`: a checkout next to the project, `../<project>/<file>`, is read
+  if it exists (its working tree: `ref:` is not honoured, and a warning
+  says so). Otherwise the file is fetched from the one GitLab instance the
+  pipeline runs on: `--variables CI_SERVER_URL=https://gitlab.example.com`
+  if given, else the host of the `origin` remote, else gitlab.com. No other
+  host is asked. For a repository whose `origin` is not on GitLab (say a
+  GitHub mirror), pass `CI_SERVER_URL`.
+- `component`: fetched from the host in the reference
+  (`gitlab.com/group/project/name@1.0`).
+- `template`: read from `--gitlab-dir`, else fetched from gitlab.com.
+
+Downloads are cached in `ext_tmp/` in the current directory.
 
 ## Parallel jobs
 

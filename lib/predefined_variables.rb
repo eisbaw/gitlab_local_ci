@@ -283,6 +283,15 @@ module PredefinedVariables
   # and whitespace, so userinfo or a query can never pass as a path.
   PATH_SEGMENT = /\A[a-zA-Z0-9_.][a-zA-Z0-9_\-.]*\z/
 
+  # A DNS host name (an IPv4 literal has the same shape and passes). An IPv6
+  # literal or anything else in a remote's host part yields no server URL
+  # (the caller falls back to gitlab.com).
+  HOST_NAME = /\A(?=.{1,253}\z)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*\z/i
+
+  # The GitLab instance include:project is fetched from when neither
+  # --variables CI_SERVER_URL nor the origin remote names one.
+  SERVER_URL_FALLBACK = 'https://gitlab.com'
+
   # "namespace/.../name" from a GitLab remote URL, or nil when the URL has
   # no host or no namespace (e.g. a local path remote), or when what it
   # yields is not a plausible GitLab path. nil makes the caller fall back
@@ -294,19 +303,64 @@ module PredefinedVariables
   #   ssh://git@host:2222/group/name       -> group/name
   #   https://u:p/w@host/group/name        -> nil
   def project_path_from_remote(url)
+    parse_remote(url)&.fetch(:path)
+  end
+
+  # "https://host[:port]" of the GitLab instance a remote URL points at, or
+  # nil when the URL is no plausible GitLab remote (project_path_from_remote
+  # nil) or its host is no DNS name. Always https: include:project fetches
+  # only over https. The port is kept only from an https:// remote; an ssh
+  # or http port says nothing about the https one. Credentials never reach
+  # the result.
+  #   git@gitlab.gnome.org:GNOME/app.git        -> https://gitlab.gnome.org
+  #   https://u:pw@git.example.com:8443/g/n.git -> https://git.example.com:8443
+  #   ssh://git@git.example.com:2222/g/n        -> https://git.example.com
+  def server_url_from_remote(url)
+    remote = parse_remote(url)
+    return nil unless remote && remote[:host]
+
+    port = remote[:scheme] == 'https' && remote[:port] ? ":#{remote[:port]}" : ''
+    "https://#{remote[:host].downcase}#{port}"
+  end
+
+  # The GitLab instance this pipeline runs on, as include:project and
+  # $CI_SERVER_* in include paths see it: --variables CI_SERVER_URL, else
+  # the origin remote's host, else SERVER_URL_FALLBACK. Not a predefined
+  # variable: rules and jobs see CI_SERVER_URL only when --variables sets
+  # it (what cannot be known locally stays unset, see the header).
+  #
+  # @param variables [Hash{String=>String}] the builder's variable set
+  #   (predefined + --variables); never the host environment
+  # @return [String]
+  def server_url(project_dir:, variables:)
+    variables['CI_SERVER_URL'] ||
+      server_url_from_remote(git(File.expand_path(project_dir), 'remote', 'get-url', 'origin')) ||
+      SERVER_URL_FALLBACK
+  end
+
+  # The one parser of an origin URL (scp-like or scheme://): {scheme:,
+  # host:, port:, path:}, nil when the path is not a plausible GitLab path.
+  # host is nil when the host part is not a DNS name (e.g. userinfo the
+  # regexes cannot strip); port only from a scheme:// URL.
+  def parse_remote(url)
     return nil if url.nil? || url.empty?
 
-    path =
-      if (match = url.match(%r{\A[a-z][a-z0-9+.-]*://[^/]+/(?<path>.+)\z}i))
-        match[:path]
-      elsif (match = url.match(%r{\A(?:[^@/]+@)?[^:/]+:(?<path>[^/].*)\z}))
-        match[:path]
-      end
+    if (match = url.match(%r{\A(?<scheme>[a-z][a-z0-9+.-]*)://(?<authority>[^/]+)/(?<path>.+)\z}i))
+      scheme = match[:scheme].downcase
+      host, port = match[:authority].split('@').last.match(/\A([^:]+)(?::(\d+))?\z/)&.captures
+      path = match[:path]
+    elsif (match = url.match(%r{\A(?:[^@/]+@)?(?<host>[^:/]+):(?<path>[^/].*)\z}))
+      scheme = 'ssh'
+      host = match[:host]
+      path = match[:path]
+    end
     return nil if path.nil?
 
     path = path.delete_suffix('/').delete_suffix('.git')
     segments = path.split('/', -1)
-    segments.size >= 2 && segments.all? { |segment| PATH_SEGMENT.match?(segment) } ? path : nil
+    return nil unless segments.size >= 2 && segments.all? { |segment| PATH_SEGMENT.match?(segment) }
+
+    { scheme: scheme, host: host && HOST_NAME.match?(host) ? host : nil, port: port, path: path }
   end
 
   # The ref name --ref asks about, without refs/heads/ or refs/tags/, or nil
@@ -345,7 +399,8 @@ module PredefinedVariables
   end
 
   # Facts about the checkout at project_dir, each nil when unknown (not a
-  # git repo, no commit, detached HEAD, no origin, ...). The only I/O here.
+  # git repo, no commit, detached HEAD, no origin, ...). The only I/O here,
+  # with server_url's read of the origin URL.
   #
   # @param ref_name [String, nil] also report whether this name is a local
   #   tag (:ref_is_tag) and a branch (:ref_is_branch, local or origin)

@@ -24,6 +24,7 @@ require 'socket'
 require_relative 'external_resource_cache'
 require_relative 'rules_evaluator'
 require_relative 'config_merge'
+require_relative 'predefined_variables'
 
 # Custom exception raised when include depth limit is exceeded
 class IncludeDepthExceededError < StandardError
@@ -64,12 +65,17 @@ class IncludeProcessor
   #   expressions. Pipeline-trigger variables (i.e. those passed via
   #   `--variables`) belong here; defaults from a top-level `variables:` block
   #   are NOT visible to include rules (matches GitLab documented behavior).
-  def initialize(project_path:, gitlab_templates_path: nil, cache_root: 'ext_tmp', variables: {})
+  # @param server_url [String] the GitLab instance include:project is
+  #   fetched from (PredefinedVariables.server_url)
+  def initialize(project_path:, gitlab_templates_path: nil, cache_root: 'ext_tmp', variables: {},
+                 server_url: PredefinedVariables::SERVER_URL_FALLBACK)
     @project_path = project_path
     @gitlab_templates_path = gitlab_templates_path
     @processed_includes = Set.new # Track processed includes to detect circular refs
     @external_cache = ExternalResourceCache.new(cache_root: cache_root)
     @variables = variables || {}
+    @server_url = server_url
+    @projects_read_locally = Set.new
   end
 
   # Process all includes in a configuration
@@ -516,54 +522,58 @@ class IncludeProcessor
       raise "Invalid file path: #{file}. Cannot contain '..'"
     end
 
+    # Not a valid git ref either (git check-ref-format), and the ref is a
+    # directory of the download cache path.
+    if ref.include?('..')
+      raise "Invalid ref: #{ref}. Cannot contain '..'"
+    end
+
     # Normalize paths (strip leading slashes)
     project = project.sub(%r{^/}, '')
     file = file.sub(%r{^/}, '')
 
     # Try local filesystem first
-    content = try_fetch_local_project_file(project, file)
+    content = try_fetch_local_project_file(project, file, include_spec['ref'])
     return content if content
 
-    # If not found locally, download from gitlab.com
-    @external_cache.fetch_project_file(project, file, ref: ref)
+    # Else the one GitLab instance this pipeline runs on (never a fan-out:
+    # a private project path must not reach unrelated hosts)
+    @external_cache.fetch_project_file(project, file, ref: ref, server_url: @server_url)
   rescue StandardError => e
     raise "Failed to fetch file '#{file}' from project '#{project}': #{e.message}"
   end
 
-  # Try to fetch project file from local filesystem
+  # Read a project file from a sibling checkout, ../<project>/<file> next to
+  # the project directory, if there is one: a local working copy of an
+  # included project (e.g. ci-templates being edited) wins over the network.
+  # It is the working tree, whatever is checked out there, so `ref:` is NOT
+  # honoured; a warning says so once per project. Honouring it (git show
+  # ref:file) would break that use, and fail for refs never fetched there.
   #
   # @param project [String] Project path
   # @param file [String] File path
-  # @return [String, nil] File content or nil if not found
-  def try_fetch_local_project_file(project, file)
-    # For local filesystem simulation, resolve project path
-    # Use parent directory of current project as base
+  # @param ref [String, nil] the include's ref:, for the warning only
+  # @return [String, nil] File content, nil when there is no such sibling
+  #   file (then the caller fetches it). A read error is raised, not nil:
+  #   it must not silently turn into a network request.
+  def try_fetch_local_project_file(project, file, ref)
     base_dir = @project_path ? File.dirname(File.expand_path(@project_path)) : File.expand_path('..')
     project_path = File.expand_path(File.join(base_dir, project))
-    base_dir_abs = File.expand_path(base_dir)
 
-    # Validate project path is within allowed directory
-    unless project_path.start_with?(base_dir_abs + File::SEPARATOR) || project_path == base_dir_abs
-      return nil # Invalid path, skip local lookup
-    end
-
-    # Check if project directory exists
+    # Callers reject '..'; this is the negative-space check that the
+    # sibling stays under base_dir anyway.
+    return nil unless project_path.start_with?(base_dir + File::SEPARATOR)
     return nil unless Dir.exist?(project_path)
 
     file_path = File.expand_path(File.join(project_path, file))
+    return nil unless file_path.start_with?(project_path + File::SEPARATOR)
+    return nil unless File.file?(file_path)
 
-    # Validate file path is within project directory
-    unless file_path.start_with?(project_path + File::SEPARATOR) || file_path == project_path
-      return nil # Invalid path, skip local lookup
+    if @projects_read_locally.add?(project)
+      warn "Warning: include:project '#{project}' read from the local checkout #{project_path}; " \
+           "ref #{ref ? "'#{ref}'" : '(default branch)'} is not honoured"
     end
-
-    # Check if file exists
-    return nil unless File.exist?(file_path)
-
     File.read(file_path)
-  rescue StandardError
-    # Any error in local lookup, return nil to try remote
-    nil
   end
 
   # Fetch a component include

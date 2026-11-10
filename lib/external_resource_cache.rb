@@ -23,7 +23,10 @@ require 'openssl'
 #
 # This class handles:
 # - GitLab CI templates from gitlab.com
-# - Project files from gitlab.com
+# - Project files from the one GitLab instance the caller names
+#   (CI_SERVER_URL); never from any other host, so a private project path
+#   is not sent elsewhere
+# - Components from the host their reference names
 # - Local caching in ext_tmp/
 # - Fallback mechanisms when local resources aren't available
 #
@@ -35,13 +38,6 @@ require 'openssl'
 class ExternalResourceCache
   # Base URL for GitLab.com
   GITLAB_COM_URL = 'https://gitlab.com'
-
-  # Known GitLab instances to try for project includes
-  KNOWN_GITLAB_INSTANCES = [
-    'https://gitlab.com',
-    'https://gitlab.gnome.org',
-    'https://gitlab.freedesktop.org'
-  ].freeze
 
   # GitLab repository that contains CI templates
   GITLAB_REPO = 'gitlab-org/gitlab'
@@ -95,26 +91,25 @@ class ExternalResourceCache
     download_template(template_name)
   end
 
-  # Fetch a file from another GitLab project
+  # Fetch a file from another project on the GitLab instance server_url
   #
   # Attempts to retrieve file in this order:
-  # 1. Local cache (ext_tmp/projects/)
-  # 2. Download from gitlab.com
+  # 1. Local cache (ext_tmp/projects/<instance>/)
+  # 2. Download from server_url, and only from there
   #
   # @param project [String] Project path (e.g., "gnome/citemplates")
   # @param file [String] File path within project
   # @param ref [String] Git ref (branch/tag/commit) to fetch from
+  # @param server_url [String] https:// URL of the GitLab instance
+  #   (PredefinedVariables.server_url)
   # @return [String] File content
   # @raise [RuntimeError] If file cannot be fetched
-  def fetch_project_file(project, file, ref: 'master')
-    # Strategy 1: Check local cache
-    cache_path = project_file_cache_path(project, file, ref)
-    if File.exist?(cache_path)
-      return File.read(cache_path)
-    end
+  def fetch_project_file(project, file, ref:, server_url:)
+    instance = parse_server_url(server_url)
+    cache_path = project_file_cache_path(instance, project, file, ref)
+    return File.read(cache_path) if File.exist?(cache_path)
 
-    # Strategy 2: Download from gitlab.com
-    download_project_file(project, file, ref)
+    download_project_file(instance, project, file, ref)
   end
 
   # Fetch a component from a GitLab instance
@@ -171,15 +166,33 @@ class ExternalResourceCache
     File.join(@cache_root, 'templates', template_name)
   end
 
-  # Get cache path for a project file
+  # The instance URL as a URI, https and a host required. Checked here, at
+  # fetch time, not when CI_SERVER_URL is set: a --variables CI_SERVER_URL
+  # that only feeds rules (say an http:// one) must not fail a pipeline
+  # that never fetches a project file.
   #
-  # @param project [String] Project path
-  # @param file [String] File path
-  # @param ref [String] Git ref
+  # @return [URI::HTTPS]
+  def parse_server_url(server_url)
+    uri = URI.parse(server_url.to_s)
+    unless uri.is_a?(URI::HTTPS) && uri.host && !uri.host.empty? && uri.userinfo.nil? && uri.query.nil? &&
+           uri.fragment.nil? && !uri.path.split('/').include?('..')
+      raise "include:project needs an https:// GitLab instance URL without credentials, query, fragment or '..'; " \
+            "CI_SERVER_URL is #{server_url.inspect}"
+    end
+
+    uri
+  rescue URI::InvalidURIError => e
+    raise "CI_SERVER_URL #{server_url.inspect} is not a URL: #{e.message}"
+  end
+
+  # Get cache path for a project file: per instance (the same project path
+  # on two instances is two projects), then project, ref, file.
+  #
+  # @param instance [URI::HTTPS] parse_server_url
   # @return [String] Full path to cached file
-  def project_file_cache_path(project, file, ref)
-    # Use ref in path to cache different versions
-    File.join(@cache_root, 'projects', project, ref, file)
+  def project_file_cache_path(instance, project, file, ref)
+    authority = instance.port == instance.default_port ? instance.host : "#{instance.host}:#{instance.port}"
+    File.join(@cache_root, 'projects', authority + instance.path.chomp('/'), project, ref, file)
   end
 
   # Get cache path for a component
@@ -211,45 +224,30 @@ class ExternalResourceCache
     content
   end
 
-  # Download a project file from GitLab instances
+  # Download a project file from one GitLab instance
   #
-  # Tries multiple known GitLab instances until one succeeds
-  #
-  # @param project [String] Project path
-  # @param file [String] File path
-  # @param ref [String] Git ref
+  # @param instance [URI::HTTPS] parse_server_url
   # @return [String] File content
-  # @raise [RuntimeError] If download fails from all instances
-  def download_project_file(project, file, ref)
-    errors = []
+  # @raise [RuntimeError] If download fails; names the instance and how it
+  #   was chosen
+  def download_project_file(instance, project, file, ref)
+    base_url = instance.to_s.chomp('/')
+    url = "#{base_url}/#{project}/-/raw/#{ref}/#{file}"
+    content = download_file(url, "project file: #{project}/#{file}@#{ref}")
 
-    # Try each known GitLab instance
-    KNOWN_GITLAB_INSTANCES.each do |base_url|
-      begin
-        url = "#{base_url}/#{project}/-/raw/#{ref}/#{file}"
-        content = download_file(url, "project file: #{project}/#{file}@#{ref}")
-
-        # Validate content is not HTML (fallback check for login redirects)
-        # Check both lowercase and uppercase HTML tags
-        if content.strip =~ /^<(!DOCTYPE|html|HTML)/i
-          raise "Response appears to be HTML (likely authentication required)"
-        end
-
-        # Save to cache
-        cache_path = project_file_cache_path(project, file, ref)
-        FileUtils.mkdir_p(File.dirname(cache_path))
-        File.write(cache_path, content)
-
-        return content
-      rescue StandardError => e
-        errors << "#{base_url}: #{e.message}"
-        # Continue to next instance
-      end
+    # Validate content is not HTML (fallback check for login redirects)
+    if content.strip =~ /^<(!DOCTYPE|html|HTML)/i
+      raise "Response appears to be HTML (likely authentication required)"
     end
 
-    # All instances failed
-    raise "Failed to download project file #{project}/#{file}@#{ref} from any known GitLab instance. Tried:\n" +
-          errors.map { |e| "  - #{e}" }.join("\n")
+    cache_path = project_file_cache_path(instance, project, file, ref)
+    FileUtils.mkdir_p(File.dirname(cache_path))
+    File.write(cache_path, content)
+
+    content
+  rescue StandardError => e
+    raise "Failed to download project file #{project}/#{file}@#{ref} from GitLab instance #{base_url} " \
+          "(--variables CI_SERVER_URL, else the origin remote's host, else gitlab.com): #{e.message}"
   end
 
   # Download a file via HTTPS

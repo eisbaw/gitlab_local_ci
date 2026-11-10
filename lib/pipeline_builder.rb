@@ -459,7 +459,8 @@ module PipelineBuilder
     IncludeProcessor.new(
       project_path: project_dir,
       gitlab_templates_path: gitlab_templates_path,
-      variables: variables
+      variables: variables,
+      server_url: PredefinedVariables.server_url(project_dir: project_dir, variables: variables)
     ).process_includes(config)
   end
 

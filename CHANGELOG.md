@@ -41,6 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A dry-run that cannot finish exits 1 and names the reason per job.
 
 ### Security
+- `include: project` requested a file not found next to the project from
+  gitlab.com, gitlab.gnome.org and gitlab.freedesktop.org in turn, sending
+  a private project path to unrelated hosts. It now asks one instance:
+  `--variables CI_SERVER_URL`, else the `origin` remote's host, else
+  gitlab.com. The download cache is now per instance
+  (`ext_tmp/projects/<host>/...`); files cached before are fetched again.
+  A repository whose `origin` is not a GitLab host needs
+  `--variables CI_SERVER_URL=...` for project includes.
+- `include: project` read from a sibling checkout now warns that `ref:` is
+  not honoured, and a read error there is reported instead of silently
+  falling back to the network. A `ref:` containing `..` is rejected.
 - `include: remote` checked only the first address a host resolved to, and
   only against IPv4 ranges: `https://localhost:9/` (resolving to `::1`) or an
   answer mixing a public and a private address got through. Every address

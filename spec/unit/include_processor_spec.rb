@@ -450,12 +450,36 @@ RSpec.describe IncludeProcessor do
         'group/lib/base.yml' => "variables: {V: base, ONLY_BASE: x}\nbuild: {script: [base]}\n",
         'group/lib/extra.yml' => "variables: {V: extra}\ntest: {script: [extra]}\n"
       ) do |processor|
-        result = processor.process_includes(
-          'include' => [{ 'project' => 'group/lib', 'ref' => 'v1', 'file' => ['/base.yml', 'extra.yml'] }]
-        )
+        result = nil
+        # TASK-75: the sibling working tree ignores ref:, and says so once
+        # per project, not once per file.
+        expect do
+          result = processor.process_includes(
+            'include' => [{ 'project' => 'group/lib', 'ref' => 'v1', 'file' => ['/base.yml', 'extra.yml'] }]
+          )
+        end.to output(%r{\AWarning: include:project 'group/lib' read from the local checkout \S+/group/lib; ref 'v1' is not honoured\n\z}).to_stderr
 
         expect(result['variables']).to eq('V' => 'extra', 'ONLY_BASE' => 'x')
         expect(result.keys).to eq(%w[variables build test])
+      end
+    end
+
+    it 'raises a read error of a sibling file instead of falling through to the network' do
+      skip 'root reads a mode-000 file' if Process.uid.zero?
+
+      in_layout('group/lib/ci.yml' => "x: {script: [x]}\n") do |processor|
+        File.chmod(0o000, File.join(File.dirname(processor.project_path), 'group/lib/ci.yml'))
+        expect_any_instance_of(ExternalResourceCache).not_to receive(:fetch_project_file)
+
+        expect { processor.process_includes('include' => [{ 'project' => 'group/lib', 'file' => 'ci.yml' }]) }
+          .to raise_error(/Permission denied/)
+      end
+    end
+
+    it 'rejects .. in a ref before looking anywhere' do
+      in_layout({}) do |processor|
+        expect { processor.process_includes('include' => [{ 'project' => 'group/lib', 'file' => 'a.yml', 'ref' => '../../x' }]) }
+          .to raise_error(/Invalid ref: \.\.\/\.\.\/x/)
       end
     end
 

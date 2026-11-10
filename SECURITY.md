@@ -52,13 +52,17 @@ verification.
   hosts. The fetch times out after 3 s (connect) / 5 s (read). With an
   `https_proxy` set, the proxy makes the connection, to the checked address.
 - `project`: read from `../<project>/<file>` next to the project directory
-  if that exists (`ref` is then ignored); otherwise requested from
-  gitlab.com, gitlab.gnome.org and gitlab.freedesktop.org in turn, so the
-  project path is sent to all three until one has it.
-- `component`: fetched from the component's host. `template`: read from the
-  `gitlab/` checkout, else fetched from gitlab.com.
+  if that exists (`ref` is then not honoured, and a warning says so);
+  otherwise requested from one GitLab instance only, and no other host:
+  `--variables CI_SERVER_URL` if set, else the host of the `origin` remote
+  (as `https://`; credentials in the remote URL are not used), else
+  gitlab.com. A failed fetch names that instance.
+- `component`: fetched from the host named in the component reference.
+  `template`: read from the `gitlab/` checkout, else fetched from
+  gitlab.com (templates are public).
 - `project`, `component` and `template` fetches time out after 10 s and are
-  cached in `ext_tmp/` in the working directory.
+  cached in `ext_tmp/` in the working directory, `project` files per
+  instance.
 
 YAML is loaded with a safe loader (no arbitrary Ruby objects), and include
 nesting stops at 150 levels. There is no telemetry.

@@ -109,32 +109,60 @@ RSpec.describe ExternalResourceCache do
     end
   end
 
+  # TASK-75: one instance, never a fan-out: a private project path must not
+  # reach hosts other than the instance the pipeline runs on.
   describe '#fetch_project_file' do
-    it 'tries each known GitLab instance in order and caches the first hit under project/ref/file' do
+    it 'asks only the given instance and caches under instance/project/ref/file' do
       responses['https://gitlab.gnome.org/GNOME/app/-/raw/main/ci/base.yml'] = ok("base: true\n")
 
-      content = cache.fetch_project_file('GNOME/app', 'ci/base.yml', ref: 'main')
-
-      expect(content).to eq("base: true\n")
-      expect(requested_urls).to eq(%w[
-        https://gitlab.com/GNOME/app/-/raw/main/ci/base.yml
-        https://gitlab.gnome.org/GNOME/app/-/raw/main/ci/base.yml
-      ])
-      expect(File.read(File.join(@dir, 'cache', 'projects', 'GNOME/app', 'main', 'ci/base.yml'))).to eq("base: true\n")
+      2.times do
+        content = cache.fetch_project_file('GNOME/app', 'ci/base.yml', ref: 'main', server_url: 'https://gitlab.gnome.org')
+        expect(content).to eq("base: true\n")
+      end
+      expect(requested_urls).to eq(%w[https://gitlab.gnome.org/GNOME/app/-/raw/main/ci/base.yml])
+      expect(File.read(File.join(@dir, 'cache', 'projects', 'gitlab.gnome.org', 'GNOME/app', 'main', 'ci/base.yml')))
+        .to eq("base: true\n")
     end
 
-    it 'names every instance it tried when none has the file' do
-      expect { cache.fetch_project_file('group/app', 'x.yml', ref: 'v1') }.to raise_error(RuntimeError) { |error|
-        expect(error.message).to start_with('Failed to download project file group/app/x.yml@v1 from any known GitLab instance')
-        described_class::KNOWN_GITLAB_INSTANCES.each { |base| expect(error.message).to include("  - #{base}: ") }
-      }
+    it 'keeps a non-default port and a relative URL root in the URL and the cache key' do
+      url = 'https://git.example.com:8443/gitlab/group/app/-/raw/v1/x.yml'
+      responses[url] = ok("x: 1\n")
+
+      cache.fetch_project_file('group/app', 'x.yml', ref: 'v1', server_url: 'https://git.example.com:8443/gitlab/')
+
+      expect(requested_urls).to eq([url])
+      expect(File.exist?(File.join(@dir, 'cache', 'projects', 'git.example.com:8443/gitlab', 'group/app', 'v1', 'x.yml'))).to be(true)
     end
 
-    it 'rejects an HTML body served as text/plain (sign-in page) and moves on' do
+    it 'does not serve one instance\'s cached file for the same path on another' do
+      responses['https://a.example/group/app/-/raw/v1/x.yml'] = ok("from: a\n")
+      responses['https://b.example/group/app/-/raw/v1/x.yml'] = ok("from: b\n")
+
+      expect(cache.fetch_project_file('group/app', 'x.yml', ref: 'v1', server_url: 'https://a.example')).to eq("from: a\n")
+      expect(cache.fetch_project_file('group/app', 'x.yml', ref: 'v1', server_url: 'https://b.example')).to eq("from: b\n")
+    end
+
+    it 'names the one instance it asked when the file is not there, and asks no other' do
+      expect { cache.fetch_project_file('group/app', 'x.yml', ref: 'v1', server_url: 'https://gitlab.example.com') }
+        .to raise_error(%r{group/app/x.yml@v1 from GitLab instance https://gitlab.example.com \(--variables CI_SERVER_URL.*HTTP 404})
+      expect(requested_urls).to eq(%w[https://gitlab.example.com/group/app/-/raw/v1/x.yml])
+    end
+
+    it 'rejects an HTML body served as text/plain (sign-in page) and caches nothing' do
       responses['https://gitlab.com/group/app/-/raw/v1/x.yml'] = ok("<!DOCTYPE html>\n<p>sign in</p>")
-      responses['https://gitlab.gnome.org/group/app/-/raw/v1/x.yml'] = ok("real: true\n")
 
-      expect(cache.fetch_project_file('group/app', 'x.yml', ref: 'v1')).to eq("real: true\n")
+      expect { cache.fetch_project_file('group/app', 'x.yml', ref: 'v1', server_url: 'https://gitlab.com') }
+        .to raise_error(/HTML/)
+      expect(Dir.glob(File.join(@dir, 'cache', 'projects', '**', 'x.yml'))).to be_empty
+    end
+
+    ['http://gitlab.example.com', 'https://user:pw@gitlab.example.com', 'https://gitlab.example.com/../x',
+     'gitlab.example.com', ''].each do |server_url|
+      it "refuses instance URL #{server_url.inspect} before any request" do
+        expect { cache.fetch_project_file('group/app', 'x.yml', ref: 'v1', server_url: server_url) }
+          .to raise_error(/CI_SERVER_URL/)
+        expect(requested_urls).to be_empty
+      end
     end
   end
 
