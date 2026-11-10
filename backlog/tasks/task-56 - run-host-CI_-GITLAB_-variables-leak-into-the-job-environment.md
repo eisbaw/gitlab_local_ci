@@ -1,11 +1,11 @@
 ---
 id: TASK-56
 title: 'run: host CI_*/GITLAB_* variables leak into the job environment'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T22:39:00Z'
-updated_date: '2026-11-10T10:29:00Z'
+updated_date: '2026-11-10T10:32:00Z'
 labels:
   - run
   - export-just
@@ -41,3 +41,9 @@ Default: jobs start from a minimal host base (PATH HOME USER LOGNAME SHELL LANG 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented as designed. lib/host_environment.rb owns BASE (one constant, per-entry rationale), the --pass-env parser and selection. run: Process.spawn(env, unsetenv_others: true) for both shells. export-just: recipe builds gitlab_ci_env=(env -i NAME=value...) at run time from exported variables of just's environment (declare -p check, ${!LC_@} for the prefix; no compgen: nixpkgs bash lacks it; no ${x@a}: bash 3.2), job variables appended (env assigns left to right, so they win); plain env under all. Mode is baked into the header and regenerate line. Rules never saw host env (grep ENV lib/: only include_processor, filed as TASK-78). Repeated --pass-env is an error rather than last-wins or merge, to avoid ambiguity. Specs: spec/unit/host_environment_spec.rb, --pass-env blocks in run_spec and export_just_spec, rejection rows in cli_arguments_spec; all 11 new integration examples red on the parent lib.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Jobs from run and export-just recipes now start from a minimal host base (PATH HOME USER LOGNAME SHELL LANG LC_* TERM TZ TMPDIR) plus their GitLab variables; --pass-env none|all|NAME,... tunes it (none default, all = old behaviour). Job variables win over host ones in every mode, --variables still win. export-just reads the names at recipe run time via env -i; the mode is baked into the file. Docs, --help, CHANGELOG (breaking) updated. just test 947/0/47 pending (main and detached worktree), e2e OK. Follow-up: TASK-78 (include expansion reads host CI_SERVER_*).
+<!-- SECTION:FINAL_SUMMARY:END -->
