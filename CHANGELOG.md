@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A dry-run that cannot finish exits 1 and names the reason per job.
 
 ### Security
+- A component reference with `..` in its project path
+  (`evil.example/a/../../../../tmp/pwn@v1`) read a `template.yml` from, and
+  wrote the downloaded one to, a path outside `ext_tmp/`. Every cache path
+  (templates, projects, components; read and write) is now built in one
+  place that refuses `..`, `.`, empty segments, NUL and backslashes and
+  asserts the result stays under the cache root.
 - `$CI_SERVER_URL`, `$CI_SERVER_HOST` and `$CI_SERVER_FQDN` in an include
   path were read from the tool's own environment, so running it inside a
   CI job on another instance changed which host a component was fetched

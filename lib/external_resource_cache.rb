@@ -73,6 +73,10 @@ class ExternalResourceCache
   # @return [String] Template content
   # @raise [RuntimeError] If template cannot be fetched
   def fetch_template(template_name, gitlab_templates_path: nil)
+    # First: its segment checks also keep the checkout lookup below inside
+    # gitlab_templates_path.
+    cache_path = template_cache_path(template_name)
+
     # Strategy 1: Check local gitlab submodule
     if gitlab_templates_path
       local_path = File.join(gitlab_templates_path, template_name)
@@ -82,7 +86,6 @@ class ExternalResourceCache
     end
 
     # Strategy 2: Check local cache
-    cache_path = template_cache_path(template_name)
     if File.exist?(cache_path)
       return File.read(cache_path)
     end
@@ -151,11 +154,41 @@ class ExternalResourceCache
 
   private
 
+  # The cache's top-level directories, one per kind of download.
+  CACHE_KINDS = %w[templates projects components].freeze
+
   # Ensure cache directories exist
   def ensure_cache_directories
-    FileUtils.mkdir_p(File.join(@cache_root, 'templates'))
-    FileUtils.mkdir_p(File.join(@cache_root, 'projects'))
-    FileUtils.mkdir_p(File.join(@cache_root, 'components'))
+    CACHE_KINDS.each { |kind| FileUtils.mkdir_p(File.join(@cache_root, kind)) }
+  end
+
+  # The one place a path under the cache root is built; every read and
+  # write of a cached file goes through it. Each part (host, project, ref
+  # or version, file) comes from the config or the server, so each '/'
+  # separated segment must be a plain name: not empty (also rules out an
+  # absolute or '//' part), '.', '..', and no NUL or backslash. Then the
+  # result must still lie under the root (negative-space assertion, in
+  # case a segment rule is ever loosened).
+  #
+  # @param kind [String] one of CACHE_KINDS
+  # @param parts [Array<String>] path parts, each may contain '/'
+  # @return [String]
+  # @raise [RuntimeError] a part that is no plain relative path
+  def cache_path(kind, *parts)
+    raise ArgumentError, "unknown cache kind #{kind.inspect}" unless CACHE_KINDS.include?(kind)
+
+    segments = parts.flat_map { |part| part.to_s.split('/', -1) }
+    bad = segments.find { |segment| segment.empty? || %w[. ..].include?(segment) || segment.match?(/[\0\\]/) }
+    if bad || segments.empty?
+      raise "Refusing cache path for #{parts.join(' ').inspect}: segment #{bad.inspect} " \
+            "(empty, '.', '..', NUL or backslash) would not be a plain name under #{@cache_root}"
+    end
+
+    path = File.join(@cache_root, kind, *segments)
+    root = File.expand_path(@cache_root) + File::SEPARATOR
+    raise "Refusing cache path #{path.inspect}: outside #{root}" unless File.expand_path(path).start_with?(root)
+
+    path
   end
 
   # Get cache path for a template
@@ -163,7 +196,7 @@ class ExternalResourceCache
   # @param template_name [String] Template name
   # @return [String] Full path to cached template
   def template_cache_path(template_name)
-    File.join(@cache_root, 'templates', template_name)
+    cache_path('templates', template_name)
   end
 
   # The instance URL as a URI, https and a host required. Checked here, at
@@ -192,7 +225,7 @@ class ExternalResourceCache
   # @return [String] Full path to cached file
   def project_file_cache_path(instance, project, file, ref)
     authority = instance.port == instance.default_port ? instance.host : "#{instance.host}:#{instance.port}"
-    File.join(@cache_root, 'projects', authority + instance.path.chomp('/'), project, ref, file)
+    cache_path('projects', authority + instance.path.chomp('/'), project, ref, file)
   end
 
   # Get cache path for a component
@@ -203,7 +236,7 @@ class ExternalResourceCache
   # @param version [String] Component version
   # @return [String] Full path to cached component
   def component_cache_path(fqdn, project, file, version)
-    File.join(@cache_root, 'components', fqdn, project, version, file)
+    cache_path('components', fqdn, project, version, file)
   end
 
   # Download a template from gitlab.com
@@ -212,12 +245,12 @@ class ExternalResourceCache
   # @return [String] Template content
   # @raise [RuntimeError] If download fails
   def download_template(template_name)
+    cache_path = template_cache_path(template_name)
     url = "#{GITLAB_COM_URL}/#{GITLAB_REPO}/-/raw/#{DEFAULT_BRANCH}/lib/gitlab/ci/templates/#{template_name}"
 
     content = download_file(url, "template: #{template_name}")
 
     # Save to cache
-    cache_path = template_cache_path(template_name)
     FileUtils.mkdir_p(File.dirname(cache_path))
     File.write(cache_path, content)
 
